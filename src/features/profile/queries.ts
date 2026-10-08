@@ -9,7 +9,7 @@ export type ProfileUpdate = Partial<
     Profile,
     | 'full_name' | 'avatar_url' | 'headline' | 'member_type' | 'branch' | 'join_year' | 'grad_year' | 'current_title'
     | 'current_company' | 'city' | 'country' | 'about' | 'linkedin_url' | 'website_url' | 'skills' | 'help_tags'
-    | 'interests' | 'onboarded'
+    | 'interests' | 'onboarded' | 'birth_day' | 'birth_month' | 'message_policy'
   >
 >
 

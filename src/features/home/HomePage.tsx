@@ -1,6 +1,7 @@
-import { ArrowRight, CalendarHeart, Camera, Search, Sparkles } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, Bell, CalendarHeart, Search, Send, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router'
+import { Link, Navigate } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
 import { Avatar, Card, PageSkeleton } from '../../components/ui/Display'
@@ -11,6 +12,10 @@ import type { Profile } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { useEvent, useMyRegistration } from '../events/queries'
 import { StatusBadge } from '../events/StatusBadge'
+import { supabase } from '../../lib/supabase'
+import { Composer } from '../community/Composer'
+import { FeedList } from '../community/FeedList'
+import { useGroups, useNotifications } from '../community/queries'
 
 function greeting() {
   const h = Number(new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()))
@@ -75,23 +80,30 @@ export function HomePage() {
   const { data: profile, isLoading } = useMyProfile()
   const { data: event } = useEvent(MEET_SLUG)
   const { data: mine } = useMyRegistration(event?.id)
+  const { data: groups } = useGroups()
 
   if (loading || (session && isLoading)) return <PageSkeleton />
   if (!session || !profile) return <Landing />
+  if (!profile.onboarded) return <Navigate to="/welcome?next=/" replace />
 
   const first = profile.full_name.split(' ')[0] || 'there'
   const comp = profileCompleteness(profile)
   const days = daysUntil(event?.starts_at ?? null)
   const reg = mine?.registration && mine.registration.status !== 'cancelled' ? mine.registration : null
 
+  const verified = profile.verification === 'verified' || profile.is_admin
   return (
-    <Page className="space-y-6 pt-[calc(env(safe-area-inset-top)+1.25rem)]">
+    <Page className="space-y-5 pt-[calc(env(safe-area-inset-top)+1.25rem)]">
       <header className="flex items-center gap-3">
         <Avatar src={profile.avatar_url} name={profile.full_name} size={48} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm text-muted">{greeting()},</p>
           <h1 className="truncate text-2xl font-bold tracking-tight">{first}</h1>
         </div>
+        <Link to="/people" aria-label="Find JECians" className="grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft">
+          <Search className="size-5" />
+        </Link>
+        <NotificationBell />
       </header>
 
       {event && (
@@ -131,11 +143,100 @@ export function HomePage() {
         </Card>
       )}
 
-      <section className="grid gap-3 sm:grid-cols-2">
-        <QuickAction to="/people" icon={<Search className="size-5" />} title="Find JECians" text="Search by name, batch, company or city" />
-        <QuickAction to="/me/import" icon={<LinkedInIcon />} title="Import from LinkedIn" text="Fill your profile in 30 seconds" />
-        <QuickAction to="/meet/photos" icon={<Camera className="size-5" />} title="Share old photos" text="For the “Then and Now” slideshow" />
-      </section>
+      {verified ? (
+        <>
+          <Spotlight />
+          <Birthdays />
+          <Composer groups={groups} />
+          <FeedList scope="home" />
+        </>
+      ) : (
+        <>
+          <Card className="p-4">
+            <p className="font-semibold">Unlock the JEC community</p>
+            <p className="mt-1 text-[15px] text-muted">
+              The feed, groups and messages are for verified JECians. You’re verified automatically when your Alumni Meet payment is confirmed, or when two verified members vouch for you (send them your invite link).
+            </p>
+          </Card>
+          <section className="grid gap-3 sm:grid-cols-2">
+            <QuickAction to="/me/import" icon={<LinkedInIcon />} title="Import from LinkedIn" text="Fill your profile in 30 seconds" />
+            <QuickAction to="/invite" icon={<Send className="size-5" />} title="Invite batchmates" text="They can vouch for you" />
+          </section>
+        </>
+      )}
     </Page>
+  )
+}
+
+function NotificationBell() {
+  const { data } = useNotifications()
+  const unread = data?.filter((n) => !n.read_at).length ?? 0
+  return (
+    <Link to="/notifications" aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'} className="relative grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft">
+      <Bell className="size-5" />
+      {unread > 0 && <span className="absolute right-1.5 top-1.5 min-w-4.5 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4.5 text-white">{unread > 9 ? '9+' : unread}</span>}
+    </Link>
+  )
+}
+
+function Birthdays() {
+  const { data } = useQuery({
+    queryKey: ['birthdays'],
+    staleTime: 60 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('upcoming_birthdays')
+      if (error) throw error
+      return data as { id: string; full_name: string; avatar_url: string | null; days_away: number }[]
+    },
+  })
+  if (!data?.length) return null
+  return (
+    <Card className="p-4">
+      <p className="font-semibold">🎂 Birthdays</p>
+      <ul className="mt-3 flex gap-4 overflow-x-auto pb-1">
+        {data.map((b) => (
+          <li key={b.id} className="w-20 shrink-0 text-center">
+            <Link to={`/people/${b.id}`} className="block">
+              <Avatar src={b.avatar_url} name={b.full_name} size={56} className="mx-auto" />
+              <p className="mt-1 truncate text-sm font-semibold">{b.full_name.split(' ')[0]}</p>
+              <p className="text-xs text-muted">{b.days_away === 0 ? 'Today!' : b.days_away === 1 ? 'Tomorrow' : `In ${b.days_away} days`}</p>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function Spotlight() {
+  const { data } = useQuery({
+    queryKey: ['spotlight'],
+    staleTime: 60 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('spotlights')
+        .select('id, headline, story, starts_on, profile:profiles(id, full_name, avatar_url, grad_year, branch)')
+        .lte('starts_on', new Date().toISOString().slice(0, 10))
+        .order('starts_on', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return data as unknown as { id: string; headline: string; story: string | null; profile: { id: string; full_name: string; avatar_url: string | null; grad_year: number | null; branch: string | null } } | null
+    },
+  })
+  if (!data) return null
+  return (
+    <Link to={`/people/${data.profile.id}`} className="block rounded-2xl border border-accent/40 bg-accent-soft p-4">
+      <p className="text-xs font-bold uppercase tracking-wider text-warning">⭐ JECian of the Week</p>
+      <div className="mt-2 flex items-center gap-3">
+        <Avatar src={data.profile.avatar_url} name={data.profile.full_name} size={52} />
+        <div className="min-w-0">
+          <p className="font-bold">{data.profile.full_name}</p>
+          <p className="text-sm text-muted">{[data.profile.branch, data.profile.grad_year].filter(Boolean).join(' ')}</p>
+        </div>
+      </div>
+      <p className="mt-2 text-[15px] font-semibold">{data.headline}</p>
+      {data.story && <p className="mt-1 line-clamp-3 text-sm text-muted">{data.story}</p>}
+    </Link>
   )
 }

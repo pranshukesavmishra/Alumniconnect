@@ -1,5 +1,5 @@
 import { BadgeCheck, Briefcase, GraduationCap, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
@@ -9,6 +9,8 @@ import { formatDate } from '../../lib/format'
 import type { Education, Experience } from '../../lib/types'
 import { signOut, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useMember } from './queries'
+import { BadgesRow, ProfileActions } from '../community/ProfileActions'
+import { useIsOrganiser } from '../../components/layout/AppShell'
 
 function period(e: Experience) {
   const from = e.start_date ? formatDate(e.start_date, { month: 'short', year: 'numeric' }) : ''
@@ -55,6 +57,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const { data, isLoading, error } = useMember(id)
   const { data: me } = useMyProfile()
   const navigate = useNavigate()
+  const organiser = useIsOrganiser()
 
   if (isLoading) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
@@ -106,6 +109,9 @@ export function ProfilePage({ self }: { self?: boolean }) {
                 </ButtonLink>
               </>
             ) : (
+              <ProfileActions profile={p} />
+            )}
+            {!isMe && (
               p.linkedin_url && (
                 <a
                   href={p.linkedin_url}
@@ -119,6 +125,28 @@ export function ProfilePage({ self }: { self?: boolean }) {
             )}
           </div>
         </section>
+
+        <BadgesRow memberId={p.id} />
+
+        {isMe && (
+          <nav className="grid gap-2 sm:grid-cols-2" aria-label="Shortcuts">
+            {[
+              { to: '/me/connections', label: 'Connections', hint: 'Requests and your network', icon: '🤝' },
+              { to: '/invite', label: 'Invite friends', hint: 'Bring your batch in', icon: '💌' },
+              { to: '/people', label: 'Find JECians', hint: 'Search the directory', icon: '🔎' },
+              { to: '/notifications', label: 'Notifications', hint: 'Likes, comments, requests', icon: '🔔' },
+              ...(organiser ? [{ to: '/admin', label: 'Organise', hint: 'Events, payments, members', icon: '🛡️' }] : []),
+            ].map((l) => (
+              <Link key={l.to} to={l.to} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
+                <span className="text-2xl" aria-hidden>{l.icon}</span>
+                <span className="min-w-0">
+                  <span className="block font-semibold">{l.label}</span>
+                  <span className="block truncate text-sm text-muted">{l.hint}</span>
+                </span>
+              </Link>
+            ))}
+          </nav>
+        )}
 
         {isMe && p.verification !== 'verified' && (
           <Notice tone="info" title="Your profile isn’t verified yet">

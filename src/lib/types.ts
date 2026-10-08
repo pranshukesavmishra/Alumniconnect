@@ -28,6 +28,11 @@ export interface Profile {
   help_tags: string[]
   interests: string[]
   onboarded: boolean
+  birth_day: number | null
+  birth_month: number | null
+  invite_code: string
+  invited_by: string | null
+  message_policy: 'jec' | 'batch_and_connections' | 'connections'
   verification: VerificationStatus
   is_admin: boolean
   created_at: string

@@ -1,9 +1,10 @@
 import clsx from 'clsx'
-import { CalendarHeart, Home, ShieldCheck, UserRound, Users } from 'lucide-react'
+import { CalendarHeart, Home, MessagesSquare, ShieldCheck, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
 import { useMyStaffEvents } from '../../features/events/queries'
+import { useConversations } from '../../features/chat/queries'
 import { Avatar } from '../ui/Display'
 
 interface Tab {
@@ -14,21 +15,30 @@ interface Tab {
 }
 
 function useTabs(): Tab[] {
-  const { data: profile } = useMyProfile()
-  const { data: staff } = useMyStaffEvents()
   const tabs: Tab[] = [
     { to: '/', label: 'Home', icon: Home, end: true },
+    { to: '/groups', label: 'Groups', icon: Users },
     { to: '/meet', label: 'Meet 2026', icon: CalendarHeart },
-    { to: '/people', label: 'People', icon: Users },
-    { to: '/me', label: 'Profile', icon: UserRound },
+    { to: '/chat', label: 'Chat', icon: MessagesSquare },
+    { to: '/me', label: 'Me', icon: UserRound },
   ]
-  if (profile?.is_admin || (staff && staff.length > 0)) tabs.push({ to: '/admin', label: 'Organise', icon: ShieldCheck })
   return tabs
+}
+
+/** Organisers get an extra entry: in the sidebar on desktop, on the Me page on phones (5 tabs max). */
+export function useIsOrganiser() {
+  const { data: profile } = useMyProfile()
+  const { data: staff } = useMyStaffEvents()
+  return !!profile?.is_admin || !!staff?.length
 }
 
 export function AppShell() {
   const tabs = useTabs()
   const { data: profile } = useMyProfile()
+  const organiser = useIsOrganiser()
+  const { data: convs } = useConversations()
+  const unread = convs?.filter((c) => c.unread).length ?? 0
+  const desktopTabs = organiser ? [...tabs, { to: '/admin', label: 'Organise', icon: ShieldCheck } as Tab] : tabs
   return (
     <div className="min-h-dvh md:flex">
       {/* desktop sidebar */}
@@ -38,7 +48,7 @@ export function AppShell() {
           <span className="font-bold leading-tight">JEC Alumni Connect</span>
         </Link>
         <nav className="space-y-1" aria-label="Main">
-          {tabs.map((t) => (
+          {desktopTabs.map((t) => (
             <NavLink
               key={t.to}
               to={t.to}
@@ -52,6 +62,7 @@ export function AppShell() {
             >
               <t.icon className="size-5" aria-hidden />
               {t.label}
+              {t.to === '/chat' && unread > 0 && <span className="ml-auto rounded-full bg-danger px-2 text-xs font-bold text-white">{unread}</span>}
             </NavLink>
           ))}
         </nav>
@@ -87,8 +98,13 @@ export function AppShell() {
               >
                 {({ isActive }) => (
                   <>
-                    <span className={clsx('grid h-7 w-12 place-items-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>
+                    <span className={clsx('relative grid h-7 w-12 place-items-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>
                       <t.icon className="size-5" aria-hidden />
+                      {t.to === '/chat' && unread > 0 && (
+                        <span className="absolute -right-0.5 -top-1 min-w-4.5 rounded-full bg-danger px-1 text-[10px] font-bold leading-4.5 text-white" aria-label={`${unread} unread`}>
+                          {unread > 9 ? '9+' : unread}
+                        </span>
+                      )}
                     </span>
                     {t.label}
                   </>

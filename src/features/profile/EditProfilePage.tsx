@@ -47,6 +47,9 @@ export function EditProfilePage() {
         linkedin_url: profile.linkedin_url ?? '',
         website_url: profile.website_url ?? '',
         phone: priv.phone ?? '',
+        birth_day: profile.birth_day ? String(profile.birth_day) : '',
+        birth_month: profile.birth_month ? String(profile.birth_month) : '',
+        message_policy: profile.message_policy ?? 'jec',
       })
       setHelpTags(profile.help_tags)
       setSkills(profile.skills)
@@ -104,6 +107,9 @@ export function EditProfilePage() {
           website_url: website,
           help_tags: helpTags,
           skills,
+          birth_day: f.birth_day ? Number(f.birth_day) : null,
+          birth_month: f.birth_month ? Number(f.birth_month) : null,
+          message_policy: (f.message_policy || 'jec') as 'jec',
         },
         phone: n(f.phone),
       })
@@ -258,6 +264,37 @@ export function EditProfilePage() {
                   ))}
                 </div>
               )}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <SectionTitle>Privacy and birthday</SectionTitle>
+            <Field label="Who can message me">
+              {(p) => (
+                <Select {...p} value={f.message_policy} onChange={set('message_policy')}>
+                  <option value="jec">Any verified JECian (messages from strangers arrive as requests)</option>
+                  <option value="batch_and_connections">My batchmates and connections</option>
+                  <option value="connections">Only my connections</option>
+                </Select>
+              )}
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Birthday: day" optional hint="Only the day and month. Shown to your batch and connections.">
+                {(p) => (
+                  <Select {...p} value={f.birth_day} onChange={set('birth_day')}>
+                    <option value="">—</option>
+                    {Array.from({ length: 31 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}
+                  </Select>
+                )}
+              </Field>
+              <Field label="Month" optional>
+                {(p) => (
+                  <Select {...p} value={f.birth_month} onChange={set('birth_month')}>
+                    <option value="">—</option>
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </Select>
+                )}
+              </Field>
             </div>
           </section>
 

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
@@ -8,7 +8,7 @@ import { MeetPage } from './features/events/MeetPage'
 import { HomePage } from './features/home/HomePage'
 import { InstallPage, NotFoundPage, PrivacyPage, TermsPage } from './features/home/StaticPages'
 import { WelcomePage } from './features/onboarding/WelcomePage'
-import { isConfigured } from './lib/supabase'
+import { isConfigured, supabase } from './lib/supabase'
 
 // Less-used screens load on demand to keep the first load small on mobile data.
 const RegisterPage = lazy(() => import('./features/events/RegisterPage').then((m) => ({ default: m.RegisterPage })))
@@ -22,6 +22,13 @@ const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({
 const AdminEventPage = lazy(() => import('./features/admin/AdminEventPage').then((m) => ({ default: m.AdminEventPage })))
 const AdminMembers = lazy(() => import('./features/admin/AdminMembers').then((m) => ({ default: m.AdminMembers })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
+const GroupsPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupsPage })))
+const GroupPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupPage })))
+const NotificationsPage = lazy(() => import('./features/community/NotificationsPage').then((m) => ({ default: m.NotificationsPage })))
+const ConnectionsPage = lazy(() => import('./features/community/ConnectionsPage').then((m) => ({ default: m.ConnectionsPage })))
+const InvitePage = lazy(() => import('./features/community/InvitePage').then((m) => ({ default: m.InvitePage })))
+const ChatListPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatListPage })))
+const ChatThreadPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatThreadPage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -32,9 +39,45 @@ if (typeof window !== 'undefined') {
     void import('./features/profile/ProfilePage')
     void import('./features/directory/DirectoryPage')
     void import('./features/events/PhotosPage')
+    void import('./features/community/GroupsPage')
+    void import('./features/chat/ChatPages')
   }
   const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback
   window.addEventListener('load', () => (idle ? idle(warm) : setTimeout(warm, 1500)), { once: true })
+}
+
+// Arrived through an invite link (?invite=CODE): remember it until the new member has signed up.
+if (typeof window !== 'undefined') {
+  const code = new URLSearchParams(window.location.search).get('invite')
+  if (code && /^[A-Z0-9]{6,12}$/i.test(code)) {
+    try {
+      localStorage.setItem('invite-code', code.toUpperCase())
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function ClaimInvite() {
+  const { data: profile } = useMyProfile()
+  useEffect(() => {
+    if (!profile?.onboarded) return
+    let code: string | null = null
+    try {
+      code = localStorage.getItem('invite-code')
+    } catch {
+      return
+    }
+    if (!code) return
+    void supabase.rpc('claim_invite', { p_code: code }).then(() => {
+      try {
+        localStorage.removeItem('invite-code')
+      } catch {
+        /* ignore */
+      }
+    })
+  }, [profile?.onboarded])
+  return null
 }
 
 /** Signed in, and the quick profile is done. */
@@ -74,6 +117,7 @@ export function App() {
   const m = (el: ReactNode) => <RequireMember>{el}</RequireMember>
   return (
     <BrowserRouter>
+      <ClaimInvite />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />
@@ -85,6 +129,13 @@ export function App() {
             <Route path="meet/register" element={m(<RegisterPage />)} />
             <Route path="meet/my" element={m(<MyRegistrationPage />)} />
             <Route path="meet/photos" element={m(<PhotosPage />)} />
+            <Route path="groups" element={m(<GroupsPage />)} />
+            <Route path="groups/:slug" element={m(<GroupPage />)} />
+            <Route path="chat" element={m(<ChatListPage />)} />
+            <Route path="chat/:id" element={m(<ChatThreadPage />)} />
+            <Route path="notifications" element={m(<NotificationsPage />)} />
+            <Route path="me/connections" element={m(<ConnectionsPage />)} />
+            <Route path="invite" element={m(<InvitePage />)} />
             <Route path="people" element={m(<DirectoryPage />)} />
             <Route path="people/:id" element={m(<ProfilePage />)} />
             <Route path="me" element={m(<ProfilePage self />)} />
