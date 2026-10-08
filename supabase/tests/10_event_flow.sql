@@ -11,7 +11,7 @@ $$;
 
 -- Three members: Asha (alumna), Bharat (alumnus), Chitra (admin / treasurer), Dev (check-in volunteer)
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('00000000-0000-0000-0000-00000000000a', 'asha@example.com', '{"full_name": "Asha Rao", "picture": "https://x/a.jpg"}'),
+  ('00000000-0000-0000-0000-00000000000a', 'asha@example.com', '{"accept_terms": true, "full_name": "Asha Rao", "picture": "https://x/a.jpg"}'),
   ('00000000-0000-0000-0000-00000000000b', 'bharat@example.com', '{"name": "Bharat Jain"}'),
   ('00000000-0000-0000-0000-00000000000c', 'chitra@example.com', '{"given_name": "Chitra", "family_name": "Sen"}'),
   ('00000000-0000-0000-0000-00000000000d', 'dev@example.com', '{}');
@@ -41,7 +41,7 @@ do $$
 declare r public.event_registrations;
 begin
   r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1',
-    '{"full_name": "Asha Rao", "phone": "+91 98765 43210", "grad_year": "2005", "branch": "CSE", "food_pref": "veg", "tshirt_size": "M", "guests": [{"name": "Kid 1"}, {"name": "Kid 2"}]}',
+    '{"accept_terms": true, "full_name": "Asha Rao", "phone": "+91 98765 43210", "grad_year": "2005", "branch": "CSE", "food_pref": "veg", "tshirt_size": "M", "guests": [{"name": "Kid 1"}, {"name": "Kid 2"}]}',
     '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f3", "quantity": 2}]');
   assert r.amount_paise = 350000, 'server computes amount: ' || r.amount_paise;
   assert r.headcount = 3, 'headcount';
@@ -51,7 +51,7 @@ begin
 
   -- updating again replaces the selection rather than adding to it
   r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1',
-    '{"full_name": "Asha Rao", "phone": "+91 98765 43210"}',
+    '{"accept_terms": true, "full_name": "Asha Rao", "phone": "+91 98765 43210"}',
     '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f2", "quantity": 1}]');
   assert r.amount_paise = 400000 and r.headcount = 2, 'update replaces items';
   assert (select count(*) from public.event_registrations) = 1, 'one registration per member';
@@ -60,17 +60,17 @@ end $$;
 -- Rejected inputs
 do $$ begin
   begin
-    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "A", "phone": "+91 9876543210"}',
+    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "A", "phone": "+91 9876543210"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f2", "quantity": 1}]');
     assert false, 'must require one main ticket';
   exception when raise_exception then null; end;
   begin
-    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "A", "phone": "+91 9876543210"}',
+    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "A", "phone": "+91 9876543210"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f3", "quantity": 9}]');
     assert false, 'must enforce max per registration';
   exception when raise_exception then null; end;
   begin
-    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "A", "phone": "12"}',
+    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "A", "phone": "12"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}]');
     assert false, 'must validate phone';
   exception when raise_exception then null; end;
@@ -78,8 +78,11 @@ end $$;
 
 -- Tampering: members cannot write registrations or payments directly, or make themselves admin
 do $$ begin
-  update public.event_registrations set amount_paise = 0, status = 'confirmed';
-  assert (select amount_paise from public.event_registrations limit 1) = 400000, 'direct update must not change amount';
+  begin
+    update public.event_registrations set amount_paise = 0, status = 'confirmed';
+    assert false, 'direct update must fail';
+  exception when insufficient_privilege then null; end;
+  assert (select amount_paise from public.event_registrations limit 1) = 400000, 'amount unchanged';
   begin
     insert into public.event_payments (registration_id, amount_paise, status)
       select id, 400000, 'verified' from public.event_registrations;
@@ -111,12 +114,12 @@ begin
   assert p.amount_paise = 400000 and p.utr = '123456789012' and p.status = 'submitted', 'payment row';
   assert (select status from public.event_registrations limit 1) = 'under_review', 'under review after payment';
   begin
-    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "Asha Rao", "phone": "+91 98765 43210"}',
+    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "Asha Rao", "phone": "+91 98765 43210"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}]');
     assert false, 'tickets locked after payment';
   exception when raise_exception then null; end;
   -- details (not tickets) can still change
-  perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "Asha Rao", "phone": "+91 98765 43210", "food_pref": "jain"}',
+  perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "Asha Rao", "phone": "+91 98765 43210", "food_pref": "jain"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f2", "quantity": 1}]');
   assert (select food_pref from public.event_registrations limit 1) = 'jain', 'details editable';
   begin
@@ -135,8 +138,8 @@ begin
   assert (select count(*) from public.event_registrations) = 0, 'cannot see others registrations';
   assert (select count(*) from public.event_payments) = 0, 'cannot see others payments';
   assert (select count(*) from public.profile_private) = 1, 'sees only own private row';
-  assert (select count(*) from public.profiles) = 4, 'profiles are visible to members';
-  r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "Bharat Jain", "phone": "9876500000"}',
+  assert (select count(*) from public.profiles) = 1, 'unverified members only see themselves';
+  r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "Bharat Jain", "phone": "9876500000"}',
     '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f2", "quantity": 1}]');
   begin
     perform public.submit_upi_payment(r.id, '123456789012', null, null);
@@ -144,7 +147,7 @@ begin
   exception when raise_exception then null; end;
   begin
     -- capacity is 5: Asha's 2 (under review) + 2 here is fine, 4 more is not
-    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "Bharat Jain", "phone": "9876500000"}',
+    perform public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "Bharat Jain", "phone": "9876500000"}',
       '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f2", "quantity": 1}, {"ticket_type_id": "00000000-0000-0000-0000-0000000000f3", "quantity": 2}]');
     assert false, 'capacity must be enforced';
   exception when raise_exception then null; end;
@@ -154,12 +157,16 @@ end $$;
 reset role;
 
 -- ---------------------------------------------------------------- Dev (volunteer) can check in but not verify payments
+create temp table t_ids as select id as pay_id from public.event_payments limit 1;
+grant select on t_ids to authenticated;
 select pg_temp.login('00000000-0000-0000-0000-00000000000d');
 set local role authenticated;
 do $$ begin
   assert (select count(*) from public.event_registrations) = 2, 'volunteer sees registrations';
+  assert (select count(*) from public.event_payments) = 0, 'volunteer cannot see payments';
+  assert (select count(*) from public.event_registration_items) = 0, 'volunteer cannot see items';
   begin
-    perform public.review_payment((select id from public.event_payments limit 1), true, null);
+    perform public.review_payment((select pay_id from t_ids), true, null);
     assert false, 'volunteer cannot verify';
   exception when insufficient_privilege then null; end;
   -- not yet confirmed: check-in does not mark arrival
@@ -176,6 +183,11 @@ declare r public.event_registrations;
 begin
   r := public.review_payment((select id from public.event_payments limit 1), true, 'Matched bank statement');
   assert r.status = 'confirmed', 'confirmed after verification';
+  assert (select verification from public.profiles where id = r.user_id) = 'verified', 'paying member becomes verified';
+  begin
+    perform public.review_payment((select id from public.event_payments limit 1), false, 'oops');
+    assert false, 'cannot review twice';
+  exception when raise_exception then null; end;
   assert (select reviewed_by from public.event_payments limit 1) = auth.uid(), 'audit trail';
 end $$;
 reset role;
@@ -201,7 +213,7 @@ do $$
 declare r public.event_registrations; p public.event_payments;
 begin
   update public.event_ticket_types set price_paise = 0 where id = '00000000-0000-0000-0000-0000000000f1';
-  r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"full_name": "Chitra Sen", "phone": "9000000000"}',
+  r := public.upsert_registration('00000000-0000-0000-0000-0000000000e1', '{"accept_terms": true, "full_name": "Chitra Sen", "phone": "9000000000"}',
     '[{"ticket_type_id": "00000000-0000-0000-0000-0000000000f1", "quantity": 1}]');
   assert r.status = 'confirmed' and r.amount_paise = 0, 'free registration auto-confirms';
 end $$;

@@ -85,6 +85,17 @@ as $$
   select coalesce((select p.is_admin from public.profiles p where p.id = auth.uid()), false);
 $$;
 
+-- Verified JEC members (and admins) can see the member directory; others only see themselves.
+create or replace function public.is_verified()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce((select p.verification = 'verified' or p.is_admin from public.profiles p where p.id = auth.uid()), false);
+$$;
+
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
@@ -133,8 +144,8 @@ alter table public.profile_private enable row level security;
 alter table public.experiences enable row level security;
 alter table public.educations enable row level security;
 
-create policy "members can read profiles" on public.profiles
-  for select to authenticated using (true);
+create policy "verified members can read profiles" on public.profiles
+  for select to authenticated using (id = auth.uid() or public.is_verified());
 create policy "members update own profile" on public.profiles
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 create policy "admins update any profile" on public.profiles
@@ -152,13 +163,13 @@ create policy "own private details" on public.profile_private
 create policy "update own private details" on public.profile_private
   for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
 
-create policy "members can read experiences" on public.experiences
-  for select to authenticated using (true);
+create policy "verified members can read experiences" on public.experiences
+  for select to authenticated using (profile_id = auth.uid() or public.is_verified());
 create policy "manage own experiences" on public.experiences
   for all to authenticated using (profile_id = auth.uid()) with check (profile_id = auth.uid());
 
-create policy "members can read educations" on public.educations
-  for select to authenticated using (true);
+create policy "verified members can read educations" on public.educations
+  for select to authenticated using (profile_id = auth.uid() or public.is_verified());
 create policy "manage own educations" on public.educations
   for all to authenticated using (profile_id = auth.uid()) with check (profile_id = auth.uid());
 

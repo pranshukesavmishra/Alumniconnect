@@ -1,5 +1,6 @@
--- Local development / staging sample data. NOT used in production: the real event is created by
--- admins in the app (Event settings) once the committee confirms the details.
+-- Local development / staging sample data. NEVER run against production: the real event is created by
+-- admins in the app (Event settings) once the committee confirms the details. Payment details are
+-- deliberately fake so nobody can pay a real account from a test build.
 insert into public.events (slug, title, tagline, description, venue, venue_map_url, starts_at, ends_at,
                            registration_closes_at, eligible_from_year, eligible_to_year, upi_id, upi_payee_name,
                            payment_note, contact_phone, contact_email, is_published)
@@ -15,8 +16,8 @@ values (
   '2026-12-27 18:00+05:30',
   '2026-12-10 23:59+05:30',
   2001, 2010,
-  'sample-upi@okaxis',
-  'JEC Alumni Association (sample)',
+  'sample.do-not-pay@upi',
+  'SAMPLE - DO NOT PAY',
   'Pay the exact amount shown. Keep the 12-digit UPI reference (UTR) from your payment app.',
   '+91 90000 00000',
   'alumni@example.com',

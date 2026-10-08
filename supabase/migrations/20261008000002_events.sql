@@ -57,8 +57,9 @@ create table public.event_staff (
 
 create table public.event_registrations (
   id uuid primary key default gen_random_uuid(),
-  event_id uuid not null references public.events (id) on delete cascade,
-  user_id uuid not null references public.profiles (id) on delete cascade,
+  -- restrict: financial records must never disappear with an account or event
+  event_id uuid not null references public.events (id) on delete restrict,
+  user_id uuid not null references public.profiles (id) on delete restrict,
   code text not null unique,
   status public.registration_status not null default 'pending_payment',
   full_name text not null,
@@ -73,11 +74,13 @@ create table public.event_registrations (
   arrival_note text check (char_length(arrival_note) <= 300),
   guests jsonb not null default '[]'::jsonb,
   notes text check (char_length(notes) <= 1000),
+  terms_accepted_at timestamptz,
+  photo_consent boolean not null default true,
   headcount int not null default 1,
   amount_paise int not null default 0,
   admin_note text,
   checked_in_at timestamptz,
-  checked_in_by uuid references public.profiles (id),
+  checked_in_by uuid references public.profiles (id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (event_id, user_id)
@@ -105,12 +108,12 @@ create table public.event_payments (
   proof_path text,
   status public.payment_status not null default 'submitted',
   review_note text check (char_length(review_note) <= 500),
-  reviewed_by uuid references public.profiles (id),
+  reviewed_by uuid references public.profiles (id) on delete set null,
   reviewed_at timestamptz,
   created_at timestamptz not null default now()
 );
 create index event_payments_registration_idx on public.event_payments (registration_id);
--- A UPI reference can only be claimed once (unless that claim was rejected).
+-- A UPI reference can only be claimed once (submit_upi_payment also stops reuse of rejected ones).
 create unique index event_payments_utr_unique on public.event_payments (utr)
   where utr is not null and status <> 'rejected';
 
@@ -126,7 +129,8 @@ create table public.event_photos (
   kind text not null default 'event' check (kind in ('event', 'throwback')),
   drive_file_id text,
   is_hidden boolean not null default false,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  check (storage_path like uploaded_by::text || '/%' and thumb_path like uploaded_by::text || '/%')
 );
 create index event_photos_event_idx on public.event_photos (event_id, created_at desc);
 
@@ -212,15 +216,16 @@ create policy "admins manage staff" on public.event_staff
 create policy "own registration or staff" on public.event_registrations
   for select to authenticated using (user_id = auth.uid() or public.is_event_staff(event_id));
 
-create policy "own items or staff" on public.event_registration_items
+-- Check-in volunteers see registrations (names, headcount) but not tickets bought or payments.
+create policy "own items or managers" on public.event_registration_items
   for select to authenticated using (exists (
     select 1 from public.event_registrations r
-     where r.id = registration_id and (r.user_id = auth.uid() or public.is_event_staff(r.event_id))));
+     where r.id = registration_id and (r.user_id = auth.uid() or public.is_event_manager(r.event_id))));
 
-create policy "own payments or staff" on public.event_payments
+create policy "own payments or managers" on public.event_payments
   for select to authenticated using (exists (
     select 1 from public.event_registrations r
-     where r.id = registration_id and (r.user_id = auth.uid() or public.is_event_staff(r.event_id))));
+     where r.id = registration_id and (r.user_id = auth.uid() or public.is_event_manager(r.event_id))));
 
 create policy "members see visible photos" on public.event_photos
   for select to authenticated using (not is_hidden or uploaded_by = auth.uid() or public.is_event_staff(event_id));
@@ -231,14 +236,47 @@ create policy "members add photos" on public.event_photos
     and (select count(*) from public.event_photos p where p.event_id = event_photos.event_id
            and p.uploaded_by = auth.uid()) < 300
   );
-create policy "owners edit captions, staff moderate" on public.event_photos
-  for update to authenticated using (uploaded_by = auth.uid() or public.is_event_manager(event_id))
-  with check (uploaded_by = auth.uid() or public.is_event_manager(event_id));
+create policy "owners edit captions" on public.event_photos
+  for update to authenticated using (uploaded_by = auth.uid()) with check (uploaded_by = auth.uid());
 create policy "owners or staff delete photos" on public.event_photos
   for delete to authenticated using (uploaded_by = auth.uid() or public.is_event_manager(event_id));
 
-revoke update on public.event_photos from authenticated, anon;
-grant update (caption, is_hidden, drive_file_id) on public.event_photos to authenticated;
+
+-- ------------------------------------------------------------------ internal helpers
+-- Serialises everything that can change an event's headcount (one lock per event) and checks
+-- the capacity. Counts registrations that are paid-and-waiting or confirmed, excluding p_exclude.
+create or replace function public._assert_capacity(p_event uuid, p_exclude uuid, p_heads int)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  cap int;
+  taken int;
+begin
+  select capacity into cap from public.events where id = p_event for update;
+  if cap is null then
+    return;
+  end if;
+  select coalesce(sum(r.headcount), 0) into taken from public.event_registrations r
+   where r.event_id = p_event and r.status in ('under_review', 'confirmed')
+     and r.id is distinct from p_exclude;
+  if taken + p_heads > cap then
+    raise exception 'Sorry, the event is full';
+  end if;
+end;
+$$;
+
+-- A paid, treasurer-verified registration also verifies the member's JEC profile.
+create or replace function public._verify_member_from_payment(p_user uuid)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.profiles set verification = 'verified' where id = p_user and verification = 'pending';
+$$;
 
 -- ------------------------------------------------------------------ member actions
 -- Create or update my registration. p_details: attendee fields; p_items: [{ticket_type_id, quantity}].
@@ -257,7 +295,8 @@ declare
   heads int := 0;
   primaries int := 0;
   v_guests jsonb := coalesce(p_details -> 'guests', '[]'::jsonb);
-  taken int;
+  v_locked boolean;
+  v_year int;
 begin
   if auth.uid() is null then
     raise exception 'Please sign in first' using errcode = '42501';
@@ -267,9 +306,6 @@ begin
   if not found then
     raise exception 'This event is not open for registration';
   end if;
-  if ev.registration_closes_at is not null and now() > ev.registration_closes_at then
-    raise exception 'Registration for this event has closed';
-  end if;
 
   if coalesce(btrim(p_details ->> 'full_name'), '') = '' then
     raise exception 'Please enter your full name';
@@ -277,21 +313,28 @@ begin
   if coalesce(p_details ->> 'phone', '') !~ '^\+?[0-9 ]{10,16}$' then
     raise exception 'Please enter a valid mobile number';
   end if;
+  if coalesce((p_details ->> 'accept_terms')::boolean, false) is not true then
+    raise exception 'Please accept the terms to register';
+  end if;
   if jsonb_typeof(v_guests) <> 'array' or jsonb_array_length(v_guests) > 15 then
     raise exception 'Guest list is not valid';
   end if;
   if jsonb_typeof(p_items) <> 'array' then
     raise exception 'Ticket selection is not valid';
   end if;
+  v_year := nullif(p_details ->> 'grad_year', '')::int;
+  if v_year is not null and (v_year < 1947 or v_year > 2100) then
+    raise exception 'Please check your passing-out year';
+  end if;
 
   -- Price everything on the server from the ticket table; the client only sends ids and quantities.
   if exists (select 1 from jsonb_array_elements(p_items) e
-              group by e ->> 'ticket_type_id' having count(*) > 1) then
+              group by lower(e ->> 'ticket_type_id') having count(*) > 1) then
     raise exception 'Ticket selection is not valid';
   end if;
   select coalesce(jsonb_agg(jsonb_build_object(
            'id', t.id, 'label', coalesce(t.label, ''), 'price', t.price_paise, 'qty', r.q,
-           'max', t.max_per_registration, 'primary', t.is_primary)), '[]'::jsonb)
+           'max', t.max_per_registration, 'primary', t.is_primary) order by t.sort), '[]'::jsonb)
     into v_lines
     from (select (e ->> 'ticket_type_id')::uuid as tid, coalesce((e ->> 'quantity')::int, 0) as q
             from jsonb_array_elements(p_items) e) r
@@ -317,38 +360,49 @@ begin
     raise exception 'Choose exactly one main (alumnus) ticket';
   end if;
 
+  -- Lock order everywhere: event row, then registration row.
+  perform 1 from public.events where id = p_event for update;
   select * into reg from public.event_registrations where event_id = p_event and user_id = auth.uid() for update;
+  v_locked := reg.id is not null and reg.status in ('under_review', 'confirmed');
 
-  if ev.capacity is not null then
-    select coalesce(sum(r.headcount), 0) into taken from public.event_registrations r
-     where r.event_id = p_event and r.status in ('under_review', 'confirmed')
-       and r.user_id <> auth.uid();
-    if taken + heads > ev.capacity then
-      raise exception 'Sorry, the event is full';
-    end if;
+  if not v_locked and ev.registration_closes_at is not null and now() > ev.registration_closes_at then
+    raise exception 'Registration for this event has closed';
   end if;
 
-  if found and reg.status in ('under_review', 'confirmed') and (reg.amount_paise <> total or reg.headcount <> heads) then
-    raise exception 'Your payment is already submitted, so tickets can no longer be changed. Please contact the organisers.';
+  if v_locked then
+    -- After payment, the ticket mix is fixed: compare the exact (ticket, quantity) sets.
+    if exists (
+      (select (l ->> 'id')::uuid, (l ->> 'qty')::int from jsonb_array_elements(v_lines) l
+       except select i.ticket_type_id, i.quantity from public.event_registration_items i where i.registration_id = reg.id)
+      union all
+      (select i.ticket_type_id, i.quantity from public.event_registration_items i where i.registration_id = reg.id
+       except select (l ->> 'id')::uuid, (l ->> 'qty')::int from jsonb_array_elements(v_lines) l)
+    ) then
+      raise exception 'Your payment is already submitted, so tickets can no longer be changed. Please contact the organisers.';
+    end if;
+  else
+    -- Early check (unpaid registrations don't hold places); enforced again when paying.
+    perform public._assert_capacity(p_event, reg.id, heads);
   end if;
 
   if reg.id is null then
     insert into public.event_registrations (event_id, user_id, code, full_name, email, phone)
     values (p_event, auth.uid(), public.new_registration_code(), '', null, '')
     returning * into reg;
-  elsif reg.status = 'cancelled' then
-    reg.status := 'pending_payment';
   end if;
 
   update public.event_registrations set
-    status = case when total = 0 and reg.status <> 'confirmed' then 'confirmed'::public.registration_status
-                  when reg.status = 'cancelled' then 'pending_payment'::public.registration_status
-                  else status end,
-    full_name = left(btrim(p_details ->> 'full_name'), 120),
+    status = case
+               when v_locked then status
+               when total = 0 then 'confirmed'::public.registration_status
+               else 'pending_payment'::public.registration_status
+             end,
+    -- the attendee's name is fixed once paid, so tickets can't be passed on
+    full_name = case when v_locked then full_name else left(btrim(p_details ->> 'full_name'), 120) end,
     email = left(nullif(btrim(p_details ->> 'email'), ''), 120),
     phone = btrim(p_details ->> 'phone'),
     branch = left(nullif(p_details ->> 'branch', ''), 80),
-    grad_year = nullif(p_details ->> 'grad_year', '')::int,
+    grad_year = v_year,
     city = left(nullif(btrim(p_details ->> 'city'), ''), 80),
     tshirt_size = nullif(p_details ->> 'tshirt_size', ''),
     food_pref = nullif(p_details ->> 'food_pref', ''),
@@ -356,15 +410,19 @@ begin
     arrival_note = left(nullif(btrim(p_details ->> 'arrival_note'), ''), 300),
     guests = v_guests,
     notes = left(nullif(btrim(p_details ->> 'notes'), ''), 1000),
+    terms_accepted_at = coalesce(terms_accepted_at, now()),
+    photo_consent = coalesce((p_details ->> 'photo_consent')::boolean, true),
     headcount = heads,
     amount_paise = total
   where id = reg.id
   returning * into reg;
 
-  delete from public.event_registration_items where registration_id = reg.id;
-  insert into public.event_registration_items (registration_id, ticket_type_id, label, unit_price_paise, quantity)
-    select reg.id, (l ->> 'id')::uuid, l ->> 'label', (l ->> 'price')::int, (l ->> 'qty')::int
-      from jsonb_array_elements(v_lines) l;
+  if not v_locked then
+    delete from public.event_registration_items where registration_id = reg.id;
+    insert into public.event_registration_items (registration_id, ticket_type_id, label, unit_price_paise, quantity)
+      select reg.id, (l ->> 'id')::uuid, l ->> 'label', (l ->> 'price')::int, (l ->> 'qty')::int
+        from jsonb_array_elements(v_lines) l;
+  end if;
 
   return reg;
 end;
@@ -383,10 +441,13 @@ declare
   pay public.event_payments;
   v_utr text := regexp_replace(coalesce(p_utr, ''), '\s', '', 'g');
 begin
-  select * into reg from public.event_registrations where id = p_registration and user_id = auth.uid() for update;
+  select * into reg from public.event_registrations where id = p_registration and user_id = auth.uid();
   if not found then
     raise exception 'Registration not found';
   end if;
+  -- event lock first, then the registration row (same order as upsert_registration)
+  perform public._assert_capacity(reg.event_id, reg.id, case when reg.status = 'pending_payment' then reg.headcount else 0 end);
+  select * into reg from public.event_registrations where id = p_registration for update;
   if reg.status not in ('pending_payment', 'under_review') then
     raise exception 'This registration does not need a payment';
   end if;
@@ -396,7 +457,9 @@ begin
   if p_proof_path is not null and p_proof_path not like auth.uid()::text || '/%' then
     raise exception 'Invalid screenshot';
   end if;
-  if exists (select 1 from public.event_payments p where p.utr = v_utr and p.status <> 'rejected') then
+  -- A UTR belongs to one registration forever; only that registration may resubmit it after a rejection.
+  if exists (select 1 from public.event_payments p
+              where p.utr = v_utr and (p.status <> 'rejected' or p.registration_id <> reg.id)) then
     raise exception 'This UPI reference has already been used';
   end if;
 
@@ -422,8 +485,10 @@ security definer
 set search_path = ''
 as $$
 begin
-  update public.event_registrations set status = 'cancelled'
-   where id = p_registration and user_id = auth.uid() and status = 'pending_payment';
+  update public.event_registrations r set status = 'cancelled'
+   where r.id = p_registration and r.user_id = auth.uid() and r.status = 'pending_payment'
+     and not exists (select 1 from public.event_payments p
+                      where p.registration_id = r.id and p.status in ('submitted', 'verified'));
   if not found then
     raise exception 'Only unpaid registrations can be cancelled here. Please contact the organisers.';
   end if;
@@ -431,6 +496,36 @@ end;
 $$;
 
 -- ------------------------------------------------------------------ staff actions
+create or replace function public._refresh_registration_status(p_registration uuid)
+returns public.event_registrations
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  reg public.event_registrations;
+  verified int;
+begin
+  select coalesce(sum(amount_paise), 0) into verified
+    from public.event_payments where registration_id = p_registration and status = 'verified';
+  update public.event_registrations r
+     set status = case
+                    when r.status = 'cancelled' then r.status
+                    when verified >= r.amount_paise then 'confirmed'::public.registration_status
+                    when exists (select 1 from public.event_payments p where p.registration_id = r.id and p.status = 'submitted')
+                      then 'under_review'::public.registration_status
+                    else 'pending_payment'::public.registration_status
+                  end,
+         admin_note = case when verified >= r.amount_paise then null else r.admin_note end
+   where r.id = p_registration
+  returning * into reg;
+  if reg.status = 'confirmed' then
+    perform public._verify_member_from_payment(reg.user_id);
+  end if;
+  return reg;
+end;
+$$;
+
 create or replace function public.review_payment(p_payment uuid, p_approve boolean, p_note text default null)
 returns public.event_registrations
 language plpgsql
@@ -440,8 +535,10 @@ as $$
 declare
   pay public.event_payments;
   reg public.event_registrations;
-  verified int;
 begin
+  if p_approve is null then
+    raise exception 'Choose approve or reject';
+  end if;
   select * into pay from public.event_payments where id = p_payment for update;
   if not found then
     raise exception 'Payment not found';
@@ -450,6 +547,12 @@ begin
   if not public.is_event_manager(reg.event_id) then
     raise exception 'Only event managers can review payments' using errcode = '42501';
   end if;
+  if pay.status <> 'submitted' then
+    raise exception 'This payment has already been reviewed';
+  end if;
+  if not p_approve and coalesce(btrim(p_note), '') = '' then
+    raise exception 'Please give a reason so the member knows what to do';
+  end if;
 
   update public.event_payments
      set status = case when p_approve then 'verified'::public.payment_status else 'rejected'::public.payment_status end,
@@ -457,25 +560,14 @@ begin
          reviewed_by = auth.uid(), reviewed_at = now()
    where id = pay.id;
 
-  select coalesce(sum(amount_paise), 0) into verified
-    from public.event_payments where registration_id = reg.id and status = 'verified';
-
-  update public.event_registrations
-     set status = case
-                    when status = 'cancelled' then status
-                    when verified >= amount_paise then 'confirmed'::public.registration_status
-                    when exists (select 1 from public.event_payments p where p.registration_id = reg.id and p.status = 'submitted')
-                      then 'under_review'::public.registration_status
-                    else 'pending_payment'::public.registration_status
-                  end,
-         admin_note = case when p_approve then admin_note else left(nullif(btrim(p_note), ''), 500) end
-   where id = reg.id
-  returning * into reg;
-  return reg;
+  if not p_approve then
+    update public.event_registrations set admin_note = left(btrim(p_note), 500) where id = reg.id;
+  end if;
+  return public._refresh_registration_status(reg.id);
 end;
 $$;
 
--- Record a cash / bank payment or a fee waiver at the desk.
+-- Record a cash / bank payment or a fee waiver at the desk. Waivers are not counted as money collected.
 create or replace function public.record_offline_payment(p_registration uuid, p_method text, p_amount_paise int, p_note text default null)
 returns public.event_registrations
 language plpgsql
@@ -484,21 +576,40 @@ set search_path = ''
 as $$
 declare
   reg public.event_registrations;
+  covered int;
+  due int;
+  amt int := p_amount_paise;
 begin
-  select * into reg from public.event_registrations where id = p_registration for update;
+  select * into reg from public.event_registrations where id = p_registration;
   if not found or not public.is_event_manager(reg.event_id) then
     raise exception 'Only event managers can record payments' using errcode = '42501';
   end if;
-  insert into public.event_payments (registration_id, amount_paise, method, status, review_note, reviewed_by, reviewed_at)
-  values (reg.id, p_amount_paise, p_method, 'verified', left(p_note, 500), auth.uid(), now());
+  if p_method not in ('cash', 'bank_transfer', 'waiver') then
+    raise exception 'Payment method must be cash, bank transfer or waiver';
+  end if;
+  perform public._assert_capacity(reg.event_id, reg.id, case when reg.status = 'pending_payment' then reg.headcount else 0 end);
+  select * into reg from public.event_registrations where id = p_registration for update;
+  if reg.status = 'cancelled' then
+    raise exception 'This registration was cancelled';
+  end if;
+  select coalesce(sum(amount_paise), 0) into covered from public.event_payments
+   where registration_id = reg.id and status in ('submitted', 'verified');
+  due := reg.amount_paise - covered;
+  if due <= 0 then
+    raise exception 'Nothing is due on this registration';
+  end if;
+  if p_method = 'waiver' then
+    amt := due;
+  elsif amt is null or amt < 1 or amt > due then
+    raise exception 'Amount must be between ₹0.01 and the ₹% still due', round(due / 100.0, 2);
+  end if;
+  if p_method = 'waiver' and coalesce(btrim(p_note), '') = '' then
+    raise exception 'Please note who approved the waiver';
+  end if;
 
-  update public.event_registrations
-     set status = case when (select coalesce(sum(amount_paise), 0) from public.event_payments
-                              where registration_id = reg.id and status = 'verified') >= amount_paise
-                       then 'confirmed'::public.registration_status else status end
-   where id = reg.id
-  returning * into reg;
-  return reg;
+  insert into public.event_payments (registration_id, amount_paise, method, status, review_note, reviewed_by, reviewed_at)
+  values (reg.id, amt, p_method, 'verified', left(p_note, 500), auth.uid(), now());
+  return public._refresh_registration_status(reg.id);
 end;
 $$;
 
@@ -532,6 +643,31 @@ begin
   return query select reg, was_in;
 end;
 $$;
+
+-- Managers hide / unhide photos (members can only edit their own captions).
+create or replace function public.moderate_photo(p_photo uuid, p_hidden boolean)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  ev uuid;
+begin
+  select event_id into ev from public.event_photos where id = p_photo;
+  if ev is null or not public.is_event_manager(ev) then
+    raise exception 'Only event managers can moderate photos' using errcode = '42501';
+  end if;
+  update public.event_photos set is_hidden = coalesce(p_hidden, true) where id = p_photo;
+end;
+$$;
+
+revoke execute on function public._assert_capacity(uuid, uuid, int) from anon, authenticated, public;
+revoke execute on function public._verify_member_from_payment(uuid) from anon, authenticated, public;
+revoke execute on function public._refresh_registration_status(uuid) from anon, authenticated, public;
+revoke execute on function public.new_registration_code() from anon, authenticated, public;
+revoke execute on function public.moderate_photo(uuid, boolean) from anon, public;
+grant execute on function public.moderate_photo(uuid, boolean) to authenticated;
 
 -- Lock down direct execution: these are the only entry points and each checks the caller.
 revoke execute on function public.upsert_registration(uuid, jsonb, jsonb) from anon, public;
@@ -571,9 +707,11 @@ create policy "delete own event photos" on storage.objects for delete to authent
 
 create policy "upload own payment proof" on storage.objects for insert to authenticated
   with check (bucket_id = 'payment-proofs' and (storage.foldername(name))[1] = auth.uid()::text);
-create policy "read own payment proof or staff" on storage.objects for select to authenticated
+create policy "read own payment proof or managers" on storage.objects for select to authenticated
   using (bucket_id = 'payment-proofs' and (
     (storage.foldername(name))[1] = auth.uid()::text
     or public.is_admin()
-    or exists (select 1 from public.event_staff s where s.user_id = auth.uid() and s.role = 'manager')
+    or exists (select 1 from public.event_payments p
+                 join public.event_registrations r on r.id = p.registration_id
+                where p.proof_path = name and public.is_event_manager(r.event_id))
   ));
