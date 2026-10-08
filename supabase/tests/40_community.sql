@@ -1,0 +1,175 @@
+-- Community: groups, feed, connections, messages, blocks, reports, invites/vouches, birthdays, badges. Rolls back.
+\set ON_ERROR_STOP 1
+begin;
+create function pg_temp.login(p_uid uuid) returns void language sql as $$
+  select set_config('request.jwt.claims', json_build_object('sub', p_uid, 'role', 'authenticated')::text, true),
+         set_config('request.jwt.claim.sub', p_uid::text, true);
+$$;
+-- A, B: CSE 2016 verified; C: ME 2010 verified; U: unverified; X: admin
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('40000000-0000-0000-0000-00000000000a', 'a@x.com', '{"full_name":"Anil"}'),
+  ('40000000-0000-0000-0000-00000000000b', 'b@x.com', '{"full_name":"Bela"}'),
+  ('40000000-0000-0000-0000-00000000000c', 'c@x.com', '{"full_name":"Chetan"}'),
+  ('40000000-0000-0000-0000-0000000000aa', 'u@x.com', '{"full_name":"Unverified"}'),
+  ('40000000-0000-0000-0000-0000000000ff', 'x@x.com', '{"full_name":"Admin"}');
+update public.profiles set verification = 'verified', onboarded = true, grad_year = 2016, branch = 'Computer Science & Engineering'
+ where id in ('40000000-0000-0000-0000-00000000000a', '40000000-0000-0000-0000-00000000000b');
+update public.profiles set verification = 'verified', onboarded = true, grad_year = 2010, branch = 'Mechanical Engineering'
+ where id = '40000000-0000-0000-0000-00000000000c';
+update public.profiles set onboarded = true, grad_year = 2016, branch = 'Computer Science & Engineering' where id = '40000000-0000-0000-0000-0000000000aa';
+update public.profiles set is_admin = true, verification = 'verified' where id = '40000000-0000-0000-0000-0000000000ff';
+-- birthday tomorrow for B
+update public.profiles set birth_day = extract(day from (now() at time zone 'Asia/Kolkata')::date + 1), birth_month = extract(month from (now() at time zone 'Asia/Kolkata')::date + 1)
+ where id = '40000000-0000-0000-0000-00000000000b';
+
+create temp table t (k text primary key, v uuid);
+grant select, insert on t to authenticated;
+
+do $$ begin
+  assert (select count(*) from public.group_members m join public.groups g on g.id = m.group_id
+           where m.user_id = '40000000-0000-0000-0000-00000000000a' and g.kind in ('batch', 'year')) = 2, 'auto-joined batch + year';
+  assert (select member_count from public.groups where slug = 'computer-science-engineering-2016') = 3, 'batch has A, B, U';
+end $$;
+
+-- A posts publicly and to the batch
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  insert into public.posts (author_id, body) values (auth.uid(), 'Hello JEC!');
+  insert into public.posts (author_id, group_id, body) select auth.uid(), id, 'Hello batch!' from public.groups where slug = 'computer-science-engineering-2016';
+  insert into t select 'pub', id from public.posts where body = 'Hello JEC!';
+  insert into t select 'batch', id from public.posts where body = 'Hello batch!';
+  begin
+    insert into public.posts (author_id, group_id, body) select auth.uid(), id, 'spam' from public.groups where slug = 'jec-official';
+    assert false, 'channel needs admin';
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.posts (author_id, group_id, body) select auth.uid(), id, 'x' from public.groups where slug = 'mechanical-engineering-2010';
+    assert false, 'cannot post in another batch';
+  exception when insufficient_privilege then null; end;
+  perform public.join_group((select id from public.groups where slug = 'trekking'), true);
+  begin perform public.join_group((select id from public.groups where slug = 'mechanical-engineering-2010'), true); assert false, 'no joining batches';
+  exception when raise_exception then null; end;
+end $$;
+reset role;
+
+-- C (other batch) sees the public post, not the batch post; U (unverified) sees nothing
+select pg_temp.login('40000000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$ begin
+  assert (select count(*) from public.posts where id = (select v from t where k = 'pub')) = 1, 'C sees public';
+  assert (select count(*) from public.posts where id = (select v from t where k = 'batch')) = 0, 'C cannot see other batch';
+  insert into public.post_likes (post_id, user_id) values ((select v from t where k = 'pub'), auth.uid());
+  insert into public.comments (post_id, author_id, body) values ((select v from t where k = 'pub'), auth.uid(), 'Welcome!');
+  assert public.request_connection('40000000-0000-0000-0000-00000000000a') = 'pending', 'request sent';
+end $$;
+reset role;
+select pg_temp.login('40000000-0000-0000-0000-0000000000aa');
+set local role authenticated;
+do $$ begin
+  assert (select count(*) from public.posts) = 0, 'unverified sees no posts';
+  begin insert into public.posts (author_id, body) values (auth.uid(), 'x'); assert false, 'unverified cannot post';
+  exception when insufficient_privilege then null; end;
+  begin perform public.start_conversation('40000000-0000-0000-0000-00000000000a'); assert false, 'unverified cannot message';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
+-- A: counts, notifications, accepts C; messaging rules
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$
+declare c public.conversations;
+begin
+  assert (select like_count from public.posts where id = (select v from t where k = 'pub')) = 1, 'like counted';
+  assert (select comment_count from public.posts where id = (select v from t where k = 'pub')) = 1, 'comment counted';
+  assert (select count(*) from public.notifications where user_id = auth.uid()) = 3, 'like + comment + connection request notified';
+  perform public.respond_connection('40000000-0000-0000-0000-00000000000c', true);
+  assert public.are_connected(auth.uid(), '40000000-0000-0000-0000-00000000000c'), 'connected';
+  -- B restricts messages to connections; A (same batch, not connected) cannot start
+  update public.profiles set message_policy = 'jec' where id = auth.uid();
+end $$;
+reset role;
+update public.profiles set message_policy = 'connections' where id = '40000000-0000-0000-0000-00000000000b';
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$
+declare c public.conversations;
+begin
+  begin perform public.start_conversation('40000000-0000-0000-0000-00000000000b'); assert false, 'policy respected';
+  exception when raise_exception then null; end;
+  c := public.start_conversation('40000000-0000-0000-0000-00000000000c');
+  assert not c.is_request, 'connected: not a request';
+  perform public.send_message(c.id, 'Hi Chetan');
+  assert (select last_message from public.conversations where id = c.id) = 'Hi Chetan', 'last message';
+  insert into t values ('conv', c.id);
+end $$;
+reset role;
+
+-- C sees the message + notification; blocks A -> A's posts vanish for C and A can't message C
+select pg_temp.login('40000000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$ begin
+  assert (select count(*) from public.messages where conversation_id = (select v from t where k = 'conv')) = 1, 'C reads message';
+  assert exists (select 1 from public.notifications where user_id = auth.uid() and kind = 'message'), 'message notification';
+  insert into public.blocks (blocker, blocked) values (auth.uid(), '40000000-0000-0000-0000-00000000000a');
+  assert (select count(*) from public.posts where author_id = '40000000-0000-0000-0000-00000000000a') = 0, 'blocked posts hidden';
+end $$;
+reset role;
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  begin perform public.send_message((select v from t where k = 'conv'), 'hello?'); assert false, 'blocked cannot message';
+  exception when raise_exception then null; end;
+end $$;
+reset role;
+
+-- reports: three reports hide a post
+insert into auth.users (id, email) values ('40000000-0000-0000-0000-0000000000d1', 'd1@x.com'), ('40000000-0000-0000-0000-0000000000d2', 'd2@x.com');
+update public.profiles set verification = 'verified' where id in ('40000000-0000-0000-0000-0000000000d1', '40000000-0000-0000-0000-0000000000d2');
+do $$
+declare u uuid;
+begin
+  foreach u in array array['40000000-0000-0000-0000-00000000000b', '40000000-0000-0000-0000-0000000000d1', '40000000-0000-0000-0000-0000000000d2']::uuid[] loop
+    insert into public.reports (reporter, target_type, target_id, reason) values (u, 'post', (select v from t where k = 'pub'), 'spam');
+  end loop;
+  assert (select is_hidden from public.posts where id = (select v from t where k = 'pub')), 'auto-hidden after 3 reports';
+end $$;
+
+-- invites + vouches verify U
+select pg_temp.login('40000000-0000-0000-0000-0000000000aa');
+set local role authenticated;
+do $$ begin
+  perform public.claim_invite((select invite_code from public.profiles where id = auth.uid())); -- own code ignored
+  assert (select invited_by from public.profiles where id = auth.uid()) is null, 'own code ignored';
+end $$;
+reset role;
+do $$ begin
+  -- simulate: U claims A's invite (as U)
+  perform set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-0000000000aa', true);
+  perform public.claim_invite((select invite_code from public.profiles where id = '40000000-0000-0000-0000-00000000000a'));
+  assert (select invited_by from public.profiles where id = '40000000-0000-0000-0000-0000000000aa') = '40000000-0000-0000-0000-00000000000a', 'invite claimed';
+  assert (select verification from public.profiles where id = '40000000-0000-0000-0000-0000000000aa') = 'pending', 'one vouch is not enough';
+  perform set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-00000000000b', true);
+  perform set_config('request.jwt.claims', '{"sub":"40000000-0000-0000-0000-00000000000b","role":"authenticated"}', true);
+  perform public.vouch_for('40000000-0000-0000-0000-0000000000aa');
+  assert (select verification from public.profiles where id = '40000000-0000-0000-0000-0000000000aa') = 'verified', 'two vouches verify';
+  assert exists (select 1 from public.notifications where user_id = '40000000-0000-0000-0000-00000000000a' and kind = 'invite_joined'), 'inviter notified';
+end $$;
+
+-- birthdays (A sees batchmate B tomorrow), badges, leaderboard
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  assert (select days_away from public.upcoming_birthdays() where full_name = 'Bela') = 1, 'birthday tomorrow';
+  assert jsonb_array_length(public.member_badges(auth.uid())) >= 1, 'founding badge';
+  assert (select joined from public.invite_leaderboard() where id = auth.uid()) = 1, 'leaderboard counts onboarded invitee';
+end $$;
+reset role;
+do $$ begin
+  assert public._next_birthday(29::smallint, 2::smallint, '2026-03-01') = '2028-02-29', 'leap day';
+  assert public._next_birthday(2::smallint, 1::smallint, '2026-12-30') = '2027-01-02', 'new year';
+end $$;
+
+select 'ALL COMMUNITY TESTS PASSED';
+rollback;
