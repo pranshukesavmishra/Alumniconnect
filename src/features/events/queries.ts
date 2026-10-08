@@ -114,8 +114,9 @@ export function useUpsertRegistration(eventId: string) {
       if (error) throw error
       return data as Registration
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) })
+    // awaited, so callers navigate only after the fresh registration is in the cache
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) })
       void qc.invalidateQueries({ queryKey: eventKeys.stats(eventId) })
     },
   })
@@ -141,10 +142,16 @@ export function useSubmitPayment(eventId: string) {
         p_payer_name: input.payerName,
         p_proof_path: proofPath,
       })
-      if (error) throw error
+      if (error) {
+        // don't leave an orphaned screenshot behind
+        if (proofPath) void supabase.storage.from('payment-proofs').remove([proofPath])
+        throw error
+      }
       return data as Payment
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) })
+    },
   })
 }
 
@@ -156,7 +163,9 @@ export function useCancelRegistration(eventId: string) {
       const { error } = await supabase.rpc('cancel_my_registration', { p_registration: registrationId })
       if (error) throw error
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) })
+    },
   })
 }
 

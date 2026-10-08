@@ -135,19 +135,21 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <StatusBadge status={reg.status} />
+          {manager && (<>
           <a href={`tel:${reg.phone.replace(/\s/g, '')}`} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-primary">
             <Phone className="size-3.5" aria-hidden /> {reg.phone}
           </a>
           <a href={`https://wa.me/${reg.phone.replace(/[^\d]/g, '').replace(/^(\d{10})$/, '91$1')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-semibold text-primary">
             WhatsApp
           </a>
+          </>)}
         </div>
-        {reg.admin_note && reg.status !== 'confirmed' && <Notice tone="warning" className="mb-4" title="Note to member" >{reg.admin_note}</Notice>}
+        {manager && reg.admin_note && reg.status !== 'confirmed' && <Notice tone="warning" className="mb-4" title="Note to member" >{reg.admin_note}</Notice>}
         <Card className="px-4">
           <dl className="divide-y divide-border">
             <KeyValue label="Batch">{[reg.branch, reg.grad_year].filter(Boolean).join(' ') || '—'}</KeyValue>
             <KeyValue label="City">{reg.city ?? '—'}</KeyValue>
-            <KeyValue label="Email">{reg.email ?? '—'}</KeyValue>
+            {manager && <KeyValue label="Email">{reg.email ?? '—'}</KeyValue>}
             {items.map((i) => (
               <KeyValue key={i.ticket_type_id} label={`${i.label} × ${i.quantity}`}>
                 {manager ? formatPaise(i.unit_price_paise * i.quantity) : ''}
@@ -159,7 +161,7 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
             <KeyValue label="T-shirt">{reg.tshirt_size ?? '—'}</KeyValue>
             <KeyValue label="Accommodation">{reg.needs_accommodation ? 'Needs help' : 'No'}</KeyValue>
             {reg.arrival_note && <KeyValue label="Arrival">{reg.arrival_note}</KeyValue>}
-            {reg.notes && <KeyValue label="Notes">{reg.notes}</KeyValue>}
+            {manager && reg.notes && <KeyValue label="Notes">{reg.notes}</KeyValue>}
             <KeyValue label="Photo consent">{reg.photo_consent ? 'Yes' : 'No'}</KeyValue>
             <KeyValue label="Registered">{formatDateTime(reg.created_at)}</KeyValue>
             {reg.checked_in_at && <KeyValue label="Checked in">{formatDateTime(reg.checked_in_at)}</KeyValue>}

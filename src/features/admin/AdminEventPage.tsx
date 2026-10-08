@@ -92,7 +92,7 @@ export function AdminEventPage() {
         {tab === 'overview' && (admin.data ? <Overview data={admin.data} /> : <PageSkeleton />)}
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} /> : <PageSkeleton />)}
-        {tab === 'settings' && <AdminSettings existing={data} />}
+        {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} />}
       </Page>
     </div>

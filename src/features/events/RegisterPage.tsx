@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { Check, Pencil } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router'
+import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
@@ -63,10 +64,26 @@ export function RegisterPage() {
     if (reg && reg.status !== 'cancelled') {
       const qty: Record<string, number> = {}
       for (const it of mine.items) qty[it.ticket_type_id] = it.quantity
+      // Match saved names to tickets by id (older entries by label); anything unmatched fills remaining slots,
+      // so a renamed ticket never drops a guest's name.
       const guestNames: Record<string, string[]> = {}
-      for (const t of tickets) {
-        if (t.is_primary) continue
-        guestNames[t.id] = reg.guests.filter((g) => g.relation === t.label).map((g) => g.name)
+      const pool = [...reg.guests]
+      const extras = tickets.filter((t) => !t.is_primary)
+      for (const t of extras) {
+        const n = qty[t.id] ?? 0
+        const mine: string[] = []
+        for (let i = 0; i < pool.length && mine.length < n; ) {
+          const g = pool[i]!
+          if (g.ticket_type_id ? g.ticket_type_id === t.id : g.relation === t.label) {
+            mine.push(g.name)
+            pool.splice(i, 1)
+          } else i++
+        }
+        guestNames[t.id] = mine
+      }
+      for (const t of extras) {
+        const list = guestNames[t.id]!
+        while (list.length < (qty[t.id] ?? 0) && pool.length) list.push(pool.shift()!.name)
       }
       setForm((f) => ({
         ...f,
@@ -79,8 +96,12 @@ export function RegisterPage() {
         notes: reg.notes ?? '',
       }))
     } else {
+      // Drop draft entries for tickets that no longer exist, and pick the main ticket if none valid is chosen.
       const primary = tickets.filter((t) => t.is_primary)
-      if (primary.length === 1 && !Object.keys(form.qty).length) setForm((f) => ({ ...f, qty: { [primary[0]!.id]: 1 } }))
+      const known = new Set(tickets.map((t) => t.id))
+      const cleaned = Object.fromEntries(Object.entries(form.qty).filter(([id]) => known.has(id)))
+      if (primary.length === 1 && !primary.some((p) => (cleaned[p.id] ?? 0) > 0)) cleaned[primary[0]!.id] = 1
+      setForm((f) => ({ ...f, qty: cleaned }))
     }
     setPrefilled(true)
   }, [prefilled, lm, tickets, mine, form.qty, setForm])
@@ -137,10 +158,10 @@ export function RegisterPage() {
   async function submit() {
     if (!validate(2) || !event || !profile) return
     const guests: Guest[] = extraTickets.flatMap((t) =>
-      (form.guestNames[t.id] ?? []).slice(0, form.qty[t.id] ?? 0).map((name) => ({ name: name.trim(), relation: t.label })),
+      (form.guestNames[t.id] ?? []).slice(0, form.qty[t.id] ?? 0).map((name) => ({ name: name.trim(), relation: t.label, ticket_type_id: t.id })),
     )
     try {
-      await upsert.mutateAsync({
+      const saved = await upsert.mutateAsync({
         details: {
           full_name: profile.full_name,
           email: session?.user.email ?? '',
@@ -160,6 +181,9 @@ export function RegisterPage() {
         items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: form.qty[t.id] ?? 0 })),
       })
       clearDraft()
+      if (!locked && saved.amount_paise !== total) {
+        toast.info(`The fees were just updated by the organisers. Your total is ${formatPaise(saved.amount_paise)}.`)
+      }
       navigate('/meet/my', { replace: true })
     } catch {
       /* shown below */

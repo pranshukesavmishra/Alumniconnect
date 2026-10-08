@@ -7,7 +7,7 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
 import { MEET_SLUG } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
-import { compressImage, PHOTO_SIZE, THUMB_SIZE } from '../../lib/image'
+import { compressImageSizes, PHOTO_SIZE, THUMB_SIZE } from '../../lib/image'
 import { publicUrl, supabase } from '../../lib/supabase'
 import type { EventPhoto } from '../../lib/types'
 import { useUserId } from '../auth/AuthProvider'
@@ -71,32 +71,40 @@ export function PhotosPage() {
     if (files.length > 30) toast.info('Uploading the first 30 photos. You can add more afterwards.')
     setProgress({ done: 0, total: arr.length })
     let failed = 0
+    let firstError: unknown = null
     for (const [i, file] of arr.entries()) {
+      const uploaded: string[] = []
       try {
-        const [big, thumb] = await Promise.all([compressImage(file, PHOTO_SIZE, 0.82), compressImage(file, THUMB_SIZE, 0.75)])
+        const [big, thumb] = await compressImageSizes(file, [
+          { maxSide: PHOTO_SIZE, quality: 0.82 },
+          { maxSide: THUMB_SIZE, quality: 0.75 },
+        ])
         const id = crypto.randomUUID()
-        const path = `${uid}/${event!.id}/${id}.${big.ext}`
-        const tpath = `${uid}/${event!.id}/${id}_t.${thumb.ext}`
-        const a = await supabase.storage.from('event-photos').upload(path, big.blob, { contentType: big.type })
+        const path = `${uid}/${event!.id}/${id}.${big!.ext}`
+        const tpath = `${uid}/${event!.id}/${id}_t.${thumb!.ext}`
+        const a = await supabase.storage.from('event-photos').upload(path, big!.blob, { contentType: big!.type })
         if (a.error) throw a.error
-        const b = await supabase.storage.from('event-photos').upload(tpath, thumb.blob, { contentType: thumb.type })
+        uploaded.push(path)
+        const b = await supabase.storage.from('event-photos').upload(tpath, thumb!.blob, { contentType: thumb!.type })
         if (b.error) throw b.error
+        uploaded.push(tpath)
         const { data: row, error } = await supabase
           .from('event_photos')
-          .insert({ event_id: event!.id, uploaded_by: uid, storage_path: path, thumb_path: tpath, width: big.width, height: big.height, kind })
+          .insert({ event_id: event!.id, uploaded_by: uid, storage_path: path, thumb_path: tpath, width: big!.width, height: big!.height, kind })
           .select('id')
           .single()
         if (error) throw error
         void archiveOriginal(row.id as string, file)
       } catch (e) {
         failed++
-        console.error(e)
+        firstError ??= e
+        if (uploaded.length) void supabase.storage.from('event-photos').remove(uploaded) // no orphaned files
       }
       setProgress({ done: i + 1, total: arr.length })
     }
     setProgress(null)
     void qc.invalidateQueries({ queryKey: ['photos', event!.id, kind] })
-    if (failed) toast.error(`${failed} photo${failed > 1 ? 's' : ''} couldn’t be uploaded. Please try those again.`)
+    if (failed) toast.error(`${failed} photo${failed > 1 ? 's' : ''} couldn’t be uploaded: ${friendlyError(firstError)}`)
     else toast.success(`${arr.length} photo${arr.length > 1 ? 's' : ''} added. Thank you!`)
   }
 

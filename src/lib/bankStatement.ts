@@ -1,9 +1,12 @@
 // Matches submitted UPI payments against the treasurer's bank statement.
-// A payment is "matched" only when its 12-digit UTR appears in a statement row AND that row
-// credits exactly the payment amount. Anything else is left for a human to check.
+// A payment is "matched" (safe to verify in bulk) only when ALL of these hold:
+//  - the statement has a recognisable credit/deposit column,
+//  - a row mentioning its 12-digit UTR credits exactly the payment amount,
+//  - no row mentioning that UTR is a debit (refund / reversal).
+// Anything else that mentions the UTR is "needs_review", for a human to check.
 import { parseRupeesToPaise } from './money'
 
-export type MatchStatus = 'matched' | 'amount_mismatch' | 'not_found'
+export type MatchStatus = 'matched' | 'needs_review' | 'not_found'
 
 export interface PaymentToMatch {
   id: string
@@ -17,6 +20,8 @@ export interface MatchResult {
   row?: string
   /** credited amount found on that row */
   creditedPaise?: number | null
+  /** why a human should look (for needs_review) */
+  reason?: string
 }
 
 function cellText(c: unknown): string {
@@ -32,12 +37,17 @@ function toPaise(c: unknown): number | null {
   return s ? parseRupeesToPaise(s) : null
 }
 
-/** Finds the header row and the credit / deposit column, if the statement has one. */
-export function findCreditColumn(rows: unknown[][]): { headerRow: number; creditCol: number } | null {
+const CREDIT = /^(credit|credits|deposit|deposits|credit amount|credit amt\.?|deposit amt\.?|deposit amount|cr|cr\.|cr amount|credit \(inr\)|deposit \(inr\)|deposit amount \(inr\)|deposit \(cr\))$/i
+const DEBIT = /^(debit|debits|withdrawal|withdrawals|debit amount|debit amt\.?|withdrawal amt\.?|withdrawal amount|dr|dr\.|dr amount|debit \(inr\)|withdrawal \(inr\)|withdrawal amount \(inr\)|withdrawal \(dr\))$/i
+
+const norm = (c: unknown) => cellText(c).replace(/\s+/g, ' ').replace(/\(\s*/g, '(').replace(/\s*\)/g, ')').trim()
+
+/** Finds the header row and the credit / debit columns, if the statement has them. */
+export function findCreditColumn(rows: unknown[][]): { headerRow: number; creditCol: number; debitCol: number } | null {
   for (let r = 0; r < Math.min(rows.length, 40); r++) {
     const row = rows[r] ?? []
-    const idx = row.findIndex((c) => /^(credit|deposit|deposits|credit amount|credit amt\.?|deposit amt\.?|cr amount|cr\.?)$/i.test(cellText(c)))
-    if (idx >= 0) return { headerRow: r, creditCol: idx }
+    const creditCol = row.findIndex((c) => CREDIT.test(norm(c)))
+    if (creditCol >= 0) return { headerRow: r, creditCol, debitCol: row.findIndex((c) => DEBIT.test(norm(c))) }
   }
   return null
 }
@@ -47,23 +57,18 @@ export function matchStatement(rows: unknown[][], payments: PaymentToMatch[]): M
   const start = header ? header.headerRow + 1 : 0
 
   // UTR -> rows mentioning it
-  const byUtr = new Map<string, { text: string; credits: number[] }[]>()
+  const byUtr = new Map<string, { text: string; credit: number | null; debit: number | null }[]>()
   for (let r = start; r < rows.length; r++) {
     const row = rows[r] ?? []
     const text = row.map(cellText).filter(Boolean).join(' | ')
-    // \d{12} not surrounded by other digits (account numbers are usually longer or shorter, and must not match partially)
+    // 12 digits not surrounded by other digits (never part of a longer account number)
     const utrs = new Set([...text.matchAll(/(?<!\d)(\d{12})(?!\d)/g)].map((m) => m[1]!))
     if (!utrs.size) continue
-    let credits: number[]
-    if (header) {
-      const v = toPaise(row[header.creditCol])
-      credits = v && v > 0 ? [v] : []
-    } else {
-      credits = row.map(toPaise).filter((v): v is number => v !== null && v > 0)
-    }
+    const credit = header ? toPaise(row[header.creditCol]) : null
+    const debit = header && header.debitCol >= 0 ? toPaise(row[header.debitCol]) : null
     for (const u of utrs) {
       const list = byUtr.get(u) ?? []
-      list.push({ text, credits })
+      list.push({ text, credit: credit && credit > 0 ? credit : null, debit: debit && debit > 0 ? debit : null })
       byUtr.set(u, list)
     }
   }
@@ -75,13 +80,20 @@ export function matchStatement(rows: unknown[][], payments: PaymentToMatch[]): M
       out.set(p.id, { status: 'not_found' })
       continue
     }
-    const exact = hits.find((h) => h.credits.includes(p.amount_paise))
-    out.set(
-      p.id,
-      exact
-        ? { status: 'matched', row: exact.text, creditedPaise: p.amount_paise }
-        : { status: 'amount_mismatch', row: hits[0]!.text, creditedPaise: header ? (hits[0]!.credits[0] ?? null) : null },
-    )
+    const first = hits[0]!
+    if (!header) {
+      out.set(p.id, { status: 'needs_review', row: first.text, reason: 'UTR found, but the credit column couldn’t be identified in this statement' })
+      continue
+    }
+    const exact = hits.find((h) => h.credit === p.amount_paise)
+    const reversal = hits.find((h) => h.debit !== null || (h.credit === null && h !== exact))
+    if (exact && !reversal) {
+      out.set(p.id, { status: 'matched', row: exact.text, creditedPaise: p.amount_paise })
+    } else if (reversal) {
+      out.set(p.id, { status: 'needs_review', row: reversal.text, creditedPaise: exact?.credit ?? first.credit, reason: 'This UTR also appears as a debit (refund or reversal)' })
+    } else {
+      out.set(p.id, { status: 'needs_review', row: first.text, creditedPaise: first.credit, reason: first.credit ? 'Amount credited is different' : 'No credit amount on this row' })
+    }
   }
   return out
 }

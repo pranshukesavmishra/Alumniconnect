@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { CalendarPlus, Check, Copy, Pencil, Smartphone, Upload, X } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -17,19 +17,62 @@ import { compressImage } from '../../lib/image'
 import { formatPaise } from '../../lib/money'
 import type { EventRow, Payment } from '../../lib/types'
 import { buildUpiLink, isValidUpiId, normalizeUtr } from '../../lib/upi'
-import { useMyProfile } from '../auth/AuthProvider'
+import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useCancelRegistration, useEvent, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
 import { PaymentBadge, StatusBadge } from './StatusBadge'
 
-const isPhone = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+const isIos = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && typeof document !== 'undefined' && 'ontouchend' in document)
+const isPhone = isIos || /Android/i.test(ua)
+
+/** iPhones have no system "upi://" chooser, so offer the popular apps' own links (same UPI parameters). */
+const IOS_APPS = [
+  { name: 'Google Pay', scheme: 'gpay://upi/pay' },
+  { name: 'PhonePe', scheme: 'phonepe://pay' },
+  { name: 'Paytm', scheme: 'paytmmp://pay' },
+]
+
+interface CachedTicket {
+  code: string
+  name: string
+  headcount: number
+  title: string
+  when: string
+}
+const ticketKey = (uid: string | null) => `ticket:${uid ?? ''}`
 
 export function MyRegistrationPage() {
   const { data: event, isLoading } = useEvent(MEET_SLUG)
-  const { data: mine, isLoading: lm, error } = useMyRegistration(event?.id)
+  const { data: mine, isLoading: lm, isFetching, error } = useMyRegistration(event?.id)
+  const uid = useUserId()
 
-  if (isLoading || lm) return <PageSkeleton />
+  // Keep the entry pass on the phone so it can be shown at the gate without network.
+  useEffect(() => {
+    const r = mine?.registration
+    if (!event || !r) return
+    try {
+      if (r.status === 'confirmed') {
+        const t: CachedTicket = { code: r.code, name: r.full_name, headcount: r.headcount, title: event.title, when: formatDateRange(event.starts_at, event.ends_at) }
+        localStorage.setItem(ticketKey(uid), JSON.stringify(t))
+      } else localStorage.removeItem(ticketKey(uid))
+    } catch {
+      /* ignore */
+    }
+  }, [mine, event, uid])
+
+  if ((isLoading || lm) && !error) return <PageSkeleton />
+  if (error || (!event && !navigator.onLine)) {
+    let cached: CachedTicket | null = null
+    try {
+      cached = JSON.parse(localStorage.getItem(ticketKey(uid)) ?? 'null') as CachedTicket | null
+    } catch {
+      /* ignore */
+    }
+    return <Page>{cached ? <OfflineTicket t={cached} /> : <Notice tone="danger" title={friendlyError(error)} />}</Page>
+  }
   if (!event) return <Navigate to="/meet" replace />
-  if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
+  // just registered / re-registered: wait for the fresh data instead of bouncing to /meet
+  if ((!mine || mine.registration.status === 'cancelled') && isFetching) return <PageSkeleton />
   if (!mine || mine.registration.status === 'cancelled') return <Navigate to="/meet" replace />
 
   const reg = mine.registration
@@ -45,6 +88,27 @@ export function MyRegistrationPage() {
         <Actions event={event} mine={mine} />
       </Page>
     </div>
+  )
+}
+
+function OfflineTicket({ t }: { t: CachedTicket }) {
+  return (
+    <Card className="overflow-hidden">
+      <div className="bg-[#0c1e45] px-5 py-4 text-white">
+        <p className="text-xs font-semibold uppercase tracking-wider text-[#F2A33A]">Entry pass · saved on this phone</p>
+        <p className="text-lg font-bold">{t.title}</p>
+        <p className="text-sm text-[#C9D4EA]">{t.when}</p>
+      </div>
+      <div className="flex flex-col items-center gap-3 p-5">
+        <QrCode value={t.code} size={200} label={`Entry QR code ${t.code}`} />
+        <p className="font-mono text-2xl font-bold tracking-widest">{t.code}</p>
+        <p className="text-center">
+          <span className="font-semibold">{t.name}</span>
+          <span className="text-muted"> · admits {t.headcount}</span>
+        </p>
+        <p className="text-center text-sm text-muted">You’re offline. This pass was saved when you last opened the app.</p>
+      </div>
+    </Card>
   )
 }
 
@@ -93,6 +157,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
   const [proof, setProof] = useState<File | null>(null)
   const [utrError, setUtrError] = useState<string | null>(null)
   const [showQr, setShowQr] = useState(!isPhone)
+  const [submitting, setSubmitting] = useState(false)
 
   const paidOrPending = mine.payments.filter((p) => p.status !== 'rejected').reduce((s, p) => s + p.amount_paise, 0)
   const due = Math.max(0, reg.amount_paise - paidOrPending)
@@ -102,30 +167,33 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting) return
     const clean = normalizeUtr(utr)
     if (!clean) return setUtrError('The UPI reference (UTR) is the 12-digit number shown in your payment app after paying.')
     setUtrError(null)
-    let blob: Blob | null = null
-    let ext = 'jpg'
-    if (proof) {
-      if (proof.type === 'application/pdf') {
-        blob = proof
-        ext = 'pdf'
-      } else {
-        const img = await compressImage(proof, 1600, 0.8).catch((err: Error) => {
-          toast.error(err.message)
-          return null
-        })
-        if (!img) return
-        blob = img.blob
-        ext = img.ext
-      }
-    }
+    setSubmitting(true) // covers screenshot compression too, so a second tap can't submit twice
+    let sent = false
     try {
+      let blob: Blob | null = null
+      let ext = 'jpg'
+      if (proof) {
+        if (proof.type === 'application/pdf') {
+          blob = proof
+          ext = 'pdf'
+        } else {
+          const img = await compressImage(proof, 1600, 0.8)
+          blob = img.blob
+          ext = img.ext
+        }
+      }
+      sent = true
       await submit.mutateAsync({ registrationId: reg.id, utr: clean, payerName: payer, proof: blob, proofExt: ext })
       toast.success('Payment details sent for verification')
-    } catch {
-      /* shown below */
+    } catch (err) {
+      // server errors are shown under the form; this covers e.g. an unreadable screenshot
+      if (!sent) toast.error(err instanceof Error ? err.message : friendlyError(err))
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -151,7 +219,20 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           <p className="text-sm text-muted">to {event.upi_payee_name}</p>
         </div>
         <div className="space-y-4 p-4">
-          {isPhone && link && (
+          {isIos && link && (
+            <div className="space-y-2">
+              <p className="text-center text-sm font-semibold">Pay {formatPaise(due)} with</p>
+              <div className="grid grid-cols-3 gap-2">
+                {IOS_APPS.map((a) => (
+                  <a key={a.name} href={link.replace('upi://pay', a.scheme)} className="flex min-h-12 items-center justify-center rounded-xl border border-border bg-surface px-2 text-center text-sm font-semibold text-primary hover:bg-primary-soft">
+                    {a.name}
+                  </a>
+                ))}
+              </div>
+              <p className="text-center text-xs text-muted">Using another app (BHIM, a bank app)? Pay to the UPI ID below.</p>
+            </div>
+          )}
+          {isPhone && !isIos && link && (
             <a
               href={link}
               className="flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 text-base font-semibold text-on-primary hover:bg-primary-hover"
@@ -255,7 +336,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
             )}
           </div>
           {submit.error && <Notice tone="danger" title={friendlyError(submit.error)} />}
-          <Button type="submit" size="lg" block loading={submit.isPending}>
+          <Button type="submit" size="lg" block loading={submitting}>
             Submit payment details
           </Button>
         </form>

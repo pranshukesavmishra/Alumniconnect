@@ -83,7 +83,7 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
         {matches && (
           <div className="flex flex-wrap items-center gap-3 rounded-xl bg-surface-2 p-3 text-sm">
             <span>
-              <strong>{matched.length}</strong> matched · {queue.filter((p) => matches.get(p.id)?.status === 'amount_mismatch').length} amount differs ·{' '}
+              <strong>{matched.length}</strong> matched · {queue.filter((p) => matches.get(p.id)?.status === 'needs_review').length} need a look ·{' '}
               {queue.filter((p) => matches.get(p.id)?.status === 'not_found').length} not in statement
             </span>
             {matched.length > 0 && (
@@ -178,8 +178,11 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy }: { p: Payment;
         {match && (
           <div className="mt-3 text-sm">
             {match.status === 'matched' && <Badge tone="success">Matches bank statement</Badge>}
-            {match.status === 'amount_mismatch' && (
-              <Badge tone="warning">UTR found, but credited {match.creditedPaise != null ? formatPaise(match.creditedPaise) : 'a different amount'}</Badge>
+            {match.status === 'needs_review' && (
+              <Badge tone="warning">
+                Check manually: {match.reason}
+                {match.creditedPaise != null && ` (credited ${formatPaise(match.creditedPaise)})`}
+              </Badge>
             )}
             {match.status === 'not_found' && <Badge tone="danger">Not in this statement</Badge>}
             {match.row && <p className="mt-1 truncate font-mono text-xs text-muted" title={match.row}>{match.row}</p>}

@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
+import { clearAllDrafts } from '../../hooks/useDraft'
 
 interface AuthState {
   session: Session | null
@@ -23,7 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setState({ session, loading: false })
-      if (event === 'SIGNED_OUT') qc.clear()
+      if (event === 'SIGNED_OUT') {
+        qc.clear()
+        clearAllDrafts()
+      }
     })
     return () => {
       mounted = false
@@ -58,5 +62,8 @@ export function useMyProfile() {
 }
 
 export async function signOut() {
-  await supabase.auth.signOut()
+  clearAllDrafts()
+  const { error } = await supabase.auth.signOut()
+  // offline or expired token: still remove the session from this device
+  if (error) await supabase.auth.signOut({ scope: 'local' })
 }

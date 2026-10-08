@@ -13,7 +13,7 @@ const statement = [
 
 describe('bank statement matching', () => {
   it('finds the credit column', () => {
-    expect(findCreditColumn(statement)).toEqual({ headerRow: 2, creditCol: 4 })
+    expect(findCreditColumn(statement)).toEqual({ headerRow: 2, creditCol: 4, debitCol: 3 })
   })
 
   it('matches UTR + exact credited amount', () => {
@@ -25,9 +25,9 @@ describe('bank statement matching', () => {
       { id: 'e', utr: null, amount_paise: 100 },
     ])
     expect(res.get('a')?.status).toBe('matched')
-    expect(res.get('b')).toMatchObject({ status: 'amount_mismatch', creditedPaise: 150000 })
+    expect(res.get('b')).toMatchObject({ status: 'needs_review', creditedPaise: 150000 })
     expect(res.get('c')?.status).toBe('not_found')
-    expect(res.get('d')?.status).toBe('amount_mismatch')
+    expect(res.get('d')?.status).toBe('needs_review')
     expect(res.get('e')?.status).toBe('not_found')
   })
 
@@ -36,9 +36,26 @@ describe('bank statement matching', () => {
     expect(res.get('x')?.status).toBe('not_found')
   })
 
-  it('works without a header row, using any amount on the row', () => {
+  it('never auto-matches when the credit column is unknown', () => {
     const rows = [['05/11/2026', 'UPI-CR-412345678902-ASHA', 3000.5]]
-    expect(matchStatement(rows, [{ id: 'z', utr: '412345678902', amount_paise: 300050 }]).get('z')?.status).toBe('matched')
+    expect(matchStatement(rows, [{ id: 'z', utr: '412345678902', amount_paise: 300050 }]).get('z')?.status).toBe('needs_review')
+  })
+
+  it('flags a credit that was later reversed', () => {
+    const rows = [
+      ['Date', 'Narration', 'Withdrawal Amt.', 'Deposit Amt.'],
+      ['1', 'UPI/412345678904/Asha', '', '2,500.00'],
+      ['2', 'REV UPI/412345678904', '2,500.00', ''],
+    ]
+    expect(matchStatement(rows, [{ id: 'r', utr: '412345678904', amount_paise: 250000 }]).get('r')).toMatchObject({ status: 'needs_review' })
+  })
+
+  it('recognises ICICI-style headers', () => {
+    const rows = [
+      ['Value Date', 'Transaction Remarks', 'Withdrawal Amount (INR )', 'Deposit Amount (INR )'],
+      ['x', 'UPI/412345678905/BHARAT', '', '1500.00'],
+    ]
+    expect(matchStatement(rows, [{ id: 'i', utr: '412345678905', amount_paise: 150000 }]).get('i')?.status).toBe('matched')
   })
 
   it('reads numbers from Excel cells and Cr suffixes', () => {

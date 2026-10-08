@@ -6,13 +6,10 @@ import { Notice } from '../../components/ui/Display'
 import { LinkedInIcon } from '../../components/ui/Icons'
 import { Field, Input } from '../../components/ui/Form'
 import { friendlyError } from '../../lib/errors'
+import { safeNext } from '../../lib/safeNext'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './AuthProvider'
 
-function safeNext(next: string | null): string {
-  // only allow same-site paths, never "//evil.com"
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
 
 function GoogleLogo() {
   return (

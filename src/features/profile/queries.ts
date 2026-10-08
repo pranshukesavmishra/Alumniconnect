@@ -40,10 +40,13 @@ export function useUpdateProfile() {
         if (error) throw error
       }
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: profileKey(uid) })
-      void qc.invalidateQueries({ queryKey: ['profile-private', uid] })
-      void qc.invalidateQueries({ queryKey: ['member', uid] })
+    // awaited: route guards must see e.g. onboarded=true before we navigate
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: profileKey(uid) }),
+        qc.invalidateQueries({ queryKey: ['profile-private', uid] }),
+        qc.invalidateQueries({ queryKey: ['member', uid] }),
+      ])
     },
   })
 }
@@ -93,50 +96,43 @@ export interface ImportedProfile {
   educations: Omit<Education, 'id' | 'profile_id'>[]
 }
 
-/** Saves a reviewed LinkedIn import: replaces previously imported entries, keeps manual ones. */
+/**
+ * Saves a reviewed LinkedIn import in one database transaction: replaces previously imported
+ * entries (manual ones are kept) and fills profile fields - only empty ones unless overwriteBasics.
+ */
 export function useSaveImport() {
   const qc = useQueryClient()
   const uid = useUserId()
   return useMutation({
     mutationFn: async (data: ImportedProfile & { overwriteBasics: boolean; current?: Profile }) => {
-      const update: ProfileUpdate = {}
       const cur = data.current
-      const take = <K extends keyof ProfileUpdate>(k: K, v: ProfileUpdate[K] | undefined) => {
-        if (v === undefined || v === null || v === '') return
-        if (data.overwriteBasics || !cur || !cur[k as keyof Profile] || (Array.isArray(cur[k as keyof Profile]) && (cur[k as keyof Profile] as unknown[]).length === 0)) {
-          update[k] = v
-        }
+      const fields: Record<string, unknown> = {}
+      const take = (k: keyof Profile, v: unknown) => {
+        if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return
+        const existing = cur?.[k]
+        const empty = existing === null || existing === undefined || existing === '' || (Array.isArray(existing) && existing.length === 0)
+        if (data.overwriteBasics || empty) fields[k] = v
       }
-      take('headline', data.headline?.slice(0, 160))
-      take('about', data.about?.slice(0, 3000))
-      take('city', data.city?.slice(0, 80))
-      take('skills', data.skills?.slice(0, 50))
+      take('headline', data.headline)
+      take('about', data.about)
+      take('city', data.city)
+      take('skills', data.skills)
       take('linkedin_url', data.linkedin_url)
-      const current = data.experiences.find((e) => e.is_current) ?? data.experiences[0]
+      // only a role marked as current on LinkedIn becomes the current role (never a past job)
+      const current = data.experiences.find((e) => e.is_current)
       if (current) {
-        take('current_title', current.title.slice(0, 120))
-        take('current_company', current.company.slice(0, 120))
+        take('current_title', current.title)
+        take('current_company', current.company)
       }
-      if (Object.keys(update).length) {
-        const { error } = await supabase.from('profiles').update(update).eq('id', uid!)
-        if (error) throw error
-      }
-      const delEx = await supabase.from('experiences').delete().eq('profile_id', uid!).eq('source', 'linkedin')
-      if (delEx.error) throw delEx.error
-      const delEd = await supabase.from('educations').delete().eq('profile_id', uid!).eq('source', 'linkedin')
-      if (delEd.error) throw delEd.error
-      if (data.experiences.length) {
-        const { error } = await supabase.from('experiences').insert(data.experiences.map((e) => ({ ...e, profile_id: uid, source: 'linkedin' })))
-        if (error) throw error
-      }
-      if (data.educations.length) {
-        const { error } = await supabase.from('educations').insert(data.educations.map((e) => ({ ...e, profile_id: uid, source: 'linkedin' })))
-        if (error) throw error
-      }
+      const { error } = await supabase.rpc('save_my_linkedin_import', {
+        p_profile: fields,
+        p_experiences: data.experiences,
+        p_educations: data.educations,
+      })
+      if (error) throw error
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: profileKey(uid) })
-      void qc.invalidateQueries({ queryKey: ['member', uid] })
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: profileKey(uid) }), qc.invalidateQueries({ queryKey: ['member', uid] })])
     },
   })
 }

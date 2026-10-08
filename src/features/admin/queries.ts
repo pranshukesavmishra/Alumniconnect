@@ -145,8 +145,10 @@ export function useSaveEvent() {
       }
       return eventId
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['admin-event'] })
+    // On success AND on a partial failure, reload from the server: the settings form re-mounts with
+    // real ids, so saving again can never insert the same ticket twice.
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: ['admin-event'] })
       void qc.invalidateQueries({ queryKey: ['event'] })
       void qc.invalidateQueries({ queryKey: ['event-tickets'] })
       void qc.invalidateQueries({ queryKey: ['managed-events'] })

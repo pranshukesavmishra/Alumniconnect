@@ -71,6 +71,17 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   const [errors, setErrors] = useState<string[]>([])
   const set = (k: keyof typeof f) => (ev: { target: { value: string } }) => setF((s) => ({ ...s, [k]: ev.target.value }))
   const setT = (i: number, patch: Partial<TicketDraft>) => setTickets((ts) => ts.map((t, j) => (j === i ? { ...t, ...patch } : t)))
+  /** Swap with the nearest ticket that isn't marked for deletion. */
+  const move = (i: number, dir: -1 | 1) =>
+    setTickets((ts) => {
+      let j = i + dir
+      while (j >= 0 && j < ts.length && ts[j]!._delete) j += dir
+      if (j < 0 || j >= ts.length) return ts
+      const c = [...ts]
+      ;[c[i], c[j]] = [c[j]!, c[i]!]
+      return c
+    })
+  const visibleIdx = tickets.map((t, i) => (t._delete ? -1 : i)).filter((i) => i >= 0)
   const live = tickets.filter((t) => !t._delete)
 
   function validate(): string[] {
@@ -79,6 +90,10 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     if (!f.title.trim()) errs.push('Title is required.')
     if (f.upi_id && !isValidUpiId(f.upi_id)) errs.push('UPI ID looks wrong (expected something like name@okicici).')
     if (f.upi_id && !f.upi_payee_name.trim()) errs.push('Enter the payee name exactly as UPI apps show it.')
+    for (const [k, label] of [['capacity', 'Max people'], ['eligible_from_year', 'Batches from'], ['eligible_to_year', 'Batches to']] as const) {
+      if (f[k].trim() && !/^\d+$/.test(f[k].trim())) errs.push(`${label}: enter a whole number without commas.`)
+    }
+    if (f.eligible_from_year && f.eligible_to_year && Number(f.eligible_from_year) > Number(f.eligible_to_year)) errs.push('Batch range: “from” is after “to”.')
     if (f.starts_at && f.ends_at && f.ends_at < f.starts_at) errs.push('The end date is before the start date.')
     if (live.filter((t) => t.is_primary).length < 1) errs.push('At least one main (alumnus) ticket is needed.')
     for (const t of live) {
@@ -209,10 +224,10 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                   Main ticket (the alumnus; exactly one per registration)
                 </Checkbox>
                 <div className="flex">
-                  <button type="button" disabled={i === 0} aria-label="Move up" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => setTickets((ts) => { const c = [...ts]; [c[i - 1], c[i]] = [c[i]!, c[i - 1]!]; return c })}>
+                  <button type="button" disabled={i === visibleIdx[0]} aria-label="Move up" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, -1)}>
                     <ArrowUp className="size-4" />
                   </button>
-                  <button type="button" disabled={i === tickets.length - 1} aria-label="Move down" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => setTickets((ts) => { const c = [...ts]; [c[i + 1], c[i]] = [c[i]!, c[i + 1]!]; return c })}>
+                  <button type="button" disabled={i === visibleIdx[visibleIdx.length - 1]} aria-label="Move down" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, 1)}>
                     <ArrowDown className="size-4" />
                   </button>
                   <button type="button" aria-label="Remove ticket" className="grid size-10 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => setT(i, { _delete: true })}>

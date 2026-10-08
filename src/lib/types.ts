@@ -85,6 +85,7 @@ export interface EventRow {
   contact_email: string | null
   cover_url: string | null
   is_published: boolean
+  updated_at: string
 }
 
 export interface TicketType {
@@ -100,6 +101,8 @@ export interface TicketType {
 
 export interface Guest {
   name: string
+  /** which ticket this person is on (labels can be renamed later; the id can't) */
+  ticket_type_id?: string
   relation?: string
   age?: number | null
 }

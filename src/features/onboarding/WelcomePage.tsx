@@ -5,15 +5,13 @@ import { Avatar, Notice, PageSkeleton } from '../../components/ui/Display'
 import { ChoiceGroup, Field, Input, Select } from '../../components/ui/Form'
 import { BRANCHES, CURRENT_YEAR, MEMBER_TYPES, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { safeNext } from '../../lib/safeNext'
 import type { MemberType } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { useMyPrivate, useUpdateProfile } from '../profile/queries'
 
 const PHONE = /^\+?[0-9 ]{10,16}$/
 
-function safeNext(next: string | null) {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
 
 export function WelcomePage() {
   const { session } = useAuth()
@@ -43,7 +41,8 @@ export function WelcomePage() {
     }
   }, [profile, priv, loaded])
 
-  if (isLoading || !profile) return <PageSkeleton />
+  // wait for both profile and private details so the prefill never overwrites typing
+  if (isLoading || !profile || !priv || !loaded) return <PageSkeleton />
   if (profile.onboarded && !params.get('edit')) return <Navigate to={next} replace />
 
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }))
@@ -68,18 +67,22 @@ export function WelcomePage() {
       document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
       return
     }
-    await update.mutateAsync({
-      profile: {
-        full_name: form.full_name.trim().replace(/\s+/g, ' '),
-        member_type: form.member_type as MemberType,
-        branch: form.branch || null,
-        grad_year: form.grad_year ? Number(form.grad_year) : null,
-        join_year: form.join_year ? Number(form.join_year) : null,
-        city: form.city.trim(),
-        onboarded: true,
-      },
-      phone: form.phone.trim().replace(/\s+/g, ' '),
-    })
+    try {
+      await update.mutateAsync({
+        profile: {
+          full_name: form.full_name.trim().replace(/\s+/g, ' '),
+          member_type: form.member_type as MemberType,
+          branch: form.branch || null,
+          grad_year: form.grad_year ? Number(form.grad_year) : null,
+          join_year: form.join_year ? Number(form.join_year) : null,
+          city: form.city.trim(),
+          onboarded: true,
+        },
+        phone: form.phone.trim().replace(/\s+/g, ' '),
+      })
+    } catch {
+      return // error shown below the form
+    }
     navigate(next, { replace: true })
   }
 

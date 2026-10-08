@@ -64,7 +64,14 @@ export function CheckInPage() {
   useEffect(() => {
     if (!eventId || !video.current) return
     let cancelled = false
-    void import('qr-scanner').then(async ({ default: QrScanner }) => {
+    void import('qr-scanner')
+      .catch(() => {
+        setCamError('The scanner couldn’t load (weak network?). Type the code below, or reload when the signal is better.')
+        return null
+      })
+      .then(async (mod) => {
+      if (!mod) return
+      const QrScanner = mod.default
       if (cancelled || !video.current) return
       const s = new QrScanner(video.current, (r) => void check(r.data), { highlightScanRegion: true, highlightCodeOutline: true, maxScansPerSecond: 5, preferredCamera: 'environment' })
       scanner.current = s

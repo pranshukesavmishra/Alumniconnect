@@ -40,30 +40,61 @@ function supportsWebp(): boolean {
   return webpSupported
 }
 
-export async function compressImage(file: Blob, maxSide: number, quality = 0.82): Promise<CompressedImage> {
+function toBlob(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not compress the photo.'))), type, quality))
+}
+
+function drawScaled(source: CanvasImageSource, sw: number, sh: number, maxSide: number): HTMLCanvasElement {
+  const scale = Math.min(1, maxSide / Math.max(sw, sh))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.max(1, Math.round(sw * scale))
+  canvas.height = Math.max(1, Math.round(sh * scale))
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not process the photo on this device.')
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(source, 0, 0, canvas.width, canvas.height)
+  return canvas
+}
+
+/** iOS Safari caps total canvas memory: release a canvas as soon as we're done with it. */
+function release(canvas: HTMLCanvasElement) {
+  canvas.width = 0
+  canvas.height = 0
+}
+
+/**
+ * Decodes the photo ONCE and produces one compressed image per requested size (largest first;
+ * smaller sizes are drawn from the previous canvas, which is fast and light on memory).
+ */
+export async function compressImageSizes(file: Blob, sizes: { maxSide: number; quality: number }[]): Promise<CompressedImage[]> {
   const source = await decode(file).catch(() => {
     throw new Error('This photo format isn’t supported. Please choose a JPG or PNG photo.')
   })
   const sw = 'naturalWidth' in source ? source.naturalWidth : source.width
   const sh = 'naturalHeight' in source ? source.naturalHeight : source.height
-  const scale = Math.min(1, maxSide / Math.max(sw, sh))
-  const width = Math.max(1, Math.round(sw * scale))
-  const height = Math.max(1, Math.round(sh * scale))
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Could not process the photo on this device.')
-  ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(source, 0, 0, width, height)
-  if ('close' in source) source.close()
-
   const type = supportsWebp() ? 'image/webp' : 'image/jpeg'
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not compress the photo.'))), type, quality),
-  )
-  return { blob, width, height, type, ext: type === 'image/webp' ? 'webp' : 'jpg' }
+  const ext = type === 'image/webp' ? 'webp' : 'jpg'
+  const out: CompressedImage[] = new Array(sizes.length)
+  const order = sizes.map((_, i) => i).sort((a, b) => sizes[b]!.maxSide - sizes[a]!.maxSide) // largest first
+  let prev: { canvas: HTMLCanvasElement; w: number; h: number } | null = null
+  try {
+    for (const idx of order) {
+      const { maxSide, quality } = sizes[idx]!
+      const canvas: HTMLCanvasElement = prev ? drawScaled(prev.canvas, prev.w, prev.h, maxSide) : drawScaled(source, sw, sh, maxSide)
+      out[idx] = { blob: await toBlob(canvas, type, quality), width: canvas.width, height: canvas.height, type, ext }
+      if (prev) release(prev.canvas)
+      prev = { canvas, w: canvas.width, h: canvas.height }
+    }
+  } finally {
+    if (prev) release(prev.canvas)
+    if ('close' in source) source.close()
+  }
+  return out // same order as requested
+}
+
+export async function compressImage(file: Blob, maxSide: number, quality = 0.82): Promise<CompressedImage> {
+  const [img] = await compressImageSizes(file, [{ maxSide, quality }])
+  return img!
 }
 
 export const AVATAR_SIZE = 480

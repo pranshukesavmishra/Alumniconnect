@@ -181,7 +181,7 @@ export function LinkedInImportPage() {
           )}
 
           <Checkbox checked={overwrite} onChange={setOverwrite}>
-            Replace the headline, city, about and current role I already have (otherwise only empty fields are filled)
+            Replace my existing headline, city, about, current role, skills and LinkedIn link (otherwise only empty fields are filled)
           </Checkbox>
 
           {save.error && <Notice tone="danger" title={friendlyError(save.error)} />}
