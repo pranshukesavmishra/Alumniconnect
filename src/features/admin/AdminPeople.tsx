@@ -13,6 +13,7 @@ import type { EventRow, Registration, RegistrationStatus } from '../../lib/types
 import { PaymentBadge, StatusBadge } from '../events/StatusBadge'
 import { exportAttendees, exportPayments, exportRegistrations } from './export'
 import { useRecordOfflinePayment, type AdminData } from './queries'
+import { RegistrationEditor } from './RegistrationEditor'
 
 const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -168,6 +169,8 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
             {manager && <KeyValue label="Total">{formatPaise(reg.amount_paise)}</KeyValue>}
           </dl>
         </Card>
+
+        {manager && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
 
         {manager && (
           <>

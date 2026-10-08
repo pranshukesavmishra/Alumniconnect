@@ -14,6 +14,7 @@ export const eventKeys = {
 export function useEvent(slug: string) {
   return useQuery({
     queryKey: eventKeys.event(slug),
+    staleTime: 5 * 60_000, // event details rarely change: show instantly, refresh in the background
     queryFn: async () => {
       const { data, error } = await supabase.from('events').select('*').eq('slug', slug).maybeSingle()
       if (error) throw error
@@ -26,6 +27,7 @@ export function useTicketTypes(eventId: string | undefined) {
   return useQuery({
     queryKey: eventKeys.tickets(eventId ?? ''),
     enabled: !!eventId,
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data, error } = await supabase.from('event_ticket_types').select('*').eq('event_id', eventId!).order('sort')
       if (error) throw error

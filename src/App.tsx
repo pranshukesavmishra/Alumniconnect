@@ -20,7 +20,22 @@ const LinkedInImportPage = lazy(() => import('./features/profile/LinkedInImportP
 const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage').then((m) => ({ default: m.DirectoryPage })))
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 const AdminEventPage = lazy(() => import('./features/admin/AdminEventPage').then((m) => ({ default: m.AdminEventPage })))
+const AdminMembers = lazy(() => import('./features/admin/AdminMembers').then((m) => ({ default: m.AdminMembers })))
+const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
+
+// Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
+if (typeof window !== 'undefined') {
+  const warm = () => {
+    void import('./features/events/RegisterPage')
+    void import('./features/events/MyRegistrationPage')
+    void import('./features/profile/ProfilePage')
+    void import('./features/directory/DirectoryPage')
+    void import('./features/events/PhotosPage')
+  }
+  const idle = (window as Window & { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback
+  window.addEventListener('load', () => (idle ? idle(warm) : setTimeout(warm, 1500)), { once: true })
+}
 
 /** Signed in, and the quick profile is done. */
 function RequireMember({ children }: { children: ReactNode }) {
@@ -76,6 +91,8 @@ export function App() {
             <Route path="me/edit" element={m(<EditProfilePage />)} />
             <Route path="me/import" element={m(<LinkedInImportPage />)} />
             <Route path="admin" element={m(<AdminHome />)} />
+            <Route path="admin/members" element={m(<AdminMembers />)} />
+            <Route path="admin/activity" element={m(<AdminAudit />)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
             <Route path="privacy" element={<PrivacyPage />} />
