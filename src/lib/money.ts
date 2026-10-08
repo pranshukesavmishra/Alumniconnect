@@ -1,10 +1,12 @@
 // All amounts are integers in paise. Format for display only.
 
-const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 0 })
+const inrWhole = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })
+const inrPaise = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+/** "₹2,500", "₹2,500.50" (never "₹2,500.5"), or "Free". */
 export function formatPaise(paise: number): string {
   if (paise === 0) return 'Free'
-  return inr.format(paise / 100)
+  return (paise % 100 === 0 ? inrWhole : inrPaise).format(paise / 100)
 }
 
 /** "2500" or "2500.50" for UPI links (UPI expects rupees with up to 2 decimals). */

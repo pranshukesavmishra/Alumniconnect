@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CalendarPlus, Check, Copy, Pencil, Share2, Smartphone, Upload, X } from 'lucide-react'
+import { CalendarPlus, Check, Copy, Pencil, Smartphone, Upload, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Field, Input } from '../../components/ui/Form'
+import { WhatsAppIcon } from '../../components/ui/Icons'
 import { QrCode } from '../../components/ui/QrCode'
 import { FOOD_PREFS, MEET_SLUG } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
@@ -379,7 +380,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
         rel="noreferrer"
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#1F9D57] px-5 text-[15px] font-semibold text-white hover:opacity-90"
       >
-        <Share2 className="size-4" aria-hidden /> Invite batchmates on WhatsApp
+        <WhatsAppIcon className="size-4" /> Invite batchmates on WhatsApp
       </a>
       {reg.status === 'pending_payment' && (
         <Button

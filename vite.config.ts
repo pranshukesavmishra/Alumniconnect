@@ -33,6 +33,9 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/auth\/v1/, /^\/rest\/v1/, /^\/storage\/v1/],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // heavy, rarely used parts (PDF reader, ZIP, QR scanner) load on demand instead of being pre-cached
+        globIgnores: ['**/pdf-*.js', '**/pdf.worker*.mjs', '**/jszip*.js', '**/qr-scanner*.js', '**/browser-*.js'],
+        maximumFileSizeToCacheInBytes: 1_000_000,
         runtimeCaching: [
           {
             // Public photos and avatars: cache on the phone so galleries open instantly and save data.

@@ -227,11 +227,26 @@ create policy "own payments or managers" on public.event_payments
     select 1 from public.event_registrations r
      where r.id = registration_id and (r.user_id = auth.uid() or public.is_event_manager(r.event_id))));
 
-create policy "members see visible photos" on public.event_photos
-  for select to authenticated using (not is_hidden or uploaded_by = auth.uid() or public.is_event_staff(event_id));
-create policy "members add photos" on public.event_photos
+-- Photos are for the JEC community: verified members, or anyone registered for that event.
+create or replace function public.can_view_event_photos(p_event uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.is_verified() or public.is_event_staff(p_event) or exists (
+    select 1 from public.event_registrations r
+     where r.event_id = p_event and r.user_id = auth.uid() and r.status <> 'cancelled');
+$$;
+
+create policy "community sees visible photos" on public.event_photos
+  for select to authenticated using (
+    uploaded_by = auth.uid() or public.is_event_staff(event_id) or (not is_hidden and public.can_view_event_photos(event_id)));
+create policy "community adds photos" on public.event_photos
   for insert to authenticated with check (
     uploaded_by = auth.uid()
+    and public.can_view_event_photos(event_id)
     and exists (select 1 from public.events e where e.id = event_id and e.is_published)
     and (select count(*) from public.event_photos p where p.event_id = event_photos.event_id
            and p.uploaded_by = auth.uid()) < 300

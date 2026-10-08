@@ -187,9 +187,8 @@ export function RegisterPage() {
           <div className="min-w-0">
             <p className="text-sm text-muted">Registering as</p>
             <p className="truncate font-semibold">{profile.full_name}</p>
-            <p className="truncate text-sm text-muted">
-              {[profile.branch, profile.grad_year && `Batch ${profile.grad_year}`, profile.city].filter(Boolean).join(' · ')}
-            </p>
+            {profile.branch && <p className="text-sm text-muted">{profile.branch}</p>}
+            <p className="text-sm text-muted">{[profile.grad_year && `Batch ${profile.grad_year}`, profile.city].filter(Boolean).join(' · ')}</p>
             <p className="text-sm text-muted">{priv?.phone}</p>
           </div>
           <Link to="/welcome?edit=1&next=/meet/register" className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label="Edit your details">
@@ -286,7 +285,7 @@ export function RegisterPage() {
 
         {step === 1 && (
           <section className="space-y-5">
-            <ChoiceGroup label="Food preference" options={FOOD_PREFS} value={(form.food_pref || null) as never} onChange={(v) => setForm((f) => ({ ...f, food_pref: v }))} columns={3} error={errors.food_pref} />
+            <ChoiceGroup label="Food preference" options={FOOD_PREFS} value={(form.food_pref || null) as never} onChange={(v) => setForm((f) => ({ ...f, food_pref: v }))} error={errors.food_pref} />
             <Field label="Your T-shirt size" error={errors.tshirt_size} hint="For the alumni meet kit.">
               {(p) => (
                 <Select {...p} value={form.tshirt_size} onChange={(e) => setForm((f) => ({ ...f, tshirt_size: e.target.value }))}>

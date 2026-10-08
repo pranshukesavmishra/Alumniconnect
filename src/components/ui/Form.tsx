@@ -143,20 +143,32 @@ export function Checkbox({
   onChange: (v: boolean) => void
   children: ReactNode
 }) {
+  const id = useId()
+  // The box has its own 44px tap target; the text is a label too, but links inside it stay tappable on their own.
   return (
-    <label className="flex cursor-pointer items-start gap-3 py-1">
-      <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span
-        aria-hidden
-        className={clsx(
-          'mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
-          checked ? 'border-primary bg-primary text-on-primary' : 'border-border bg-surface',
-        )}
-      >
-        {checked && <Check className="size-3.5" strokeWidth={3} />}
+    <div className="flex items-start gap-1">
+      <span className="relative -ml-3 grid size-11 shrink-0 place-items-center">
+        <input
+          id={id}
+          type="checkbox"
+          className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        <span
+          aria-hidden
+          className={clsx(
+            'grid size-5 place-items-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring',
+            checked ? 'border-primary bg-primary text-on-primary' : 'border-border bg-surface',
+          )}
+        >
+          {checked && <Check className="size-3.5" strokeWidth={3} />}
+        </span>
       </span>
-      <span className="text-[15px] leading-snug">{children}</span>
-    </label>
+      <label htmlFor={id} className="cursor-pointer pt-2.5 text-[15px] leading-snug">
+        {children}
+      </label>
+    </div>
   )
 }
 

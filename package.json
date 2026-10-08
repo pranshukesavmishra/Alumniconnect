@@ -22,11 +22,13 @@
     "jszip": "^3.10.2",
     "lucide-react": "^1.53.0",
     "papaparse": "^5.7.0",
+    "pdfjs-dist": "^6.4.299",
     "qr-scanner": "^1.4.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.4.0",
+    "read-excel-file": "^9.3.12",
     "sonner": "^2.0.8",
     "zod": "^4.6.5"
   },

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Notice } from '../../components/ui/Display'
+import { LinkedInIcon } from '../../components/ui/Icons'
 import { Field, Input } from '../../components/ui/Form'
 import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
@@ -20,15 +21,6 @@ function GoogleLogo() {
       <path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24Z" />
       <path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8l4-3.1Z" />
       <path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9Z" />
-    </svg>
-  )
-}
-
-function LinkedInLogo() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" aria-hidden>
-      <rect width="24" height="24" rx="4" fill="#0A66C2" />
-      <path fill="#fff" d="M7.1 9.5h2.6V18H7.1zM8.4 5.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm2.9 4.1h2.5v1.2c.4-.7 1.2-1.4 2.6-1.4 2.7 0 3.2 1.8 3.2 4.1V18h-2.6v-4.1c0-1 0-2.2-1.4-2.2s-1.6 1-1.6 2.1V18h-2.7z" />
     </svg>
   )
 }
@@ -117,7 +109,7 @@ export function SignInPage() {
               <Button variant="secondary" size="lg" block icon={<GoogleLogo />} loading={busy === 'google'} onClick={() => oauth('google')}>
                 Continue with Google
               </Button>
-              <Button variant="secondary" size="lg" block icon={<LinkedInLogo />} loading={busy === 'linkedin_oidc'} onClick={() => oauth('linkedin_oidc')}>
+              <Button variant="secondary" size="lg" block icon={<LinkedInIcon />} loading={busy === 'linkedin_oidc'} onClick={() => oauth('linkedin_oidc')}>
                 Continue with LinkedIn
               </Button>
               <Button variant="ghost" size="lg" block icon={<Mail className="size-5" />} onClick={() => setStep('email')}>

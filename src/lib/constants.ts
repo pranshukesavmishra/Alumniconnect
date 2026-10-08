@@ -1,17 +1,19 @@
 // Shared lists. Branch names can be edited here without touching any screen.
 
+// Departments as listed on jecjabalpur.ac.in (Oct 2026). Add older department names here if earlier batches need them.
 export const BRANCHES = [
   'Civil Engineering',
-  'Mechanical Engineering',
+  'Computer Science & Engineering',
   'Electrical Engineering',
   'Electronics & Telecommunication Engineering',
-  'Electronics & Communication Engineering',
-  'Computer Science & Engineering',
-  'Information Technology',
   'Industrial & Production Engineering',
-  'Architecture',
+  'Information Technology',
+  'Mechanical Engineering',
+  'Mechatronics',
+  'Artificial Intelligence & Data Science',
   'MCA',
-  'M.E. / M.Tech.',
+  'M.Tech. / M.E.',
+  'M.Sc. (Applied Sciences)',
   'Other',
 ] as const
 

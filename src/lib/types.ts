@@ -123,6 +123,8 @@ export interface Registration {
   arrival_note: string | null
   guests: Guest[]
   notes: string | null
+  terms_accepted_at: string | null
+  photo_consent: boolean
   headcount: number
   amount_paise: number
   admin_note: string | null
