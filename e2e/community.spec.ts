@@ -60,12 +60,34 @@ test('two batchmates post, like, comment, connect and chat', async ({ browser })
   await a.page.screenshot({ path: `${shots}/23-notifications.png` })
   await a.page.goto('/me/connections')
   await a.page.getByRole('button', { name: 'Accept' }).click()
+  // connecting turned the message request into a normal chat; it shows as unread
   await a.page.goto('/chat')
-  await a.page.getByText(`Meera ${run}`).click()
+  const row = a.page.getByRole('link', { name: new RegExp(`Meera ${run}`) })
+  await expect(row.getByLabel('1 unread')).toBeVisible()
+  await expect(a.page.getByRole('navigation', { name: 'Main' }).getByLabel('1 unread')).toBeVisible() // tab badge
+  await row.click()
   await expect(a.page.getByText('Hi Ravi! See you at the meet.')).toBeVisible()
+  await expect(a.page.getByRole('navigation', { name: 'Main' })).toBeHidden() // full-screen chat on phones
   await a.page.getByLabel('Message').fill('Yes! Booked my ticket.')
   await a.page.getByRole('button', { name: 'Send' }).click()
   await expect(b.page.getByText('Yes! Booked my ticket.')).toBeVisible({ timeout: 15_000 }) // arrives without reload
+  // Meera's own message shows "Seen" once Ravi has read it
+  await expect(b.page.getByText('Seen', { exact: true })).toBeVisible({ timeout: 30_000 })
+
+  // Batch group chat: Ravi writes; Meera (same batch) sees the history and the unread count
+  await a.page.goto('/groups')
+  await a.page.getByText('Computer Science & Engineering 2012').click()
+  await a.page.getByRole('link', { name: /Group chat/ }).click()
+  await a.page.getByLabel('Message').fill(`Batch 2012 dinner on Friday? ${run}`)
+  await a.page.getByRole('button', { name: 'Send' }).click()
+  await expect(a.page.getByText(`Batch 2012 dinner on Friday? ${run}`)).toBeVisible()
+  await b.page.goto('/chat')
+  const groupRow = b.page.getByRole('link', { name: /Computer Science & Engineering 2012/ })
+  await expect(groupRow).toContainText(`Ravi: Batch 2012 dinner on Friday? ${run}`)
+  await groupRow.click()
+  await expect(b.page.getByText(`Batch 2012 dinner on Friday? ${run}`)).toBeVisible()
+  await expect(b.page.getByText(`Ravi ${run}`).first()).toBeVisible() // sender name in groups
+  await b.page.screenshot({ path: `${shots}/24-group-chat.png` })
 
   await a.ctx.close()
   await b.ctx.close()

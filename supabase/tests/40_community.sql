@@ -70,7 +70,7 @@ do $$ begin
   assert (select count(*) from public.posts) = 0, 'unverified sees no posts';
   begin insert into public.posts (author_id, body) values (auth.uid(), 'x'); assert false, 'unverified cannot post';
   exception when insufficient_privilege then null; end;
-  begin perform public.start_conversation('40000000-0000-0000-0000-00000000000a'); assert false, 'unverified cannot message';
+  begin perform public.start_dm('40000000-0000-0000-0000-00000000000a'); assert false, 'unverified cannot message';
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;
@@ -79,7 +79,7 @@ reset role;
 select pg_temp.login('40000000-0000-0000-0000-00000000000a');
 set local role authenticated;
 do $$
-declare c public.conversations;
+declare c public.chats;
 begin
   assert (select like_count from public.posts where id = (select v from t where k = 'pub')) = 1, 'like counted';
   assert (select comment_count from public.posts where id = (select v from t where k = 'pub')) = 1, 'comment counted';
@@ -94,14 +94,18 @@ update public.profiles set message_policy = 'connections' where id = '40000000-0
 select pg_temp.login('40000000-0000-0000-0000-00000000000a');
 set local role authenticated;
 do $$
-declare c public.conversations;
+declare c public.chats;
 begin
-  begin perform public.start_conversation('40000000-0000-0000-0000-00000000000b'); assert false, 'policy respected';
+  begin perform public.start_dm('40000000-0000-0000-0000-00000000000b'); assert false, 'policy respected';
   exception when raise_exception then null; end;
-  c := public.start_conversation('40000000-0000-0000-0000-00000000000c');
+  c := public.start_dm('40000000-0000-0000-0000-00000000000c');
   assert not c.is_request, 'connected: not a request';
+  assert (public.start_dm('40000000-0000-0000-0000-00000000000c')).id = c.id, 'same DM reused';
   perform public.send_message(c.id, 'Hi Chetan');
-  assert (select last_message from public.conversations where id = c.id) = 'Hi Chetan', 'last message';
+  assert (select last_message from public.chats where id = c.id) = 'Hi Chetan', 'last message';
+  begin perform public.send_message(c.id, null, 'image', '[{"path":"40000000-0000-0000-0000-00000000000c/x/a.jpg"}]'); assert false, 'foreign attachment path';
+  exception when raise_exception then null; end;
+  assert (select unread from public.my_chats() where id = c.id) = 0, 'own message is not unread';
   insert into t values ('conv', c.id);
 end $$;
 reset role;
@@ -110,7 +114,10 @@ reset role;
 select pg_temp.login('40000000-0000-0000-0000-00000000000c');
 set local role authenticated;
 do $$ begin
-  assert (select count(*) from public.messages where conversation_id = (select v from t where k = 'conv')) = 1, 'C reads message';
+  assert (select count(*) from public.messages where chat_id = (select v from t where k = 'conv')) = 1, 'C reads message';
+  assert (select unread from public.my_chats() where id = (select v from t where k = 'conv')) = 1, 'C has 1 unread';
+  perform public.mark_chat_read((select v from t where k = 'conv'));
+  assert (select unread from public.my_chats() where id = (select v from t where k = 'conv')) = 0, 'read clears unread';
   assert exists (select 1 from public.notifications where user_id = auth.uid() and kind = 'message'), 'message notification';
   insert into public.blocks (blocker, blocked) values (auth.uid(), '40000000-0000-0000-0000-00000000000a');
   assert (select count(*) from public.posts where author_id = '40000000-0000-0000-0000-00000000000a') = 0, 'blocked posts hidden';
@@ -120,7 +127,63 @@ select pg_temp.login('40000000-0000-0000-0000-00000000000a');
 set local role authenticated;
 do $$ begin
   begin perform public.send_message((select v from t where k = 'conv'), 'hello?'); assert false, 'blocked cannot message';
+  exception when insufficient_privilege then null; end;
+  begin perform public.start_dm('40000000-0000-0000-0000-00000000000c'); assert false, 'blocked cannot start';
   exception when raise_exception then null; end;
+end $$;
+reset role;
+
+-- group chat: history is visible to everyone in the group, including people who join later
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$
+declare ch uuid; m public.messages;
+begin
+  select c.id into ch from public.chats c join public.groups g on g.id = c.group_id where g.slug = 'trekking';
+  insert into t values ('trek', ch);
+  m := public.send_message(ch, 'First trek plan: Bhedaghat in Jan');
+  perform public.send_message(ch, 'Who is in?', 'text', '[]', m.id);
+  perform public.send_message(ch, null, 'poll', '[]', null, '{"question":"Which date?","options":["4 Jan","11 Jan"]}');
+  begin
+    perform public.send_message((select c.id from public.chats c join public.groups g on g.id = c.group_id where g.slug = 'jec-official'), 'spam');
+    assert false, 'channel chat is admin-only';
+  exception when insufficient_privilege then null; end;
+  begin
+    perform public.send_message((select c.id from public.chats c join public.groups g on g.id = c.group_id where g.slug = 'mechanical-engineering-2010'), 'hi');
+    assert false, 'not a member of that batch';
+  exception when insufficient_privilege then null; end;
+  perform public.edit_message(m.id, 'First trek plan: Bhedaghat, 11 Jan');
+  assert (select edited_at is not null from public.messages where id = m.id), 'edited';
+end $$;
+reset role;
+-- B joins the circle later: sees all 3 earlier messages, but they don't count as unread; @mention notifies
+select pg_temp.login('40000000-0000-0000-0000-00000000000b');
+set local role authenticated;
+do $$
+declare ch uuid := (select v from t where k = 'trek'); p uuid;
+begin
+  assert (select count(*) from public.messages where chat_id = ch) = 0, 'non-member cannot read circle chat';
+  perform public.join_group((select id from public.groups where slug = 'trekking'), true);
+  assert (select count(*) from public.messages where chat_id = ch) = 3, 'new member sees past history';
+  assert (select unread from public.my_chats() where id = ch) = 0, 'history is not unread for late joiner';
+  select id into p from public.messages where chat_id = ch and kind = 'poll';
+  perform public.vote_poll(p, array[1]);
+  begin perform public.vote_poll(p, array[0, 1]); assert false, 'single choice';
+  exception when raise_exception then null; end;
+  perform public.react_to_message(p, '👍');
+  perform public.send_message(ch, 'Count me in @anil');
+end $$;
+reset role;
+do $$ begin
+  assert exists (select 1 from public.notifications where user_id = '40000000-0000-0000-0000-00000000000a' and kind = 'mention'), 'mention notified';
+  assert (select count(*) from public.poll_votes) = 1 and (select count(*) from public.message_reactions) = 1, 'vote + reaction';
+end $$;
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  assert (select unread from public.my_chats() where id = (select v from t where k = 'trek')) = 1, 'A has 1 unread in circle';
+  begin perform public.delete_message((select id from public.messages where body = 'Count me in @anil')); assert false, 'cannot delete others';
+  exception when insufficient_privilege then null; end;
 end $$;
 reset role;
 

@@ -1,10 +1,10 @@
 import clsx from 'clsx'
 import { CalendarHeart, Home, MessagesSquare, ShieldCheck, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { Link, NavLink, Outlet } from 'react-router'
+import { Link, NavLink, Outlet, useMatch } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
 import { useMyStaffEvents } from '../../features/events/queries'
-import { useConversations } from '../../features/chat/queries'
+import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
 import { Avatar } from '../ui/Display'
 
 interface Tab {
@@ -36,8 +36,10 @@ export function AppShell() {
   const tabs = useTabs()
   const { data: profile } = useMyProfile()
   const organiser = useIsOrganiser()
-  const { data: convs } = useConversations()
-  const unread = convs?.filter((c) => c.unread).length ?? 0
+  const unread = useUnreadChats()
+  useInboxLive()
+  // Focused screens (an open chat) use the whole height, like WhatsApp: no bottom tabs.
+  const focused = !!useMatch('/chat/:id')
   const desktopTabs = organiser ? [...tabs, { to: '/admin', label: 'Organise', icon: ShieldCheck } as Tab] : tabs
   return (
     <div className="min-h-dvh md:flex">
@@ -77,11 +79,12 @@ export function AppShell() {
         )}
       </aside>
 
-      <main className="min-w-0 flex-1 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+      <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]')}>
         <Outlet />
       </main>
 
       {/* phone bottom tabs */}
+      {!focused && (
       <nav
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 pb-safe backdrop-blur md:hidden"
@@ -114,6 +117,7 @@ export function AppShell() {
           ))}
         </ul>
       </nav>
+      )}
     </div>
   )
 }

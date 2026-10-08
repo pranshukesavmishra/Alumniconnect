@@ -1,112 +1,363 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
-import { useUserId } from '../auth/AuthProvider'
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
+import { hasUnknownSender, mergeMessages, PAGE_SIZE, removeLocal, type Attachment, type Message, type MessageKind, type MessageWindow, type Poll } from './merge'
 
-export interface Conversation {
+export type { Message } from './merge'
+
+export interface ChatSummary {
   id: string
-  user_a: string
-  user_b: string
-  started_by: string
+  kind: 'dm' | 'group'
+  title: string
+  avatar_url: string | null
+  icon: string | null
+  subtitle: string | null
+  other_id: string | null
+  group_id: string | null
+  group_slug: string | null
+  group_kind: 'batch' | 'year' | 'circle' | 'channel' | null
+  joined: boolean
+  is_group_admin: boolean
   is_request: boolean
-  last_message_at: string
+  started_by: string | null
   last_message: string | null
-  a_read_at: string | null
-  b_read_at: string | null
-  other: { id: string; full_name: string; avatar_url: string | null; grad_year: number | null; branch: string | null }
-  unread: boolean
+  last_message_at: string | null
+  last_sender: string | null
+  last_sender_name: string | null
+  unread: number
+  muted: boolean
+  last_read_at: string | null
+  other_last_read_at: string | null
+  pinned_message: string | null
+  can_post: boolean
 }
 
-export interface Message {
-  id: string
-  conversation_id: string
-  sender_id: string
-  body: string
-  created_at: string
-  pending?: boolean
+const SELECT = '*, sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)'
+
+export const chatKeys = {
+  list: (uid: string | null) => ['chats', uid] as const,
+  one: (id: string) => ['chat', id] as const,
+  messages: (id: string) => ['messages', id] as const,
 }
 
-const OTHER = 'id, full_name, avatar_url, grad_year, branch'
-
-export function useConversations() {
+/** My inbox: DMs + group chats, newest first, with unread counts. One round trip. */
+export function useChats() {
   const uid = useUserId()
+  const { data: me } = useMyProfile()
+  const verified = me?.verification === 'verified' || !!me?.is_admin
   return useQuery({
-    queryKey: ['conversations', uid],
-    enabled: !!uid,
+    queryKey: chatKeys.list(uid),
+    enabled: !!uid && verified,
     refetchInterval: 30_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('conversations')
-        .select(`*, a:profiles!conversations_user_a_fkey(${OTHER}), b:profiles!conversations_user_b_fkey(${OTHER})`)
-        .order('last_message_at', { ascending: false })
-        .limit(100)
+      const { data, error } = await supabase.rpc('my_chats', { p_chat: null })
       if (error) throw error
-      return (data as (Omit<Conversation, 'other' | 'unread'> & { a: Conversation['other']; b: Conversation['other'] })[]).map((c) => {
-        const iAmA = c.user_a === uid
-        const myRead = iAmA ? c.a_read_at : c.b_read_at
-        return { ...c, other: iAmA ? c.b : c.a, unread: !!c.last_message && (!myRead || myRead < c.last_message_at) } as Conversation
-      })
+      return data as ChatSummary[]
     },
   })
 }
 
-export function useMessages(conversationId: string | undefined) {
-  const qc = useQueryClient()
-  const q = useQuery({
-    queryKey: ['messages', conversationId],
-    enabled: !!conversationId,
-    refetchInterval: 8_000, // fallback if live updates are unavailable
+/** One chat's header info (also works for a channel I can read but don't follow). */
+export function useChat(id: string | undefined) {
+  return useQuery({
+    queryKey: chatKeys.one(id ?? ''),
+    enabled: !!id,
+    refetchInterval: 20_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('messages').select('*').eq('conversation_id', conversationId!).order('created_at', { ascending: false }).limit(200)
+      const { data, error } = await supabase.rpc('my_chats', { p_chat: id })
       if (error) throw error
-      return (data as Message[]).reverse()
+      return ((data as ChatSummary[])[0] ?? null) as ChatSummary | null
     },
   })
-  // Live: new messages appear instantly
+}
+
+/** Total unread chats for the tab badge (muted chats don't count, like WhatsApp). */
+export function useUnreadChats(): number {
+  const { data } = useChats()
+  return data?.filter((c) => c.unread > 0 && !c.muted).length ?? 0
+}
+
+/** Live inbox: any new message I can see refreshes the list (RLS filters what each person receives). */
+export function useInboxLive() {
+  const uid = useUserId()
+  const qc = useQueryClient()
   useEffect(() => {
-    if (!conversationId) return
+    if (!uid) return
+    let t: ReturnType<typeof setTimeout> | undefined
     const ch = supabase
-      .channel(`messages:${conversationId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, (payload) => {
-        const m = payload.new as Message
-        qc.setQueryData<Message[]>(['messages', conversationId], (old) => (old?.some((x) => x.id === m.id) ? old : [...(old ?? []).filter((x) => !(x.pending && x.body === m.body)), m]))
+      .channel(`inbox:${uid}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        clearTimeout(t)
+        t = setTimeout(() => void qc.invalidateQueries({ queryKey: ['chats', uid] }), 300)
       })
       .subscribe()
     return () => {
+      clearTimeout(t)
       void supabase.removeChannel(ch)
     }
-  }, [conversationId, qc])
-  return q
+  }, [uid, qc])
 }
 
-export function useSendMessage(conversationId: string) {
+async function fetchPage(chatId: string, before?: string): Promise<Message[]> {
+  let q = supabase.from('messages').select(SELECT).eq('chat_id', chatId).order('created_at', { ascending: false }).limit(PAGE_SIZE)
+  if (before) q = q.lt('created_at', before)
+  const { data, error } = await q
+  if (error) throw error
+  return (data as Message[]).reverse()
+}
+
+function setWindow(qc: QueryClient, chatId: string, fn: (w: MessageWindow) => MessageWindow) {
+  qc.setQueryData<MessageWindow>(chatKeys.messages(chatId), (old) => fn(old ?? { items: [], hasOlder: false }))
+}
+
+/**
+ * Messages of one chat. Loads the newest page, then older pages on demand. New messages, edits and
+ * deletions arrive live; if live updates are unavailable we poll the newest page instead.
+ */
+export function useMessages(chatId: string | undefined) {
   const qc = useQueryClient()
   const uid = useUserId()
+  const [live, setLive] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+
+  const q = useQuery({
+    queryKey: chatKeys.messages(chatId ?? ''),
+    enabled: !!chatId,
+    refetchInterval: live ? 60_000 : 5_000,
+    queryFn: async () => {
+      const page = await fetchPage(chatId!)
+      const old = qc.getQueryData<MessageWindow>(chatKeys.messages(chatId!))
+      if (!old) return { items: page, hasOlder: page.length === PAGE_SIZE }
+      return { items: mergeMessages(old.items, page, uid), hasOlder: old.hasOlder || (old.items.length === 0 && page.length === PAGE_SIZE) }
+    },
+  })
+
+  useEffect(() => {
+    if (!chatId) return
+    const onRow = (payload: { new: Record<string, unknown> }) => {
+      const m = payload.new as unknown as Message
+      if (!m?.id) return
+      const items = qc.getQueryData<MessageWindow>(chatKeys.messages(chatId))?.items ?? []
+      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(w.items, [m], uid) }))
+      if (hasUnknownSender(items, m)) void qc.invalidateQueries({ queryKey: chatKeys.messages(chatId) })
+    }
+    const ch = supabase
+      .channel(`messages:${chatId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
+      .subscribe((status) => setLive(status === 'SUBSCRIBED'))
+    return () => {
+      setLive(false)
+      void supabase.removeChannel(ch)
+    }
+  }, [chatId, qc, uid])
+
+  const loadOlder = useCallback(async () => {
+    if (!chatId || loadingOlder) return
+    const w = qc.getQueryData<MessageWindow>(chatKeys.messages(chatId))
+    const oldest = w?.items.find((m) => !m.pending && !m.failed)
+    if (!w?.hasOlder || !oldest) return
+    setLoadingOlder(true)
+    try {
+      const page = await fetchPage(chatId, oldest.created_at)
+      setWindow(qc, chatId, (cur) => ({ items: mergeMessages(cur.items, page, uid), hasOlder: page.length === PAGE_SIZE }))
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [chatId, loadingOlder, qc, uid])
+
+  return { ...q, loadOlder, loadingOlder, live }
+}
+
+export interface SendInput {
+  body: string
+  kind?: MessageKind
+  attachments?: Attachment[]
+  replyTo?: string | null
+  poll?: Poll | null
+  /** set when retrying a failed message */
+  localId?: string
+}
+
+/** Send with an instant optimistic bubble; on failure the bubble stays with "Retry". */
+export function useSendMessage(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  const { data: me } = useMyProfile()
   return useMutation({
-    mutationFn: async (body: string) => {
-      const { data, error } = await supabase.rpc('send_message', { p_conversation: conversationId, p_body: body })
+    mutationFn: async (input: SendInput & { localId: string }) => {
+      const { data, error } = await supabase.rpc('send_message', {
+        p_chat: chatId,
+        p_body: input.body,
+        p_kind: input.kind ?? 'text',
+        p_attachments: input.attachments ?? [],
+        p_reply_to: input.replyTo ?? null,
+        p_poll: input.poll ?? null,
+      })
       if (error) throw error
       return data as Message
     },
-    // show the message immediately; replace with the real one when the server confirms
-    onMutate: (body) => {
-      const temp: Message = { id: `temp-${Date.now()}`, conversation_id: conversationId, sender_id: uid!, body: body.trim(), created_at: new Date().toISOString(), pending: true }
-      qc.setQueryData<Message[]>(['messages', conversationId], (old) => [...(old ?? []), temp])
-      return { tempId: temp.id }
+    onMutate: (input) => {
+      const local: Message = {
+        id: input.localId,
+        chat_id: chatId,
+        sender_id: uid,
+        kind: input.kind ?? 'text',
+        body: input.body.trim() || null,
+        attachments: input.attachments ?? [],
+        reply_to: input.replyTo ?? null,
+        poll: input.poll ?? null,
+        edited_at: null,
+        deleted_at: null,
+        created_at: new Date().toISOString(),
+        sender: me ? { id: me.id, full_name: me.full_name, avatar_url: me.avatar_url } : null,
+        pending: true,
+      }
+      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(removeLocal(w.items, input.localId), [], uid).concat(local) }))
     },
-    onSuccess: (m, _b, ctx) => {
-      qc.setQueryData<Message[]>(['messages', conversationId], (old) => {
-        const without = (old ?? []).filter((x) => x.id !== ctx?.tempId)
-        return without.some((x) => x.id === m.id) ? without : [...without, m]
-      })
-      void qc.invalidateQueries({ queryKey: ['conversations', uid] })
+    onSuccess: (m, input) => {
+      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(removeLocal(w.items, input.localId), [m], uid) }))
+      qc.setQueryData<ChatSummary[]>(chatKeys.list(uid), (list) =>
+        list?.map((c) => (c.id === chatId ? { ...c, last_message: m.body, last_message_at: m.created_at, last_sender: uid, unread: 0, is_request: c.started_by === uid ? c.is_request : false } : c)),
+      )
+      void qc.invalidateQueries({ queryKey: chatKeys.list(uid) })
     },
-    onError: (_e, _b, ctx) => qc.setQueryData<Message[]>(['messages', conversationId], (old) => (old ?? []).filter((x) => x.id !== ctx?.tempId)),
+    onError: (_e, input) => {
+      setWindow(qc, chatId, (w) => ({ ...w, items: w.items.map((x) => (x.id === input.localId ? { ...x, pending: false, failed: true } : x)) }))
+    },
   })
 }
 
-export async function startConversation(otherId: string): Promise<string> {
-  const { data, error } = await supabase.rpc('start_conversation', { p_other: otherId })
+export function newLocalId(): string {
+  return `local-${crypto.randomUUID()}`
+}
+
+/** Discard a failed message. */
+export function discardLocal(qc: QueryClient, chatId: string, localId: string) {
+  setWindow(qc, chatId, (w) => ({ ...w, items: removeLocal(w.items, localId) }))
+}
+
+/** Mark read (server + local cache), and tell the other side via the live channel. */
+export function useMarkRead(chatId: string | undefined, notify: () => void) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  const busy = useRef(false)
+  return useCallback(async () => {
+    if (!chatId || busy.current) return
+    busy.current = true
+    try {
+      const { error } = await supabase.rpc('mark_chat_read', { p_chat: chatId })
+      if (error) return
+      qc.setQueryData<ChatSummary[]>(chatKeys.list(uid), (list) => list?.map((c) => (c.id === chatId ? { ...c, unread: 0 } : c)))
+      notify()
+    } finally {
+      busy.current = false
+    }
+  }, [chatId, notify, qc, uid])
+}
+
+/**
+ * Typing indicators and instant "Seen" updates over a lightweight broadcast channel (nothing stored).
+ * Works best-effort: if live updates are unavailable, Seen still updates on the next refresh.
+ */
+export function useChatSignals(chatId: string | undefined) {
+  const qc = useQueryClient()
+  const { data: me } = useMyProfile()
+  const [typing, setTyping] = useState<Record<string, { name: string; until: number }>>({})
+  const channel = useRef<RealtimeChannel | null>(null)
+  const joined = useRef(false)
+  const lastTypingSent = useRef(0)
+
+  useEffect(() => {
+    if (!chatId || !me) return
+    const ch = supabase.channel(`chat:${chatId}`, { config: { broadcast: { self: false } } })
+    ch.on('broadcast', { event: 'typing' }, ({ payload }) => {
+      const p = payload as { id: string; name: string; stop?: boolean }
+      if (!p?.id || p.id === me.id) return
+      setTyping((t) => {
+        const next = { ...t }
+        if (p.stop) delete next[p.id]
+        else next[p.id] = { name: p.name, until: Date.now() + 6000 }
+        return next
+      })
+    })
+      .on('broadcast', { event: 'read' }, () => void qc.invalidateQueries({ queryKey: chatKeys.one(chatId) }))
+      .on('broadcast', { event: 'message' }, ({ payload }) => {
+        const p = payload as { id?: string }
+        if (p?.id) setTyping((t) => {
+          const next = { ...t }
+          delete next[p.id!]
+          return next
+        })
+      })
+      .subscribe((status) => {
+        joined.current = status === 'SUBSCRIBED'
+      })
+    channel.current = ch
+    const sweep = setInterval(() => setTyping((t) => {
+      const now = Date.now()
+      const live = Object.entries(t).filter(([, v]) => v.until > now)
+      return live.length === Object.keys(t).length ? t : Object.fromEntries(live)
+    }), 2000)
+    return () => {
+      clearInterval(sweep)
+      channel.current = null
+      joined.current = false
+      void supabase.removeChannel(ch)
+    }
+  }, [chatId, me, qc])
+
+  const sendTyping = useCallback(() => {
+    if (!me || !channel.current || !joined.current || Date.now() - lastTypingSent.current < 3000) return
+    lastTypingSent.current = Date.now()
+    void channel.current.send({ type: 'broadcast', event: 'typing', payload: { id: me.id, name: me.full_name.split(' ')[0] } })
+  }, [me])
+  const sentMessage = useCallback(() => {
+    if (!me || !channel.current || !joined.current) return
+    lastTypingSent.current = 0
+    void channel.current.send({ type: 'broadcast', event: 'message', payload: { id: me.id } })
+  }, [me])
+  const sentRead = useCallback(() => {
+    if (!me || !channel.current || !joined.current) return
+    void channel.current.send({ type: 'broadcast', event: 'read', payload: { id: me.id } })
+  }, [me])
+
+  const names = Object.values(typing).map((t) => t.name)
+  return { typingNames: names, sendTyping, sentMessage, sentRead }
+}
+
+export async function startDm(otherId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('start_dm', { p_other: otherId })
   if (error) throw error
   return (data as { id: string }).id
+}
+
+export function useAcceptRequest(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('accept_message_request', { p_chat: chatId })
+      if (error) throw error
+    },
+    onSuccess: async () => {
+      await Promise.all([qc.invalidateQueries({ queryKey: chatKeys.one(chatId) }), qc.invalidateQueries({ queryKey: chatKeys.list(uid) })])
+    },
+  })
+}
+
+/** The chat id of a group (for the "Chat" button on a group page). */
+export function useGroupChatId(groupId: string | undefined) {
+  return useQuery({
+    queryKey: ['group-chat', groupId],
+    enabled: !!groupId,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('chats').select('id').eq('group_id', groupId!).maybeSingle()
+      if (error) throw error
+      return (data?.id as string | undefined) ?? null
+    },
+  })
 }

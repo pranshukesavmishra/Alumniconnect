@@ -9,7 +9,7 @@ import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
-import { startConversation } from '../chat/queries'
+import { startDm } from '../chat/queries'
 
 type ConnState = 'none' | 'sent' | 'received' | 'connected'
 
@@ -59,7 +59,7 @@ export function ProfileActions({ profile }: { profile: Profile }) {
   async function message() {
     setBusy('message')
     try {
-      const id = await startConversation(profile.id)
+      const id = await startDm(profile.id)
       navigate(`/chat/${id}`)
     } catch (e) {
       toast.error(friendlyError(e))

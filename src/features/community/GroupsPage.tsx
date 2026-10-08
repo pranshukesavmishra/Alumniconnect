@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Check, Plus, ShieldAlert, Users } from 'lucide-react'
+import { Check, ChevronRight, MessagesSquare, Plus, ShieldAlert, Users } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
 import { Composer } from './Composer'
 import { FeedList } from './FeedList'
+import { useGroupChatId } from '../chat/queries'
 import { useGroups, useJoinGroup, type GroupWithMe } from './queries'
 
 function GroupRow({ g }: { g: GroupWithMe }) {
@@ -155,6 +156,7 @@ export function GroupPage() {
       />
       <Page className="space-y-4">
         {g.description && <p className="text-[15px] text-muted">{g.description}</p>}
+        {canRead && <GroupChatLink groupId={g.id} channel={g.kind === 'channel'} />}
         {canPost && <Composer fixedGroup={g} />}
         {canRead ? (
           <FeedList scope={`group:${g.id}`} showGroup={false} empty={g.kind === 'channel' ? 'No announcements yet.' : 'Start the conversation.'} />
@@ -168,5 +170,23 @@ export function GroupPage() {
         )}
       </Page>
     </div>
+  )
+}
+
+/** Entry to the group's chat (full history is visible to every member, including new joiners). */
+function GroupChatLink({ groupId, channel }: { groupId: string; channel: boolean }) {
+  const { data: chatId } = useGroupChatId(groupId)
+  if (!chatId) return null
+  return (
+    <Link to={`/chat/${chatId}`} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 hover:bg-surface-2">
+      <span className="grid size-10 place-items-center rounded-full bg-primary-soft text-primary">
+        <MessagesSquare className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">{channel ? 'Channel updates' : 'Group chat'}</span>
+        <span className="block truncate text-sm text-muted">{channel ? 'Announcements from the admins' : 'Talk with everyone in this group'}</span>
+      </span>
+      <ChevronRight className="size-5 text-muted" aria-hidden />
+    </Link>
   )
 }

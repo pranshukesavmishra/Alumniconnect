@@ -224,7 +224,8 @@ export function useJoinGroup() {
       const { error } = await supabase.rpc('join_group', { p_group: input.id, p_join: input.join })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['groups'] }),
+    // joining/leaving changes the chat list too (every group has a chat)
+    onSuccess: () => Promise.all([qc.invalidateQueries({ queryKey: ['groups'] }), qc.invalidateQueries({ queryKey: ['chats'] })]),
   })
 }
 

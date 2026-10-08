@@ -1,0 +1,125 @@
+// Pure helpers for the message list kept in the query cache. Kept separate so they can be unit-tested:
+// ordering, de-duplication and optimistic (pending/failed) messages are where chat apps usually break.
+
+export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'poll' | 'system'
+
+export interface Attachment {
+  path: string
+  name?: string
+  mime?: string
+  size?: number
+  width?: number
+  height?: number
+  duration?: number
+}
+
+export interface Poll {
+  question: string
+  options: string[]
+  multiple?: boolean
+}
+
+export interface Sender {
+  id: string
+  full_name: string
+  avatar_url: string | null
+}
+
+export interface Message {
+  id: string
+  chat_id: string
+  sender_id: string | null
+  kind: MessageKind
+  body: string | null
+  attachments: Attachment[]
+  reply_to: string | null
+  poll: Poll | null
+  edited_at: string | null
+  deleted_at: string | null
+  created_at: string
+  sender?: Sender | null
+  /** client-only: optimistic message waiting for the server */
+  pending?: boolean
+  /** client-only: the send failed; the user can retry or discard */
+  failed?: boolean
+}
+
+export interface MessageWindow {
+  items: Message[]
+  /** true when older messages exist on the server that are not loaded yet */
+  hasOlder: boolean
+}
+
+export const PAGE_SIZE = 50
+
+const isLocal = (m: Message) => !!(m.pending || m.failed)
+
+function byTime(a: Message, b: Message): number {
+  // local (unsent) messages always sit at the bottom, in the order they were written
+  if (isLocal(a) !== isLocal(b)) return isLocal(a) ? 1 : -1
+  if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
+/**
+ * Merge server messages into the window. Server copies replace cached copies with the same id (edits,
+ * deletions) and keep a known sender if the incoming row has none (realtime rows carry no join).
+ * When `me` is given, each incoming message of mine also retires the oldest matching optimistic copy,
+ * so a message never shows twice when the live update arrives before the send call returns.
+ */
+export function mergeMessages(current: Message[], incoming: Message[], me?: string | null): Message[] {
+  const map = new Map<string, Message>()
+  for (const m of current) map.set(m.id, m)
+  const senders = new Map<string, Sender>()
+  for (const m of current) if (m.sender && m.sender_id) senders.set(m.sender_id, m.sender)
+  for (const m of incoming) {
+    const prev = map.get(m.id)
+    if (!prev && me && m.sender_id === me) {
+      const local = [...map.values()].find((x) => x.pending && x.kind === m.kind && (x.body ?? '') === (m.body ?? ''))
+      if (local) map.delete(local.id)
+    }
+    const sender = m.sender ?? prev?.sender ?? (m.sender_id ? senders.get(m.sender_id) : undefined) ?? null
+    map.set(m.id, { ...m, sender, pending: false, failed: false })
+  }
+  return [...map.values()].sort(byTime)
+}
+
+/** Drop one optimistic message (after it was confirmed or discarded). */
+export function removeLocal(items: Message[], localId: string): Message[] {
+  return items.filter((m) => m.id !== localId)
+}
+
+/** True when the realtime/poll row has a sender we don't know yet (so we should refetch to get the name). */
+export function hasUnknownSender(items: Message[], m: Message): boolean {
+  return !!m.sender_id && !m.sender && !items.some((x) => x.sender_id === m.sender_id && x.sender)
+}
+
+/** Preview line for a message (chat list, reply quote, notifications). */
+export function previewOf(m: Pick<Message, 'kind' | 'body' | 'attachments' | 'poll' | 'deleted_at'>): string {
+  if (m.deleted_at) return 'This message was deleted'
+  switch (m.kind) {
+    case 'image':
+      return m.body ? `📷 ${m.body}` : '📷 Photo'
+    case 'file':
+      return `📄 ${m.attachments[0]?.name ?? 'File'}`
+    case 'voice':
+      return '🎤 Voice message'
+    case 'poll':
+      return `📊 ${m.poll?.question ?? 'Poll'}`
+    default:
+      return m.body ?? ''
+  }
+}
+
+/** Index of the first unread message from someone else, given my last-read time when the chat was opened. */
+export function firstUnreadIndex(items: Message[], lastReadAt: string | null, me: string | null): number {
+  if (!lastReadAt) return -1
+  return items.findIndex((m) => !isLocal(m) && m.sender_id !== me && m.created_at > lastReadAt && !m.deleted_at)
+}
+
+/** Whether two consecutive messages should be visually grouped (same sender, within 5 minutes, same day). */
+export function isContinuation(prev: Message | undefined, m: Message): boolean {
+  if (!prev || prev.kind === 'system' || m.kind === 'system' || prev.sender_id !== m.sender_id) return false
+  const gap = new Date(m.created_at).getTime() - new Date(prev.created_at).getTime()
+  return gap >= 0 && gap < 5 * 60_000 && new Date(m.created_at).toDateString() === new Date(prev.created_at).toDateString()
+}

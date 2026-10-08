@@ -13,9 +13,3 @@ alter table public.posts add constraint posts_media_paths check (
   not jsonb_path_exists(media, '$[*] ? (!(@.path starts with $p))', jsonb_build_object('p', author_id::text || '/'))
 );
 
--- Live chat: stream new messages to open conversations (row-level security still applies).
-do $$ begin
-  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    alter publication supabase_realtime add table public.messages;
-  end if;
-end $$;

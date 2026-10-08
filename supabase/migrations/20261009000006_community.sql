@@ -322,118 +322,7 @@ begin
 end;
 $$;
 
--- ------------------------------------------------------------------ messages
-create table public.conversations (
-  id uuid primary key default gen_random_uuid(),
-  user_a uuid not null references public.profiles (id) on delete cascade,
-  user_b uuid not null references public.profiles (id) on delete cascade,
-  started_by uuid not null references public.profiles (id) on delete cascade,
-  is_request boolean not null default false, -- true until the recipient replies or accepts
-  last_message_at timestamptz not null default now(),
-  last_message text,
-  a_read_at timestamptz,
-  b_read_at timestamptz,
-  created_at timestamptz not null default now(),
-  check (user_a < user_b),
-  unique (user_a, user_b)
-);
-create index conversations_a_idx on public.conversations (user_a, last_message_at desc);
-create index conversations_b_idx on public.conversations (user_b, last_message_at desc);
-
-create table public.messages (
-  id uuid primary key default gen_random_uuid(),
-  conversation_id uuid not null references public.conversations (id) on delete cascade,
-  sender_id uuid not null references public.profiles (id) on delete cascade,
-  body text not null check (char_length(body) between 1 and 4000),
-  created_at timestamptz not null default now()
-);
-create index messages_conv_idx on public.messages (conversation_id, created_at desc);
-
--- Starts (or returns) my conversation with another member, honouring their "who can message me" setting.
-create or replace function public.start_conversation(p_other uuid)
-returns public.conversations language plpgsql security definer set search_path = '' as $$
-declare
-  me uuid := auth.uid();
-  a uuid := least(me, p_other);
-  b uuid := greatest(me, p_other);
-  c public.conversations;
-  other public.profiles;
-  mine public.profiles;
-  allowed boolean;
-  n int;
-begin
-  if not public.is_verified() then raise exception 'Only verified members can send messages' using errcode = '42501'; end if;
-  if p_other = me then raise exception 'That’s you!'; end if;
-  select * into other from public.profiles where id = p_other;
-  if not found then raise exception 'Member not found'; end if;
-  if public.is_blocked_between(me, p_other) then raise exception 'You can’t message this member'; end if;
-  select * into c from public.conversations where user_a = a and user_b = b;
-  if found then return c; end if;
-
-  select * into mine from public.profiles where id = me;
-  allowed := case other.message_policy
-    when 'jec' then true
-    when 'batch_and_connections' then public.are_connected(me, p_other) or (mine.grad_year is not null and mine.grad_year = other.grad_year)
-    else public.are_connected(me, p_other)
-  end;
-  if not allowed then raise exception 'This member only accepts messages from connections. Send a connection request first.'; end if;
-
-  select count(*) into n from public.conversations where started_by = me and created_at > now() - interval '1 day';
-  if n >= 10 and not public.are_connected(me, p_other) then
-    raise exception 'You can start up to 10 new conversations a day. Please try again tomorrow.';
-  end if;
-
-  insert into public.conversations (user_a, user_b, started_by, is_request)
-  values (a, b, me, not public.are_connected(me, p_other))
-  returning * into c;
-  return c;
-end;
-$$;
-
-create or replace function public.send_message(p_conversation uuid, p_body text)
-returns public.messages language plpgsql security definer set search_path = '' as $$
-declare
-  c public.conversations;
-  m public.messages;
-  me uuid := auth.uid();
-  other uuid;
-  n int;
-begin
-  select * into c from public.conversations where id = p_conversation for update;
-  if not found or me not in (c.user_a, c.user_b) then raise exception 'Conversation not found'; end if;
-  other := case when me = c.user_a then c.user_b else c.user_a end;
-  if public.is_blocked_between(me, other) then raise exception 'You can’t message this member'; end if;
-  if coalesce(btrim(p_body), '') = '' then raise exception 'Message is empty'; end if;
-  -- an unanswered request: the starter can send at most 3 messages until the other person replies
-  if c.is_request and me = c.started_by then
-    select count(*) into n from public.messages where conversation_id = c.id;
-    if n >= 3 then raise exception 'Please wait for a reply before sending more messages.'; end if;
-  end if;
-  insert into public.messages (conversation_id, sender_id, body) values (c.id, me, left(btrim(p_body), 4000)) returning * into m;
-  update public.conversations set
-    last_message_at = m.created_at,
-    last_message = left(m.body, 140),
-    is_request = case when me <> c.started_by then false else is_request end,
-    a_read_at = case when me = user_a then m.created_at else a_read_at end,
-    b_read_at = case when me = user_b then m.created_at else b_read_at end
-  where id = c.id;
-  return m;
-end;
-$$;
-
-create or replace function public.mark_conversation_read(p_conversation uuid)
-returns void language sql security definer set search_path = '' as $$
-  update public.conversations set
-    a_read_at = case when auth.uid() = user_a then now() else a_read_at end,
-    b_read_at = case when auth.uid() = user_b then now() else b_read_at end
-  where id = p_conversation and auth.uid() in (user_a, user_b);
-$$;
-
-create or replace function public.accept_message_request(p_conversation uuid)
-returns void language sql security definer set search_path = '' as $$
-  update public.conversations set is_request = false
-   where id = p_conversation and auth.uid() in (user_a, user_b) and auth.uid() <> started_by;
-$$;
+-- (messages live in 20261009000008_chat.sql)
 
 -- ------------------------------------------------------------------ reports
 create table public.reports (
@@ -510,9 +399,6 @@ begin
     elsif new.status = 'accepted' and old.status <> 'accepted' then
       perform public._notify(new.requester, 'connection_accepted', new.addressee, null, null);
     end if;
-  elsif tg_table_name = 'messages' then
-    perform public._notify((select case when c.user_a = new.sender_id then c.user_b else c.user_a end from public.conversations c where c.id = new.conversation_id),
-                           'message', new.sender_id, new.conversation_id, new.body);
   elsif tg_table_name = 'profiles' then
     -- someone joined using my invite
     if new.invited_by is not null and old.invited_by is null then
@@ -525,7 +411,6 @@ $$;
 create trigger post_likes_notify after insert on public.post_likes for each row execute function public._notify_trigger();
 create trigger comments_notify after insert on public.comments for each row execute function public._notify_trigger();
 create trigger connections_notify after insert or update on public.connections for each row execute function public._notify_trigger();
-create trigger messages_notify after insert on public.messages for each row execute function public._notify_trigger();
 create trigger profiles_invite_notify after update of invited_by on public.profiles for each row execute function public._notify_trigger();
 
 create or replace function public.mark_notifications_read()
@@ -676,8 +561,6 @@ alter table public.comments enable row level security;
 alter table public.post_likes enable row level security;
 alter table public.connections enable row level security;
 alter table public.follows enable row level security;
-alter table public.conversations enable row level security;
-alter table public.messages enable row level security;
 alter table public.reports enable row level security;
 alter table public.notifications enable row level security;
 alter table public.vouches enable row level security;
@@ -724,9 +607,6 @@ create policy "follows visible" on public.follows for select to authenticated us
 create policy "follow" on public.follows for insert to authenticated with check (follower = auth.uid() and public.is_verified());
 create policy "unfollow" on public.follows for delete to authenticated using (follower = auth.uid());
 
-create policy "own conversations" on public.conversations for select to authenticated using (auth.uid() in (user_a, user_b));
-create policy "messages in own conversations" on public.messages for select to authenticated using (
-  exists (select 1 from public.conversations c where c.id = conversation_id and auth.uid() in (c.user_a, c.user_b)));
 
 create policy "file reports" on public.reports for insert to authenticated with check (reporter = auth.uid() and public.is_verified());
 create policy "see own or all (admins)" on public.reports for select to authenticated using (reporter = auth.uid() or public.is_admin());
@@ -742,7 +622,7 @@ create policy "admins manage batch sizes" on public.batch_sizes for all to authe
 
 -- ------------------------------------------------------------------ grants
 grant select on public.groups, public.group_members, public.posts, public.comments, public.post_likes, public.connections,
-  public.follows, public.conversations, public.messages, public.reports, public.notifications, public.vouches, public.spotlights to authenticated;
+  public.follows, public.reports, public.notifications, public.vouches, public.spotlights to authenticated;
 grant insert, update, delete on public.groups, public.spotlights, public.batch_sizes to authenticated;          -- RLS: admins
 grant select on public.batch_sizes to authenticated;
 grant update (role) on public.group_members to authenticated;                                                    -- RLS: group admins
@@ -757,7 +637,6 @@ declare f text;
 begin
   foreach f in array array[
     'join_group(uuid, boolean)', 'propose_circle(text, text, text)', 'request_connection(uuid)', 'respond_connection(uuid, boolean)',
-    'start_conversation(uuid)', 'send_message(uuid, text)', 'mark_conversation_read(uuid)', 'accept_message_request(uuid)',
     'moderate(text, uuid, boolean, text)', 'mark_notifications_read()', 'vouch_for(uuid)', 'claim_invite(text)',
     'upcoming_birthdays()', 'member_badges(uuid)', 'batch_progress(int, text)', 'invite_leaderboard(int)']
   loop
