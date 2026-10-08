@@ -10,6 +10,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import type { EventRow, TicketType } from '../../lib/types'
 import { isValidUpiId } from '../../lib/upi'
+import { DriveArchive } from './DriveArchive'
 import { useSaveEvent } from './queries'
 
 /** ISO -> "2026-12-26T10:00" in India time, for <input type="datetime-local"> */
@@ -235,6 +236,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         <Field label="Payee name (as shown in UPI apps)">{(p) => <Input {...p} value={f.upi_payee_name} onChange={set('upi_payee_name')} maxLength={80} />}</Field>
         <Field label="Payment instructions" optional>{(p) => <Textarea {...p} rows={2} value={f.payment_note} onChange={set('payment_note')} maxLength={1000} />}</Field>
       </section>
+
+      {e && <DriveArchive eventId={e.id} />}
 
       <section className="space-y-4">
         <SectionTitle>Contact</SectionTitle>

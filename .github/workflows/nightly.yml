@@ -1,0 +1,74 @@
+name: Nightly backup and keep-alive
+
+# Runs every night at 02:00 India time (20:30 UTC), and can be started by hand from the Actions tab.
+# 1. Calls the nightly-backup function: CSV backup to the committee's Google Drive + keeps Supabase awake.
+# 2. Takes a full database dump, compresses and ENCRYPTS it (AES-256, password known only to the committee),
+#    and stores it in places independent of Google Drive:
+#      - as a GitHub Actions artifact (kept 90 days)
+#      - in S3-compatible storage (Cloudflare R2 or Backblaze B2, free tiers) if those secrets are set
+# Secrets (repo Settings > Secrets and variables > Actions): see docs/SETUP.md, "Backups".
+on:
+  schedule:
+    - cron: '30 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Drive backup and keep-alive
+        env:
+          FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          BACKUP_SECRET: ${{ secrets.BACKUP_SECRET }}
+        run: |
+          if [ -z "$FUNCTIONS_URL" ]; then echo "SUPABASE_FUNCTIONS_URL not set, skipping"; exit 0; fi
+          curl --fail-with-body -sS -X POST "$FUNCTIONS_URL/nightly-backup" -H "x-backup-secret: $BACKUP_SECRET"
+
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+
+      - name: Dump, compress and encrypt the database
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then echo "::error::SUPABASE_DB_URL and BACKUP_PASSPHRASE are required"; exit 1; fi
+          STAMP=$(TZ=Asia/Kolkata date +%Y-%m-%d_%H%M)
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # DATA ONLY: the structure is rebuilt from supabase/migrations (see docs/BACKUP_RESTORE.md).
+          # Includes sign-in accounts (auth.users/identities) and photo file records (storage.objects).
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --format=custom --compress=9 --data-only --no-owner --no-privileges \
+            --table='public.*' --table=auth.users --table=auth.identities --table=storage.objects --file=db.dump
+          /usr/lib/postgresql/17/bin/pg_restore --list db.dump > /dev/null   # sanity check: the dump is readable
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 \
+            --output "jec-alumni-db-$STAMP.dump.gpg" db.dump
+          rm db.dump
+          ls -lh jec-alumni-db-*.gpg
+
+      - name: Keep in GitHub (90 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: jec-alumni-db-${{ env.STAMP }}
+          path: jec-alumni-db-*.gpg
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Copy to S3-compatible storage (R2 / B2)
+        env:
+          S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          if [ -z "$S3_BUCKET" ]; then echo "No S3 backup bucket configured, skipping"; exit 0; fi
+          aws s3 cp jec-alumni-db-*.gpg "s3://$S3_BUCKET/database/" --endpoint-url "$S3_ENDPOINT"

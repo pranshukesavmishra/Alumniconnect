@@ -28,13 +28,19 @@ create table public.events (
   contact_phone text check (char_length(contact_phone) <= 40),
   contact_email text check (char_length(contact_email) <= 120),
   cover_url text,
-  drive_folder_id text,
   is_published boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create trigger events_touch before update on public.events
   for each row execute function public.touch_updated_at();
+
+-- Admin-only settings kept out of the public events table (e.g. the Google Drive archive folder).
+create table public.event_settings (
+  event_id uuid primary key references public.events (id) on delete cascade,
+  drive_folder_id text check (drive_folder_id ~ '^[A-Za-z0-9_-]{10,200}$'),
+  updated_at timestamptz not null default now()
+);
 
 create table public.event_ticket_types (
   id uuid primary key default gen_random_uuid(),
@@ -191,6 +197,7 @@ $$;
 
 -- ------------------------------------------------------------------ RLS
 alter table public.events enable row level security;
+alter table public.event_settings enable row level security;
 alter table public.event_ticket_types enable row level security;
 alter table public.event_staff enable row level security;
 alter table public.event_registrations enable row level security;
@@ -201,6 +208,9 @@ alter table public.event_photos enable row level security;
 create policy "published events are public" on public.events
   for select using (is_published or public.is_admin());
 create policy "admins manage events" on public.events
+  for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+create policy "admins manage event settings" on public.event_settings
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 create policy "ticket types are public" on public.event_ticket_types

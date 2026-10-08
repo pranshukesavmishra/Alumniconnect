@@ -84,7 +84,6 @@ export interface EventRow {
   contact_phone: string | null
   contact_email: string | null
   cover_url: string | null
-  drive_folder_id: string | null
   is_published: boolean
 }
 

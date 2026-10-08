@@ -423,3 +423,7 @@ content_path = "./supabase/templates/otp.html"
 [auth.email.template.confirmation]
 subject = "Your JEC Alumni Connect sign-in code"
 content_path = "./supabase/templates/otp.html"
+
+# Called by the scheduled GitHub Action with a shared secret instead of a user JWT.
+[functions.nightly-backup]
+verify_jwt = false

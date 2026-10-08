@@ -18,6 +18,7 @@ grant select, insert, update, delete on public.experiences, public.educations to
 grant select on public.events, public.event_ticket_types to anon, authenticated;
 grant insert, update, delete on public.events, public.event_ticket_types to authenticated;  -- RLS: admins only
 grant select, insert, update, delete on public.event_staff to authenticated;                 -- RLS: admins only
+grant select, insert, update, delete on public.event_settings to authenticated;              -- RLS: admins only
 grant select on public.event_registrations, public.event_registration_items, public.event_payments to authenticated;
 grant select, insert, delete on public.event_photos to authenticated;
 grant update (caption) on public.event_photos to authenticated;

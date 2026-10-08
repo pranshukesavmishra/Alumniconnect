@@ -14,6 +14,25 @@ import { useUserId } from '../auth/AuthProvider'
 import { useEvent } from './queries'
 
 type Kind = 'throwback' | 'event'
+
+/**
+ * Sends the full-quality original to the committee's Google Drive (best effort, in the background).
+ * The phone uploads straight to Google; our server only hands out a one-time upload link.
+ * If Drive isn't set up yet the server answers {skipped: true} and nothing happens.
+ */
+async function archiveOriginal(photoId: string, file: File) {
+  try {
+    const start = await supabase.functions.invoke('drive-upload', { body: { action: 'start', photo_id: photoId, mime_type: file.type || 'image/jpeg', size: file.size } })
+    const url = (start.data as { upload_url?: string } | null)?.upload_url
+    if (start.error || !url) return
+    const put = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type || 'image/jpeg' }, body: file })
+    if (!put.ok) throw new Error(`Drive upload failed: ${put.status}`)
+    const { id } = (await put.json()) as { id: string }
+    await supabase.functions.invoke('drive-upload', { body: { action: 'finish', photo_id: photoId, file_id: id } })
+  } catch (e) {
+    console.warn('Original not archived to Drive (photo is still saved in the app)', e)
+  }
+}
 const PAGE = 48
 
 export function PhotosPage() {
@@ -62,16 +81,13 @@ export function PhotosPage() {
         if (a.error) throw a.error
         const b = await supabase.storage.from('event-photos').upload(tpath, thumb.blob, { contentType: thumb.type })
         if (b.error) throw b.error
-        const { error } = await supabase.from('event_photos').insert({
-          event_id: event!.id,
-          uploaded_by: uid,
-          storage_path: path,
-          thumb_path: tpath,
-          width: big.width,
-          height: big.height,
-          kind,
-        })
+        const { data: row, error } = await supabase
+          .from('event_photos')
+          .insert({ event_id: event!.id, uploaded_by: uid, storage_path: path, thumb_path: tpath, width: big.width, height: big.height, kind })
+          .select('id')
+          .single()
         if (error) throw error
+        void archiveOriginal(row.id as string, file)
       } catch (e) {
         failed++
         console.error(e)
