@@ -198,8 +198,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
         {isMe && (
           <section className="pt-2">
             <Button
-              variant="ghost"
-              className="text-danger hover:bg-danger-soft"
+              variant="danger-ghost"
               icon={<LogOut className="size-4" />}
               onClick={async () => {
                 await signOut()

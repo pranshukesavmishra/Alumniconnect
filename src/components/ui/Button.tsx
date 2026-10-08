@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost' | 'success'
 type Size = 'md' | 'lg' | 'sm'
 
 const base =
@@ -15,6 +15,7 @@ const variants: Record<Variant, string> = {
   secondary: 'bg-surface text-primary border border-border hover:bg-primary-soft',
   ghost: 'text-primary hover:bg-primary-soft',
   danger: 'bg-danger text-white hover:opacity-90',
+  'danger-ghost': 'text-danger hover:bg-danger-soft',
   success: 'bg-success text-white hover:opacity-90',
 }
 

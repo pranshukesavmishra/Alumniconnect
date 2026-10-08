@@ -384,8 +384,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
       </a>
       {reg.status === 'pending_payment' && (
         <Button
-          variant="ghost"
-          className="text-danger hover:bg-danger-soft"
+          variant="danger-ghost"
           loading={cancel.isPending}
           onClick={() => {
             if (window.confirm('Cancel your registration? You can register again later while registration is open.')) {

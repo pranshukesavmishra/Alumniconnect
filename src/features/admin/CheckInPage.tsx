@@ -93,9 +93,9 @@ export function CheckInPage() {
 
   const tone = result?.kind === 'ok' ? 'bg-success text-white' : result?.kind === 'again' ? 'bg-accent text-[#1d2433]' : result ? 'bg-danger text-white' : ''
   return (
-    <div className="min-h-dvh bg-black text-white">
+    <div className="min-h-dvh">
       <PageHeader title="Check-in" subtitle={`${data.event.title} · ${count} people this session`} back={`/admin/events/${slug}`} />
-      <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden bg-black">
+      <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden bg-black text-white sm:mt-4 sm:rounded-3xl">
         <video ref={video} className="size-full object-cover" muted playsInline />
         {camError && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center">
@@ -137,7 +137,7 @@ export function CheckInPage() {
           </div>
         )}
 
-        <form onSubmit={submitManual} className="flex gap-2 text-text">
+        <form onSubmit={submitManual} className="flex gap-2">
           <div className="relative flex-1">
             <Keyboard className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />
             <Input aria-label="Ticket code" placeholder="Type code, e.g. 7KQ4M2" className="pl-11 font-mono uppercase" value={manual} onChange={(e) => setManual(e.target.value)} autoCapitalize="characters" />
@@ -146,7 +146,7 @@ export function CheckInPage() {
             Check
           </Button>
         </form>
-        <p className="text-center text-sm text-white/60">Point the camera at the attendee’s QR code. Green = welcome, amber = already in, red = help desk.</p>
+        <p className="text-center text-sm text-muted">Point the camera at the attendee’s QR code. Green = welcome, amber = already in, red = help desk.</p>
       </div>
     </div>
   )

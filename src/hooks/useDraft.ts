@@ -16,7 +16,9 @@ export function useDraft<T>(key: string | null, initial: () => T): [T, (v: T | (
     return initial()
   })
   const keyRef = useRef(key)
-  keyRef.current = key
+  useEffect(() => {
+    keyRef.current = key
+  }, [key])
 
   useEffect(() => {
     if (!key) return

@@ -114,7 +114,7 @@ function Bars({ rows }: { rows: { label: string; value: number }[] }) {
   return (
     <ul className="space-y-2">
       {rows.map((r) => (
-        <li key={r.label} className="grid grid-cols-[6rem_1fr_3rem] items-center gap-3 text-sm">
+        <li key={r.label} className="grid grid-cols-[8.5rem_1fr_3rem] items-center gap-3 text-sm">
           <span className="truncate text-muted">{r.label}</span>
           <span className="h-2.5 overflow-hidden rounded-full bg-surface-2">
             <span className="block h-full rounded-full bg-primary" style={{ width: `${(r.value / max) * 100}%` }} />
