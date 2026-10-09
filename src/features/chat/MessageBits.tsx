@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pencil, Pin, PinOff, Plus, Reply, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pause, Pencil, Pin, PinOff, Play, Plus, Reply, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -8,7 +8,7 @@ import { Avatar } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
 import { Linkified } from '../community/PostCard'
 import { downloadUrl, formatBytes, useMediaUrl } from './media'
-import { groupReactions, previewOf, type Attachment, type Message, type Reaction, type ReplyPreview } from './merge'
+import { formatDuration, groupReactions, nextSelection, pollTally, previewOf, type Attachment, type Message, type Reaction, type ReplyPreview } from './merge'
 
 export const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏']
 const MORE_REACTIONS = ['🔥', '🎉', '👏', '💯', '🙌', '😍', '🤣', '😊', '🤔', '😎', '🥳', '😅', '👌', '✅', '🙂', '😇', '🤝', '💪', '🌟', '🎂', '🇮🇳', '☕', '🍰', '📸']
@@ -460,5 +460,112 @@ export function RichText({ text, mentions, mine }: { text: string; mentions: boo
         ),
       )}
     </>
+  )
+}
+
+// ------------------------------------------------------------------ voice notes
+export function VoicePlayer({ a, mine, pending }: { a: Attachment; mine: boolean; pending?: boolean }) {
+  const { data: url, isError } = useMediaUrl(a.path, a.localUrl)
+  const src = a.localUrl ?? url
+  const audio = useRef<HTMLAudioElement>(null)
+  const [playing, setPlaying] = useState(false)
+  const [pos, setPos] = useState(0)
+  const [dur, setDur] = useState(a.duration ?? 0)
+  const [rate, setRate] = useState(1)
+
+  function toggle() {
+    const el = audio.current
+    if (!el) return
+    if (el.paused) {
+      // only one voice note plays at a time
+      document.querySelectorAll('audio').forEach((x) => x !== el && x.pause())
+      void el.play().catch(() => toast.error('Couldn’t play this voice message.'))
+    } else el.pause()
+  }
+  function cycleRate() {
+    const next = rate === 1 ? 1.5 : rate === 1.5 ? 2 : 1
+    setRate(next)
+    if (audio.current) audio.current.playbackRate = next
+  }
+  const shown = playing || pos > 0 ? pos : dur
+  return (
+    <div className="flex w-[min(62vw,260px)] items-center gap-2 py-0.5">
+      <button type="button" onClick={toggle} disabled={!src || pending} className={clsx('grid size-11 shrink-0 place-items-center rounded-full', mine ? 'bg-white/20' : 'bg-primary-soft text-primary')} aria-label={playing ? 'Pause voice message' : 'Play voice message'}>
+        {!src && !isError ? <Loader2 className="size-5 animate-spin" aria-hidden /> : playing ? <Pause className="size-5" aria-hidden /> : <Play className="size-5" aria-hidden />}
+      </button>
+      <input
+        type="range"
+        min={0}
+        max={Math.max(dur, 0.1)}
+        step={0.1}
+        value={Math.min(pos, dur || pos)}
+        onChange={(e) => {
+          const t = Number(e.target.value)
+          setPos(t)
+          if (audio.current) audio.current.currentTime = t
+        }}
+        aria-label="Seek"
+        className="h-8 min-w-0 flex-1 accent-current"
+      />
+      <span className="w-9 shrink-0 text-xs tabular-nums">{formatDuration(shown)}</span>
+      <button type="button" onClick={cycleRate} className={clsx('min-h-8 shrink-0 rounded-full px-1.5 text-xs font-bold', mine ? 'bg-white/20' : 'bg-surface-2')} aria-label={`Speed ${rate}x`}>
+        {rate}×
+      </button>
+      {src && (
+        <audio
+          ref={audio}
+          src={src}
+          preload="metadata"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => {
+            setPlaying(false)
+            setPos(0)
+          }}
+          onTimeUpdate={(e) => setPos(e.currentTarget.currentTime)}
+          onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setDur(e.currentTarget.duration)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------ polls
+export function PollCard({ m, me, mine, onVote }: { m: Message; me: string | null; mine: boolean; onVote: (options: number[]) => void }) {
+  const poll = m.poll
+  if (!poll) return null
+  const t = pollTally(poll, m.votes, me)
+  const total = t.counts.reduce((a, b) => a + b, 0)
+  return (
+    <div className="w-[min(70vw,300px)] py-0.5">
+      <p className="mb-2 font-semibold">📊 {poll.question}</p>
+      <p className={clsx('mb-1.5 text-xs', mine ? 'text-on-primary/75' : 'text-muted')}>{poll.multiple ? 'Select one or more' : 'Select one'}</p>
+      <ul className="space-y-1.5">
+        {poll.options.map((o, i) => {
+          const picked = t.mine.includes(i)
+          const pct = total ? Math.round((t.counts[i]! / total) * 100) : 0
+          return (
+            <li key={i}>
+              <button
+                type="button"
+                disabled={m.pending || m.failed}
+                onClick={() => onVote(nextSelection(poll, t.mine, i))}
+                role={poll.multiple ? 'checkbox' : 'radio'}
+                aria-checked={picked}
+                className={clsx('relative flex min-h-11 w-full items-center gap-2 overflow-hidden rounded-xl border px-3 text-left', mine ? 'border-white/30' : 'border-border')}
+              >
+                <span aria-hidden className={clsx('absolute inset-y-0 left-0', mine ? 'bg-white/20' : 'bg-primary-soft')} style={{ width: `${pct}%` }} />
+                <span className={clsx('relative grid size-5 shrink-0 place-items-center border-2', poll.multiple ? 'rounded-md' : 'rounded-full', picked ? (mine ? 'border-white bg-white text-primary' : 'border-primary bg-primary text-on-primary') : 'border-current opacity-60')}>
+                  {picked && <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden><path d="m2 6 3 3 5-6" /></svg>}
+                </span>
+                <span className="relative min-w-0 flex-1 break-words">{o}</span>
+                <span className="relative text-sm font-semibold tabular-nums">{t.counts[i]}</span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <p className={clsx('mt-1.5 text-xs', mine ? 'text-on-primary/75' : 'text-muted')}>{t.voters} {t.voters === 1 ? 'vote' : 'votes'}</p>
+    </div>
   )
 }

@@ -65,10 +65,13 @@ alter table public.message_reactions replica identity full;  -- deletions carry 
 
 create table public.poll_votes (
   message_id uuid not null references public.messages (id) on delete cascade,
+  chat_id uuid not null references public.chats (id) on delete cascade,   -- lets live updates filter by chat
   user_id uuid not null references public.profiles (id) on delete cascade,
   option_index int not null check (option_index between 0 and 11),
   primary key (message_id, user_id, option_index)
 );
+create index poll_votes_chat_idx on public.poll_votes (chat_id);
+alter table public.poll_votes replica identity full;
 
 -- ------------------------------------------------------------------ access
 create or replace function public.can_read_chat(p_chat uuid)
@@ -314,7 +317,7 @@ begin
     raise exception 'Choose one option';
   end if;
   delete from public.poll_votes where message_id = p_message and user_id = auth.uid();
-  insert into public.poll_votes (message_id, user_id, option_index) select p_message, auth.uid(), o from unnest(p_options) o;
+  insert into public.poll_votes (message_id, chat_id, user_id, option_index) select p_message, m.chat_id, auth.uid(), o from unnest(p_options) o;
 end;
 $$;
 
@@ -470,8 +473,7 @@ create policy "own read state" on public.chat_reads for select to authenticated 
 create policy "readable messages" on public.messages for select to authenticated using (
   public.can_read_chat(chat_id) and (sender_id is null or not public.is_blocked_between(auth.uid(), sender_id)));
 create policy "readable reactions" on public.message_reactions for select to authenticated using (public.can_read_chat(chat_id));
-create policy "readable votes" on public.poll_votes for select to authenticated using (
-  exists (select 1 from public.messages m where m.id = message_id and public.can_read_chat(m.chat_id)));
+create policy "readable votes" on public.poll_votes for select to authenticated using (public.can_read_chat(chat_id));
 
 grant select on public.chats, public.chat_reads, public.messages, public.message_reactions, public.poll_votes to authenticated;
 
@@ -516,6 +518,6 @@ create policy "read chat media of my chats" on storage.objects for select to aut
 -- Live updates
 do $$ begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    alter publication supabase_realtime add table public.messages, public.message_reactions;
+    alter publication supabase_realtime add table public.messages, public.message_reactions, public.poll_votes;
   end if;
 end $$;

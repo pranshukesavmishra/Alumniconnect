@@ -1,11 +1,13 @@
 import clsx from 'clsx'
-import { Camera, Check, FileText, Image as ImageIcon, Paperclip, Pencil, Reply, Send, X } from 'lucide-react'
+import { BarChart3, Camera, Check, FileText, Image as ImageIcon, Mic, Paperclip, Pencil, Plus, Reply, Send, Trash2, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Avatar } from '../../components/ui/Display'
 import { fileProblem, formatBytes, isPhoto, MAX_PHOTOS } from './media'
-import { previewOf, type Message, type ReplyPreview } from './merge'
+import { formatDuration, previewOf, type Message, type Poll, type ReplyPreview } from './merge'
+import { friendlyError } from '../../lib/errors'
+import { MAX_VOICE_SECONDS, useVoiceRecorder, voiceSupported } from './useVoiceRecorder'
 import { useMentionCandidates, type SendInput } from './queries'
 
 const MAX_PICK = 30
@@ -41,6 +43,8 @@ export function ChatComposer({
   const [text, setText] = useState('')
   const [picked, setPicked] = useState<Picked[]>([])
   const [attachOpen, setAttachOpen] = useState(false)
+  const [pollOpen, setPollOpen] = useState(false)
+  const voice = useVoiceRecorder()
   const [saving, setSaving] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const photoInput = useRef<HTMLInputElement>(null)
@@ -137,6 +141,20 @@ export function ChatComposer({
     }
   }
 
+  async function startVoice() {
+    try {
+      await voice.start()
+    } catch (e) {
+      toast.error(friendlyError(e))
+    }
+  }
+  async function sendVoice() {
+    const r = await voice.stop()
+    if (!r) return toast('Hold on a little longer — voice messages need at least 1 second.')
+    onSend({ body: '', kind: 'voice', files: [r.file], duration: r.seconds, replyTo })
+    onCancelReply()
+  }
+
   async function submit(e?: FormEvent) {
     e?.preventDefault()
     const body = text.trim()
@@ -173,6 +191,7 @@ export function ChatComposer({
     input.current?.focus()
   }
 
+  const showMic = !editing && !text.trim() && picked.length === 0 && voiceSupported()
   const canSend = editing ? !!text.trim() || editing.kind !== 'text' : !!text.trim() || picked.length > 0
   const banner = editing ? (
     <Bar icon={<Pencil className="size-4" />} title="Edit message" text={editing.body ?? previewOf(editing)} onClose={() => {
@@ -218,6 +237,21 @@ export function ChatComposer({
           ))}
         </ul>
       )}
+      {voice.recording ? (
+        <div className="flex items-center gap-2" role="group" aria-label="Recording voice message">
+          <button type="button" onClick={() => void voice.cancel()} className="grid size-12 shrink-0 place-items-center rounded-full text-danger hover:bg-danger-soft" aria-label="Discard recording">
+            <Trash2 className="size-5" />
+          </button>
+          <div className="flex min-h-12 flex-1 items-center gap-3 rounded-3xl border border-border bg-surface px-4" role="status">
+            <span className="size-3 animate-pulse rounded-full bg-danger" aria-hidden />
+            <span className="font-semibold tabular-nums">{formatDuration(voice.seconds)}</span>
+            <span className="text-sm text-muted">Recording… max {MAX_VOICE_SECONDS / 60} min</span>
+          </div>
+          <button type="button" onClick={() => void sendVoice()} className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-on-primary" aria-label="Send voice message">
+            <Send className="size-5" />
+          </button>
+        </div>
+      ) : (
       <form onSubmit={submit} className="flex items-end gap-2">
         {!editing && (
           <button type="button" onClick={() => setAttachOpen(true)} className="grid size-12 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Attach photo or file">
@@ -272,6 +306,11 @@ export function ChatComposer({
             }
           }}
         />
+        {showMic ? (
+          <button type="button" onClick={() => void startVoice()} className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-on-primary" aria-label="Record voice message">
+            <Mic className="size-5" />
+          </button>
+        ) : (
         <button
           type="submit"
           disabled={!canSend || saving}
@@ -280,7 +319,9 @@ export function ChatComposer({
         >
           {editing ? <Check className="size-5" /> : <Send className="size-5" />}
         </button>
+        )}
       </form>
+      )}
       {text.length > 3500 && <p className="mt-1 text-right text-xs text-muted">{4000 - text.length} characters left</p>}
 
       <input ref={photoInput} type="file" accept="image/*" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = '' }} />
@@ -290,9 +331,63 @@ export function ChatComposer({
         <SheetAction icon={<ImageIcon className="size-5" />} onClick={() => photoInput.current?.click()}>Photos</SheetAction>
         <SheetAction icon={<Camera className="size-5" />} onClick={() => cameraInput.current?.click()}>Camera</SheetAction>
         <SheetAction icon={<FileText className="size-5" />} onClick={() => docInput.current?.click()}>Document (PDF, Word, Excel…)</SheetAction>
+        <SheetAction icon={<BarChart3 className="size-5" />} onClick={() => { setAttachOpen(false); setPollOpen(true) }}>Poll</SheetAction>
         <p className="px-5 pt-2 text-xs text-muted">Up to 25 MB per file. Files are visible only to people in this chat.</p>
       </Sheet>
+      <PollSheet open={pollOpen} onClose={() => setPollOpen(false)} onCreate={(poll) => { onSend({ body: '', kind: 'poll', poll, replyTo }); onCancelReply(); setPollOpen(false) }} />
     </div>
+  )
+}
+
+function PollSheet({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (p: Poll) => void }) {
+  const [question, setQuestion] = useState('')
+  const [options, setOptions] = useState(['', ''])
+  const [multiple, setMultiple] = useState(false)
+  useEffect(() => {
+    if (!open) {
+      setQuestion('')
+      setOptions(['', ''])
+      setMultiple(false)
+    }
+  }, [open])
+  const clean = options.map((o) => o.trim()).filter(Boolean)
+  const valid = question.trim().length > 0 && clean.length >= 2 && new Set(clean.map((o) => o.toLowerCase())).size === clean.length
+  return (
+    <Sheet open={open} onClose={onClose} label="Create a poll">
+      <form
+        className="space-y-3 px-5 pb-2 pt-1"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (valid) onCreate({ question: question.trim(), options: clean, multiple })
+        }}
+      >
+        <h2 className="text-lg font-bold">Create a poll</h2>
+        <input aria-label="Question" placeholder="Ask a question" maxLength={200} value={question} onChange={(e) => setQuestion(e.target.value)} className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-[16px] focus:border-primary focus:outline-none" />
+        <div className="space-y-2">
+          {options.map((o, i) => (
+            <div key={i} className="flex gap-2">
+              <input aria-label={`Option ${i + 1}`} placeholder={`Option ${i + 1}`} maxLength={100} value={o} onChange={(e) => setOptions(options.map((x, j) => (j === i ? e.target.value : x)))} className="min-h-12 flex-1 rounded-xl border border-border bg-surface px-3 text-[16px] focus:border-primary focus:outline-none" />
+              {options.length > 2 && (
+                <button type="button" onClick={() => setOptions(options.filter((_, j) => j !== i))} className="grid size-12 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={`Remove option ${i + 1}`}>
+                  <X className="size-5" />
+                </button>
+              )}
+            </div>
+          ))}
+          {options.length < 12 && (
+            <button type="button" onClick={() => setOptions([...options, ''])} className="inline-flex min-h-11 items-center gap-2 rounded-full px-3 font-semibold text-primary hover:bg-primary-soft">
+              <Plus className="size-4" aria-hidden /> Add option
+            </button>
+          )}
+        </div>
+        <label className="flex min-h-11 items-center gap-3">
+          <input type="checkbox" checked={multiple} onChange={(e) => setMultiple(e.target.checked)} className="size-5 accent-[var(--primary)]" />
+          Allow multiple answers
+        </label>
+        {clean.length >= 2 && new Set(clean.map((o) => o.toLowerCase())).size !== clean.length && <p className="text-sm text-danger">Options must be different.</p>}
+        <button type="submit" disabled={!valid} className="min-h-12 w-full rounded-full bg-primary font-semibold text-on-primary disabled:opacity-40">Send poll</button>
+      </form>
+    </Sheet>
   )
 }
 

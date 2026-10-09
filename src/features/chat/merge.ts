@@ -29,6 +29,11 @@ export interface Sender {
   avatar_url: string | null
 }
 
+export interface Vote {
+  user_id: string
+  option_index: number
+}
+
 export interface Reaction {
   user_id: string
   emoji: string
@@ -61,6 +66,7 @@ export interface Message {
   created_at: string
   sender?: Sender | null
   reactions?: Reaction[]
+  votes?: Vote[]
   reply?: ReplyPreview | null
   /** client-only: optimistic message waiting for the server */
   pending?: boolean
@@ -105,8 +111,9 @@ export function mergeMessages(current: Message[], incoming: Message[], me?: stri
     const sender = m.sender ?? prev?.sender ?? (m.sender_id ? senders.get(m.sender_id) : undefined) ?? null
     // live rows carry no joins: keep what we already know
     const reactions = m.reactions ?? prev?.reactions ?? []
+    const votes = m.deleted_at ? [] : (m.votes ?? prev?.votes ?? [])
     const reply = m.reply !== undefined ? m.reply : (prev?.reply ?? null)
-    map.set(m.id, { ...m, sender, reactions: m.deleted_at ? [] : reactions, reply, pending: false, failed: false })
+    map.set(m.id, { ...m, sender, reactions: m.deleted_at ? [] : reactions, votes, reply, pending: false, failed: false })
   }
   return [...map.values()].sort(byTime)
 }
@@ -167,4 +174,31 @@ export function groupReactions(list: Reaction[] | undefined, me: string | null):
 export function applyMyReaction(list: Reaction[] | undefined, me: string, emoji: string | null): Reaction[] {
   const others = (list ?? []).filter((r) => r.user_id !== me)
   return emoji ? [...others, { user_id: me, emoji }] : others
+}
+
+/** Poll results: votes per option, number of voters, and which options I picked. */
+export function pollTally(poll: Poll, votes: Vote[] | undefined, me: string | null) {
+  const counts = poll.options.map(() => 0)
+  const voters = new Set<string>()
+  const mine: number[] = []
+  for (const v of votes ?? []) {
+    if (v.option_index >= 0 && v.option_index < counts.length) {
+      counts[v.option_index]!++
+      voters.add(v.user_id)
+      if (v.user_id === me) mine.push(v.option_index)
+    }
+  }
+  return { counts, voters: voters.size, mine }
+}
+
+/** My new selection after tapping an option (single choice replaces, multiple toggles). */
+export function nextSelection(poll: Poll, current: number[], tapped: number): number[] {
+  if (!poll.multiple) return current.length === 1 && current[0] === tapped ? [] : [tapped]
+  return current.includes(tapped) ? current.filter((i) => i !== tapped) : [...current, tapped].sort((a, b) => a - b)
+}
+
+/** "0:07" / "12:03" */
+export function formatDuration(seconds: number | undefined): string {
+  const s = Math.max(0, Math.round(seconds ?? 0))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }

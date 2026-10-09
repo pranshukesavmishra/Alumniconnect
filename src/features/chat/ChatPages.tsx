@@ -13,7 +13,7 @@ import { supabase } from '../../lib/supabase'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useJoinGroup } from '../community/queries'
 import { ChatComposer } from './Composer'
-import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
+import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, PollCard, VoicePlayer, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
 import { firstUnreadIndex, isContinuation, previewOf, type Attachment, type Message, type ReplyPreview } from './merge'
 import {
   chatKeys,
@@ -27,6 +27,7 @@ import {
   usePinMessage,
   usePinnedMessage,
   useReact,
+  useVote,
   useChat,
   useChats,
   useChatSignals,
@@ -252,13 +253,14 @@ interface BubbleProps {
   onReply: () => void
   onHeart: () => void
   onPhotos: (items: Attachment[], start: number) => void
+  onVote: (options: number[]) => void
   onReactions: () => void
   onQuote: (id: string) => void
   onRetry: () => void
   onDiscard: () => void
 }
 
-function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMenu, onReply, onHeart, onPhotos, onReactions, onQuote, onRetry, onDiscard }: BubbleProps) {
+function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMenu, onReply, onHeart, onPhotos, onVote, onReactions, onQuote, onRetry, onDiscard }: BubbleProps) {
   const gestures = useMessageGestures({ onReply, onMenu, onDoubleTap: onHeart, enabled: interactive })
   if (m.kind === 'system') {
     return <p className="mx-auto my-2 w-fit max-w-[85%] rounded-full bg-surface-2 px-3 py-1 text-center text-xs text-muted">{m.body}</p>
@@ -293,8 +295,10 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
             ) : (
               <>
                 {m.kind === 'image' && <PhotoGrid items={m.attachments} pending={m.pending} onOpen={(i) => onPhotos(m.attachments, i)} />}
+                {m.kind === 'voice' && m.attachments[0] && <VoicePlayer a={m.attachments[0]} mine={mine} pending={m.pending} />}
+                {m.kind === 'poll' && <PollCard m={m} me={me} mine={mine} onVote={onVote} />}
                 {m.kind === 'file' && m.attachments[0] && <FileCard a={m.attachments[0]} mine={mine} pending={m.pending} />}
-                {m.kind === 'text' || m.kind === 'image' || m.kind === 'file' ? m.body && <RichText text={m.body} mentions={isGroup} mine={mine} /> : <p>{previewOf(m)}</p>}
+                {m.kind === 'text' || m.kind === 'image' || m.kind === 'file' ? m.body && <RichText text={m.body} mentions={isGroup} mine={mine} /> : null}
               </>
             )}
             <p className={clsx('-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-primary/75' : 'text-muted')}>
@@ -353,6 +357,7 @@ export function ChatThreadPage() {
   const { data: win, isLoading, error, loadOlder, loadingOlder } = useMessages(id)
   const send = useSendMessage(id)
   const react = useReact(id)
+  const vote = useVote(id)
   const edit = useEditMessage(id)
   const del = useDeleteMessage(id)
   const accept = useAcceptRequest(id)
@@ -570,7 +575,7 @@ export function ChatThreadPage() {
               <ChatAvatar c={chat} size={40} />
               <span className="min-w-0">
                 <span className="block truncate font-bold leading-tight">{chat.title}</span>
-                <span className="block truncate text-sm text-muted">{signals.typingNames.length ? <TypingLine names={signals.typingNames} /> : chat.subtitle}</span>
+                <span className="block truncate text-sm text-muted">{signals.typingNames.length ? <TypingLine names={signals.typingNames} /> : chat.kind === 'dm' && chat.other_id && signals.online.includes(chat.other_id) ? <span className="text-success">● online</span> : chat.subtitle}</span>
               </span>
             </Link>
           ) : (
@@ -651,6 +656,7 @@ export function ChatThreadPage() {
                       onReply={() => permsFor(m).canReply && setReplyTo(replyPreviewOf(m))}
                       onHeart={() => heart(m)}
                       onPhotos={(list, start) => setViewer({ items: list, start })}
+                      onVote={(options) => vote.mutate({ id: m.id, options }, { onError: (e) => toast.error(friendlyError(e)) })}
                       onReactions={() => setReactorsFor(m.id)}
                       onQuote={(qid) => void jumpTo(qid)}
                       onRetry={() => {

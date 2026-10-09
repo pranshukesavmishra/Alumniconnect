@@ -38,6 +38,7 @@ export interface ChatSummary {
 const SELECT =
   '*, sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url),' +
   ' reactions:message_reactions(user_id, emoji, user:profiles(full_name, avatar_url)),' +
+  ' votes:poll_votes(user_id, option_index),' +
   ' reply:reply_to(id, sender_id, kind, body, attachments, poll, deleted_at, sender:profiles!messages_sender_id_fkey(full_name))'
 
 export const chatKeys = {
@@ -173,6 +174,7 @@ export function useMessages(chatId: string | undefined) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `chat_id=eq.${chatId}` }, onReaction)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'poll_votes', filter: `chat_id=eq.${chatId}` }, onReaction)
       .subscribe((status) => setLive(status === 'SUBSCRIBED'))
     return () => {
       clearTimeout(t)
@@ -203,6 +205,8 @@ export interface SendInput {
   kind?: MessageKind
   /** photos (sent together as one album) or a single document */
   files?: File[]
+  /** voice notes: length in seconds */
+  duration?: number
   replyTo?: ReplyPreview | null
   poll?: Poll | null
 }
@@ -221,6 +225,7 @@ export function useSendMessage(chatId: string) {
       let attachments: Attachment[] = []
       if (input.files?.length) {
         attachments = await Promise.all(input.files.map((f) => (kind === 'image' ? uploadPhoto(uid!, chatId, f) : uploadFile(uid!, chatId, f))))
+        if (kind === 'voice' && attachments[0]) attachments[0].duration = input.duration
       }
       const { data, error } = await supabase.rpc('send_message', {
         p_chat: chatId,
@@ -245,7 +250,7 @@ export function useSendMessage(chatId: string) {
         sender_id: uid,
         kind,
         body: input.body.trim() || null,
-        attachments: (input.files ?? []).map((f) => ({ path: `local:${f.name}`, name: f.name, size: f.size, mime: f.type, localUrl: kind === 'image' ? URL.createObjectURL(f) : undefined })),
+        attachments: (input.files ?? []).map((f) => ({ path: `local:${f.name}`, name: f.name, size: f.size, mime: f.type, localUrl: kind === 'image' || kind === 'voice' ? URL.createObjectURL(f) : undefined, duration: input.duration })),
         reply_to: input.replyTo?.id ?? null,
         reply: input.replyTo ?? null,
         poll: input.poll ?? null,
@@ -254,6 +259,7 @@ export function useSendMessage(chatId: string) {
         created_at: new Date().toISOString(),
         sender: me ? { id: me.id, full_name: me.full_name, avatar_url: me.avatar_url } : null,
         reactions: [],
+        votes: [],
         pending: true,
       }
       setWindow(qc, chatId, (w) => ({ ...w, items: [...removeLocal(w.items, input.localId), local] }))
@@ -263,7 +269,7 @@ export function useSendMessage(chatId: string) {
       setWindow(qc, chatId, (w) => {
         const local = w.items.find((x) => x.id === input.localId)
         local?.attachments.forEach((a) => a.localUrl && URL.revokeObjectURL(a.localUrl))
-        return { ...w, items: mergeMessages(removeLocal(w.items, input.localId), [{ ...m, reply: input.replyTo ?? null, reactions: [] }], uid) }
+        return { ...w, items: mergeMessages(removeLocal(w.items, input.localId), [{ ...m, reply: input.replyTo ?? null, reactions: [], votes: [] }], uid) }
       })
       qc.setQueryData<ChatSummary[]>(chatKeys.list(uid), (list) =>
         list?.map((c) => (c.id === chatId ? { ...c, last_message_at: m.created_at, last_sender: uid, unread: 0, is_request: c.started_by === uid ? c.is_request : false } : c)),
@@ -380,13 +386,15 @@ export function useChatSignals(chatId: string | undefined) {
   const qc = useQueryClient()
   const { data: me } = useMyProfile()
   const [typing, setTyping] = useState<Record<string, { name: string; until: number }>>({})
+  const [online, setOnline] = useState<string[]>([])
   const channel = useRef<RealtimeChannel | null>(null)
   const joined = useRef(false)
   const lastTypingSent = useRef(0)
 
   useEffect(() => {
     if (!chatId || !me) return
-    const ch = supabase.channel(`chat:${chatId}`, { config: { broadcast: { self: false } } })
+    const ch = supabase.channel(`chat:${chatId}`, { config: { broadcast: { self: false }, presence: { key: me.id } } })
+    ch.on('presence', { event: 'sync' }, () => setOnline(Object.keys(ch.presenceState()).filter((k) => k !== me.id)))
     ch.on('broadcast', { event: 'typing' }, ({ payload }) => {
       const p = payload as { id: string; name: string; stop?: boolean }
       if (!p?.id || p.id === me.id) return
@@ -408,6 +416,7 @@ export function useChatSignals(chatId: string | undefined) {
       })
       .subscribe((status) => {
         joined.current = status === 'SUBSCRIBED'
+        if (status === 'SUBSCRIBED') void ch.track({ at: Date.now() })
       })
     channel.current = ch
     const sweep = setInterval(() => setTyping((t) => {
@@ -419,6 +428,7 @@ export function useChatSignals(chatId: string | undefined) {
       clearInterval(sweep)
       channel.current = null
       joined.current = false
+      setOnline([])
       void supabase.removeChannel(ch)
     }
   }, [chatId, me, qc])
@@ -439,7 +449,7 @@ export function useChatSignals(chatId: string | undefined) {
   }, [me])
 
   const names = Object.values(typing).map((t) => t.name)
-  return { typingNames: names, sendTyping, sentMessage, sentRead }
+  return { typingNames: names, online, sendTyping, sentMessage, sentRead }
 }
 
 export async function startDm(otherId: string): Promise<string> {
@@ -543,5 +553,23 @@ export function useMentionCandidates(chatId: string, prefix: string | null, enab
       if (error) throw error
       return data as MentionCandidate[]
     },
+  })
+}
+
+/** Vote in a poll (empty selection removes my vote). Optimistic. */
+export function useVote(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  return useMutation({
+    mutationFn: async ({ id, options }: { id: string; options: number[] }) => {
+      const { error } = await supabase.rpc('vote_poll', { p_message: id, p_options: options })
+      if (error) throw error
+    },
+    onMutate: ({ id, options }) => {
+      const before = qc.getQueryData<MessageWindow>(chatKeys.messages(chatId))?.items.find((m) => m.id === id)?.votes
+      patchMessage(qc, chatId, id, (m) => ({ ...m, votes: [...(m.votes ?? []).filter((v) => v.user_id !== uid), ...options.map((o) => ({ user_id: uid!, option_index: o }))] }))
+      return { before }
+    },
+    onError: (_e, { id }, ctx) => patchMessage(qc, chatId, id, (m) => ({ ...m, votes: ctx?.before ?? m.votes })),
   })
 }

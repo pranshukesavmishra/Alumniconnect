@@ -126,3 +126,31 @@ describe('reactions', () => {
     expect(gone?.reactions).toHaveLength(0)
   })
 })
+
+describe('polls and voice', () => {
+  it('tallies votes and my selection', async () => {
+    const { pollTally } = await import('./merge')
+    const t = pollTally({ question: 'q', options: ['a', 'b', 'c'] }, [
+      { user_id: ME, option_index: 1 },
+      { user_id: 'x', option_index: 1 },
+      { user_id: 'y', option_index: 0 },
+      { user_id: 'z', option_index: 9 },
+    ], ME)
+    expect(t).toEqual({ counts: [1, 2, 0], voters: 3, mine: [1] })
+  })
+  it('single choice replaces/clears, multiple toggles', async () => {
+    const { nextSelection } = await import('./merge')
+    const single = { question: 'q', options: ['a', 'b'] }
+    expect(nextSelection(single, [0], 1)).toEqual([1])
+    expect(nextSelection(single, [1], 1)).toEqual([])
+    const multi = { question: 'q', options: ['a', 'b', 'c'], multiple: true }
+    expect(nextSelection(multi, [2], 0)).toEqual([0, 2])
+    expect(nextSelection(multi, [0, 2], 2)).toEqual([0])
+  })
+  it('formats durations', async () => {
+    const { formatDuration } = await import('./merge')
+    expect(formatDuration(7)).toBe('0:07')
+    expect(formatDuration(723)).toBe('12:03')
+    expect(formatDuration(undefined)).toBe('0:00')
+  })
+})
