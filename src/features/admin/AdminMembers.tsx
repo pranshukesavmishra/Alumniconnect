@@ -233,7 +233,7 @@ export function AdminMembers() {
           setOpenId(newId)
         }}
       />
-      <FiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filter={filter} views={views.data ?? []} onApply={(f) => { setQ(f.q ?? ''); setFilter(f) }} />
+      <FiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filter={{ ...filter, q: q.trim() || undefined }} views={views.data ?? []} onApply={(f) => { setQ(f.q ?? ''); setFilter(f) }} />
       <BulkSheet
         to={bulk}
         ids={[...selected]}

@@ -63,6 +63,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   record_refund: 'Recorded a refund',
   refund_payment: 'Marked a payment as refunded',
   export_ledger: 'Downloaded the finance ledger',
+  export_event_data: 'Downloaded event data (registrations, payments, responses or attendee lists)',
   transfer_registration: 'Transferred a registration to another member',
   promote_waitlist: 'Offered a place to someone on the waiting list',
   run_waitlist: 'Offered free places to the waiting list',
@@ -84,7 +85,7 @@ export const AUDIT_GROUPS: { id: string; label: string; actions: string[] }[] = 
   { id: 'roles', label: 'Roles', actions: ['role_grant', 'role_revoke', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'] },
   { id: 'moderation', label: 'Moderation', actions: ['hide_post', 'restore_post', 'hide_comment', 'restore_comment', 'hide_job', 'restore_job', 'hide_help', 'restore_help', 'hide_business', 'restore_business', 'remove_message', 'dismiss_reports', 'slow_mode', 'meetup_hidden', 'meetup_closed', 'meetup_restored', 'meetup_member_removed'] },
   { id: 'messages', label: 'Messages', actions: ['send_event_message', 'schedule_event_message', 'cancel_event_message', 'message_needs_approval', 'approve_event_message', 'reject_event_message', 'post_announcement'] },
-  { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
+  { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'export_event_data', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
   { id: 'members', label: 'Members', actions: ['update_member', 'create_member', 'merge_member', 'export_members', 'import_preview', 'import_job_start', 'import_job_retry', 'view_member_email', 'view_as_member', 'search_contact'] },
 ]
 
@@ -93,6 +94,7 @@ export function auditSummary(details: Record<string, unknown>): string {
   const parts: string[] = []
   if (typeof d.role === 'string') parts.push(`${d.name ? `${String(d.name)}: ` : ''}${d.role}${d.event ? ` on ${String(d.event)}` : ''}`)
   if (d.code) parts.push(String(d.code))
+  if (typeof d.what === 'string') parts.push(`${d.what.replace(/_/g, ' ')}${typeof d.count === 'number' ? ` (${d.count})` : ''}`)
   if (typeof d.amount === 'number') parts.push(formatPaise(d.amount))
   if (d.amount?.from !== undefined && d.amount.from !== d.amount.to) parts.push(`${formatPaise(d.amount.from)} → ${formatPaise(d.amount.to)}`)
   if (d.status?.from && d.status.from !== d.status.to) parts.push(`${d.status.from} → ${d.status.to}`)

@@ -6,6 +6,7 @@ import { formatPaise } from '../../lib/money'
 import type { EventRow, Registration } from '../../lib/types'
 import { useEventQuestions, useTicketTypes } from '../events/queries'
 import { asText, ist, safe, saveCsv, stamp } from './export'
+import { loggedExport } from './exportLog'
 import type { AdminData } from './queries'
 import { fundTotals, foodTally, live, perDay, pickupGroups, questionSummaries, responseRow, teamLists, ticketRevenue, tshirtTally, type Tally } from './responses'
 
@@ -96,12 +97,12 @@ export function AdminResponses({ event, data }: { event: EventRow; data: AdminDa
   const emergency = regs.filter((r) => r.emergency_phone || r.medical_notes)
 
   const exportAll = () =>
-    saveCsv(
+    loggedExport(event.id, 'responses', data.registrations.length, () => saveCsv(
       `${event.slug}-responses-${stamp()}.csv`,
       data.registrations.map((r) => responseRow(event, r, questions, tickets, paid.get(r.id) ?? 0, { safe, asText, ist })),
-    )
+    ))
   const exportPerformers = () =>
-    saveCsv(
+    loggedExport(event.id, 'performers', performers.length, () => saveCsv(
       `${event.slug}-performers-${stamp()}.csv`,
       performers.map((r) => ({
         Name: safe(r.full_name),
@@ -113,12 +114,12 @@ export function AdminResponses({ event, data }: { event: EventRow; data: AdminDa
         Description: safe(r.perform_description),
         Minutes: r.perform_minutes ?? '',
       })),
-    )
+    ))
   const exportSongs = () =>
-    saveCsv(
+    loggedExport(event.id, 'song_requests', songs.length, () => saveCsv(
       `${event.slug}-song-requests-${stamp()}.csv`,
       songs.flatMap((r) => r.song_requests.map((s) => ({ Song: safe(s), 'Requested by': safe(r.nickname || r.full_name), Batch: r.grad_year ?? '' }))),
-    )
+    ))
 
   if (data.registrations.length === 0) return <EmptyState title="No registrations yet">Answers will appear here as members register.</EmptyState>
 

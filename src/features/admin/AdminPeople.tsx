@@ -12,6 +12,7 @@ import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import type { EventRow, Registration, RegistrationStatus } from '../../lib/types'
 import { PaymentBadge, StatusBadge } from '../events/StatusBadge'
 import { exportAttendees, exportPayments, exportRegistrations } from './export'
+import { loggedExport } from './exportLog'
 import { useRecordOfflinePayment, type AdminData } from './queries'
 import { RegistrationAdjustments } from './RegistrationAdjustments'
 import { AdminReunionDetail } from './AdminReunionDetail'
@@ -46,13 +47,13 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
     <div className="space-y-4">
       {manager && (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => exportRegistrations(event, data)}>
+          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => loggedExport(event.id, 'registrations', data.registrations.length, () => exportRegistrations(event, data))}>
             Registrations (Excel)
           </Button>
-          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => exportAttendees(event, data)}>
+          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => loggedExport(event.id, 'attendees', data.registrations.length, () => exportAttendees(event, data))}>
             Attendees / badges
           </Button>
-          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => exportPayments(event, data)}>
+          <Button size="sm" variant="secondary" icon={<Download className="size-4" />} onClick={() => loggedExport(event.id, 'payments', data.payments.length, () => exportPayments(event, data))}>
             Payments
           </Button>
         </div>

@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import type { EventRow } from '../../lib/types'
 import { ArrivalsCounter, GateSearch } from './CheckInTools'
 import { saveCsv, spreadsheetSafe } from './export'
+import { loggedExport } from './exportLog'
 import { useArrivals, useAttendance } from './opsQueries'
 
 const hourLabel = (h: string) => {
@@ -139,7 +140,7 @@ export function AdminDayOf({ event, manager }: { event: EventRow; manager: boole
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold">{plural(attendance.data.no_shows.length, 'confirmed registration', 'confirmed registrations')} not arrived</p>
                 <Button size="sm" variant="secondary" icon={<Download className="size-4" />} disabled={attendance.data.no_shows.length === 0}
-                  onClick={() => saveCsv(`${event.slug}-not-arrived.csv`, attendance.data!.no_shows.map((n) => ({ Code: n.code, Name: spreadsheetSafe(n.full_name), Batch: n.batch ?? '', Branch: n.branch ?? '', People: n.headcount, Mobile: n.phone ? `="${n.phone.replace(/"/g, '')}"` : '' })))}>
+                  onClick={() => loggedExport(event.id, 'not_arrived', attendance.data!.no_shows.length, () => saveCsv(`${event.slug}-not-arrived.csv`, attendance.data!.no_shows.map((n) => ({ Code: n.code, Name: spreadsheetSafe(n.full_name), Batch: n.batch ?? '', Branch: n.branch ?? '', People: n.headcount, Mobile: n.phone ? `="${n.phone.replace(/"/g, '')}"` : '' }))))}>
                   CSV
                 </Button>
               </div>
