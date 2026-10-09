@@ -146,6 +146,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
               { to: '/help', label: 'Ask JEC', hint: 'Get or give help', icon: '🤝' },
               { to: '/jobs', label: 'Jobs', hint: 'Openings and referrals', icon: '💼' },
               { to: '/mentors', label: 'Mentorship', hint: 'Find or become a mentor', icon: '🎓' },
+              { to: '/businesses', label: 'Businesses', hint: 'Support JECian-owned', icon: '🏪' },
               { to: '/invite', label: 'Invite friends', hint: 'Bring your batch in', icon: '💌' },
               { to: '/people', label: 'Find JECians', hint: 'Search the directory', icon: '🔎' },
               { to: '/notifications', label: 'Notifications', hint: 'Likes, comments, requests', icon: '🔔' },
