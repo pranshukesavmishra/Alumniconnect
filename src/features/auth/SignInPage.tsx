@@ -98,7 +98,7 @@ export function SignInPage() {
         <div aria-hidden className="absolute -bottom-16 -left-10 size-48 rounded-full bg-accent/15" />
         <div className="relative mx-auto w-full max-w-md md:mx-0">
           <div className="flex items-center gap-3">
-            <img src="/pwa-192.png" alt="" className="size-12 rounded-2xl shadow-pop" />
+            <img src="/jec-logo.png" alt="" className="h-14 w-auto drop-shadow" />
             <div>
               <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
               <p className="text-sm text-hero-text">{tx('brand.college')}</p>

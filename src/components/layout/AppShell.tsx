@@ -51,7 +51,7 @@ export function AppShell() {
       {/* desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-4 py-6 backdrop-blur md:flex">
         <Link to="/" className="mb-8 flex items-center gap-3 px-2">
-          <img src="/pwa-192.png" alt="" className="size-10 rounded-2xl shadow-card" />
+          <img src="/jec-logo.png" alt="" className="h-10 w-auto drop-shadow-sm" />
           <span className="leading-tight">
             <span className="block text-[17px] font-bold tracking-tight">JEC Alumni</span>
             <span className="block text-xs font-medium text-muted">Jabalpur Engineering College</span>

@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
     if (!this.state.error) return this.props.children
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
-        <img src="/pwa-192.png" alt="" className="size-14 rounded-2xl" />
+        <img src="/jec-logo.png" alt="" className="h-14 w-auto" />
         <h1 className="text-2xl font-bold">Something went wrong</h1>
         <p className="text-muted">Please reload the page. If it keeps happening, tell the organisers. Your registration and payment details are safe.</p>
         <div className="flex gap-3">

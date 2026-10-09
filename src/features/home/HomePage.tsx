@@ -49,7 +49,7 @@ function Landing() {
         <div aria-hidden className="absolute -right-32 -top-24 size-96 rounded-full bg-hero-2" />
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
-            <img src="/pwa-192.png" alt="" className="size-14 rounded-2xl" />
+            <img src="/jec-logo.png" alt="" className="h-14 w-auto" />
             <span className="text-text">
               <LanguageSwitch compact />
             </span>
