@@ -11,7 +11,7 @@ import { buildBadges, paginate } from '../../lib/badges'
 import { friendlyError } from '../../lib/errors'
 import { plural } from '../../lib/format'
 import type { RegistrationStatus } from '../../lib/types'
-import { useAdminData, useAdminEvent, useEventRole } from './queries'
+import { useAdminData, useAdminEvent, useEventCaps } from './queries'
 
 type Scope = 'confirmed' | 'paid_or_waiting'
 const PER_PAGE = 8
@@ -20,8 +20,8 @@ const PER_PAGE = 8
 export function AdminBadges() {
   const { slug = '' } = useParams()
   const { data, isLoading, error } = useAdminEvent(slug)
-  const role = useEventRole(data?.event.id)
-  const admin = useAdminData(data?.event.id, role)
+  const caps = useEventCaps(data?.event.id)
+  const admin = useAdminData(data?.event.id, caps)
   const [scope, setScope] = useState<Scope>('confirmed')
   const [guests, setGuests] = useState(true)
   const [q, setQ] = useState('')
@@ -41,7 +41,7 @@ export function AdminBadges() {
 
   if (isLoading || (admin.isLoading && !admin.data)) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
-  if (!data || role !== 'manager') return <Navigate to="/admin" replace />
+  if (!data || !caps?.finance) return <Navigate to="/admin" replace />
   if (admin.error) return <Page><Notice tone="danger" title={friendlyError(admin.error)} /></Page>
 
   const pages = paginate(shown, PER_PAGE)

@@ -3,7 +3,7 @@ import { CalendarHeart, Home, MessagesSquare, ShieldCheck, UserRound, Users } fr
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useMatch } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
-import { useMyStaffEvents } from '../../features/events/queries'
+import { useMySiteRoles, useMyStaffEvents } from '../../features/events/queries'
 import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
 import { Avatar } from '../ui/Display'
 import { useT, type MsgKey } from '../../i18n'
@@ -30,7 +30,8 @@ function useTabs(): Tab[] {
 export function useIsOrganiser() {
   const { data: profile } = useMyProfile()
   const { data: staff } = useMyStaffEvents()
-  return !!profile?.is_admin || !!staff?.length
+  const { data: site } = useMySiteRoles()
+  return !!profile?.is_admin || !!staff?.length || !!site?.length
 }
 
 export function AppShell() {

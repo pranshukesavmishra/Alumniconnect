@@ -127,7 +127,8 @@ begin
 
   r := public.admin_roles_overview();
   assert exists (select 1 from jsonb_array_elements(r -> 'admins') x where x ->> 'full_name' = 'Boss'), 'admin listed';
-  assert exists (select 1 from jsonb_array_elements(r -> 'staff') x where x ->> 'full_name' = 'Treasurer' and x ->> 'role' = 'manager' and x ->> 'event_slug' = 'cc-mine'), 'treasurer listed';
+  assert exists (select 1 from jsonb_array_elements(r -> 'staff') x where x ->> 'full_name' = 'Treasurer' and x ->> 'role' = 'treasurer' and x ->> 'event_slug' = 'cc-mine'), 'treasurer listed (legacy manager row became treasurer + content)';
+  assert exists (select 1 from jsonb_array_elements(r -> 'staff') x where x ->> 'full_name' = 'Treasurer' and x ->> 'role' = 'content' and x ->> 'event_slug' = 'cc-mine'), 'and content manager';
   assert exists (select 1 from jsonb_array_elements(r -> 'staff') x where x ->> 'full_name' = 'Volunteer' and x ->> 'role' = 'checkin'), 'volunteer listed';
   assert r::text !~ 'x\.com', 'no e-mail in roles overview';
 end $$;

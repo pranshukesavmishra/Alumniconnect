@@ -39,6 +39,8 @@ const AdminModeration = lazy(() => import('./features/admin/AdminModeration').th
 const AdminMemberTimeline = lazy(() => import('./features/admin/AdminMemberTimeline').then((m) => ({ default: m.AdminMemberTimeline })))
 const AdminDuplicates = lazy(() => import('./features/admin/AdminDuplicates').then((m) => ({ default: m.AdminDuplicates })))
 const AdminImport = lazy(() => import('./features/admin/AdminImport').then((m) => ({ default: m.AdminImport })))
+const AdminInbox = lazy(() => import('./features/admin/AdminInbox').then((m) => ({ default: m.AdminInbox })))
+const AdminViewAs = lazy(() => import('./features/admin/AdminViewAs').then((m) => ({ default: m.AdminViewAs })))
 const AdminRoles = lazy(() => import('./features/admin/AdminRoles').then((m) => ({ default: m.AdminRoles })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
 const GroupsPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupsPage })))
@@ -186,6 +188,8 @@ export function App() {
             <Route path="admin/members/import" element={m(<AdminImport />)} />
             <Route path="admin/members/duplicates" element={m(<AdminDuplicates />)} />
             <Route path="admin/members/:id" element={m(<AdminMemberTimeline />)} />
+            <Route path="admin/members/:id/preview" element={m(<AdminViewAs />)} />
+            <Route path="admin/inbox" element={m(<AdminInbox />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
             <Route path="admin/roles" element={m(<AdminRoles />)} />
             <Route path="admin/reports" element={m(<AdminModeration />)} />

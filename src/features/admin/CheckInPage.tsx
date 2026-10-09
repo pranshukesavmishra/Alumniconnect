@@ -12,7 +12,7 @@ import { formatDateTime } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import type { Registration } from '../../lib/types'
 import { ArrivalsCounter, GateSearch } from './CheckInTools'
-import { useAdminEvent, useEventRole } from './queries'
+import { useAdminEvent, useEventCaps } from './queries'
 
 type Result =
   | { kind: 'ok'; reg: Registration }
@@ -23,7 +23,7 @@ type Result =
 export function CheckInPage() {
   const { slug = '' } = useParams()
   const { data, isLoading } = useAdminEvent(slug)
-  const role = useEventRole(data?.event.id)
+  const role = useEventCaps(data?.event.id)
   const video = useRef<HTMLVideoElement>(null)
   const scanner = useRef<{ stop: () => void; destroy: () => void } | null>(null)
   const last = useRef<{ code: string; at: number } | null>(null)

@@ -18,12 +18,14 @@ export interface AttentionEvent {
   missing_upi: boolean
 }
 
+/** Admins get every field; a moderator only gets reports_open. */
 export interface AttentionGlobal {
-  members_pending: number
-  oldest_member_pending_at: string | null
+  members_pending?: number
+  oldest_member_pending_at?: string | null
   reports_open: number
-  circles_waiting: number
-  jobs_expiring: number
+  circles_waiting?: number
+  jobs_expiring?: number
+  messages_to_approve?: number
 }
 
 export interface Attention {
@@ -106,21 +108,31 @@ export function buildQueue(a: Attention, now: number = Date.now()): QueueItem[] 
     if (g.reports_open > 0) {
       out.push({ id: 'reports', tone: 'danger', count: g.reports_open, title: `${plural(g.reports_open, 'report', 'reports')} to review`, detail: 'Posts, comments and messages members flagged', href: '/admin/reports' })
     }
-    if (g.members_pending > 0) {
+    if ((g.messages_to_approve ?? 0) > 0) {
+      out.push({
+        id: 'approvals',
+        tone: 'warning',
+        count: g.messages_to_approve!,
+        title: `${plural(g.messages_to_approve!, 'message', 'messages')} to approve`,
+        detail: 'Sent to more than 200 people: a second admin must approve',
+        href: '/admin/inbox',
+      })
+    }
+    if ((g.members_pending ?? 0) > 0) {
       out.push({
         id: 'members',
         tone: 'warning',
-        count: g.members_pending,
-        title: `${plural(g.members_pending, 'member', 'members')} to verify`,
-        detail: `Finished their profile and wait for approval${waiting(g.oldest_member_pending_at, now)}`,
+        count: g.members_pending!,
+        title: `${plural(g.members_pending!, 'member', 'members')} to verify`,
+        detail: `Finished their profile and wait for approval${waiting(g.oldest_member_pending_at ?? null, now)}`,
         href: '/admin/members?filter=pending',
       })
     }
-    if (g.circles_waiting > 0) {
-      out.push({ id: 'circles', tone: 'primary', count: g.circles_waiting, title: `${plural(g.circles_waiting, 'circle', 'circles')} waiting for approval`, detail: 'Proposed by members', href: '/admin/community' })
+    if ((g.circles_waiting ?? 0) > 0) {
+      out.push({ id: 'circles', tone: 'primary', count: g.circles_waiting!, title: `${plural(g.circles_waiting!, 'circle', 'circles')} waiting for approval`, detail: 'Proposed by members', href: '/admin/community' })
     }
-    if (g.jobs_expiring > 0) {
-      out.push({ id: 'jobs', tone: 'neutral', count: g.jobs_expiring, title: `${plural(g.jobs_expiring, 'job', 'jobs')} expiring this week`, detail: 'They disappear from the board when they expire', href: '/jobs' })
+    if ((g.jobs_expiring ?? 0) > 0) {
+      out.push({ id: 'jobs', tone: 'neutral', count: g.jobs_expiring!, title: `${plural(g.jobs_expiring!, 'job', 'jobs')} expiring this week`, detail: 'They disappear from the board when they expire', href: '/jobs' })
     }
   }
   const rank: Record<QueueTone, number> = { danger: 0, warning: 1, primary: 2, neutral: 3 }
@@ -130,14 +142,5 @@ export function buildQueue(a: Attention, now: number = Date.now()): QueueItem[] 
 /** Total number of things waiting, for the badge on the admin entry point. */
 export function attentionTotal(a: Attention | undefined): number {
   if (!a) return 0
-  return a.events.reduce((n, e) => n + e.payments_to_verify, 0) + (a.global ? a.global.members_pending + a.global.reports_open + a.global.circles_waiting : 0)
-}
-
-/** What the signed-in person can do, in plain words (shown on the admin home and the roles page). */
-export function describeAccess(isAdmin: boolean, staff: { role: 'manager' | 'checkin'; title: string }[]): { label: string; detail: string }[] {
-  const out: { label: string; detail: string }[] = []
-  if (isAdmin) out.push({ label: 'Admin', detail: 'Everything: members, every event, payments, reports, circles and the activity log.' })
-  for (const s of staff.filter((x) => x.role === 'manager')) out.push({ label: 'Treasurer / manager', detail: `${s.title}: registrations, payments and programme.` })
-  for (const s of staff.filter((x) => x.role === 'checkin')) out.push({ label: 'Check-in volunteer', detail: `${s.title}: scan tickets and see attendee names only.` })
-  return out
+  return a.events.reduce((n, e) => n + e.payments_to_verify, 0) + (a.global ? (a.global.members_pending ?? 0) + a.global.reports_open + (a.global.circles_waiting ?? 0) + (a.global.messages_to_approve ?? 0) : 0)
 }

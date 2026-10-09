@@ -93,40 +93,31 @@ test('Drive archive section is admin-only and never shows an owner address', asy
   await expect(page.locator('body')).not.toContainText('@gmail.com')
 })
 
-test('team: add a treasurer and a volunteer, change role, remove', async () => {
+test('team: add a treasurer, a content manager and a volunteer, remove (DB + audit + confirmation)', async () => {
   const t = await makeUser('ev-treasurer', { name: `Treasurer Tia ${ts}` })
   const v = await makeUser('ev-volunteer', { name: `Volunteer Vik ${ts}` })
+  const add = async (role: string, name: string) => {
+    await page.getByLabel('Role', { exact: true }).selectOption(role)
+    await page.getByLabel('Search members by name').fill(name)
+    await page.getByRole('button', { name: `Give role: ${name}` }).click()
+    await expect(page.getByText(`${name} is now`).last()).toBeVisible()
+  }
   await page.goto(`/admin/events/${slug}?tab=team`)
-  await expect(page.getByText('No one added yet.')).toBeVisible()
-  await page.getByLabel('Role').selectOption('manager')
-  await page.getByLabel('Search members by name').fill(`Treasurer Tia ${ts}`)
-  await page.getByRole('button', { name: 'Add' }).click()
-  await expect(page.getByText(`Treasurer Tia ${ts} added`)).toBeVisible()
-  await page.getByLabel('Role').selectOption('checkin')
-  await page.getByLabel('Search members by name').fill(`Volunteer Vik ${ts}`)
-  await page.getByRole('button', { name: 'Add' }).click()
-  await expect(page.getByText(`Volunteer Vik ${ts} added`)).toBeVisible()
-  expect(sql(`select string_agg(role::text, ',' order by role) from event_staff where event_id = '${eventId}'`)).toBe('manager,checkin')
-  expect(sql(`select role from event_staff where event_id = '${eventId}' and user_id = '${t.id}'`)).toBe('manager')
-  await expect(page.locator('p', { hasText: 'Treasurer / manager' })).toHaveCount(1)
-  await expect(page.locator('p', { hasText: 'Check-in volunteer' })).toHaveCount(1)
-  // change role: re-adding with another role updates it (upsert); there is no separate "change role" control
-  await page.getByLabel('Role').selectOption('checkin')
-  await page.getByLabel('Search members by name').fill(`Treasurer Tia ${ts}`)
-  await page.getByRole('button', { name: 'Add' }).click()
-  await expect(page.locator('p', { hasText: 'Check-in volunteer' })).toHaveCount(2)
-  expect(sql(`select role from event_staff where event_id = '${eventId}' and user_id = '${t.id}'`)).toBe('checkin')
-  await page.getByLabel('Role').selectOption('manager')
-  await page.getByLabel('Search members by name').fill(`Treasurer Tia ${ts}`)
-  await page.getByRole('button', { name: 'Add' }).click()
-  await expect(page.locator('p', { hasText: 'Treasurer / manager' })).toHaveCount(1)
-  await page.getByRole('button', { name: `Remove Volunteer Vik ${ts}` }).click()
-  await expect(page.getByRole('button', { name: `Remove Volunteer Vik ${ts}` })).toHaveCount(0)
+  await expect(page.getByText('No one added yet')).toBeVisible()
+  await add('treasurer', `Treasurer Tia ${ts}`)
+  await add('content', `Treasurer Tia ${ts}`)
+  await add('checkin', `Volunteer Vik ${ts}`)
+  expect(sql(`select string_agg(role, ',' order by role) from event_staff where event_id = '${eventId}'`)).toBe('checkin,content,treasurer')
+  expect(sql(`select string_agg(role, ',' order by role) from event_staff where event_id = '${eventId}' and user_id = '${t.id}'`)).toBe('content,treasurer')
+  await expect(page.getByTestId('team-list').locator('[data-role]')).toHaveCount(3)
+  await page.getByRole('button', { name: `Remove Check-in volunteer role from Volunteer Vik ${ts}` }).click()
+  await expect(page.getByTestId('team-list').locator('[data-role]')).toHaveCount(2)
   expect(sql(`select count(*) from event_staff where event_id = '${eventId}' and user_id = '${v.id}'`)).toBe('0')
+  expect(sql(`select count(*) from admin_audit where action in ('role_grant','role_revoke') and details->>'event_id' = '${eventId}'`)).toBe('4')
 })
 
 test('event, ticket and team changes are written to the activity log', async () => {
-  expect(auditCount(`target_id = '${eventId}' or target_table in ('events', 'event_ticket_types', 'event_staff', 'event_settings')`)).toBeGreaterThan(0)
+  expect(auditCount(`target_id = '${eventId}' or target_table in ('events', 'event_ticket_types', 'event_staff', 'event_settings') or details->>'event_id' = '${eventId}'`)).toBeGreaterThan(0)
 })
 
 test('registrations: search, edit tickets / food / phone with a reason, cancel, reopen (DB + audit)', async () => {

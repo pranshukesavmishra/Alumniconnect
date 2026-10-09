@@ -40,6 +40,7 @@ export function AdminMemberTimeline() {
                   {m.added_by_admin && <Badge>Added by an admin</Badge>}
                 </div>
               </div>
+              <Link to={`/admin/members/${m.id}/preview`} className="grid min-h-11 place-items-center rounded-full px-3 text-sm font-semibold text-primary hover:bg-primary-soft">View as member</Link>
               <Link to={`/admin/members?open=${m.id}`} className="grid min-h-11 place-items-center rounded-full px-3 text-sm font-semibold text-primary hover:bg-primary-soft">Open profile</Link>
             </Card>
             <MemberNotes id={m.id} />

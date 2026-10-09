@@ -10,6 +10,8 @@ import { friendlyError } from '../../lib/errors'
 import { relativeTime } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
+import { Field, Select } from '../../components/ui/Form'
+import { useIsModerator } from './queries'
 
 interface ReportRow {
   target_type: 'post' | 'comment' | 'message' | 'profile' | 'job' | 'help' | 'business'
@@ -45,9 +47,10 @@ export function useOpenReportCount(enabled: boolean) {
 }
 
 export function AdminModeration() {
-  const { data: me, isLoading: meLoading } = useMyProfile()
+  const { isLoading: meLoading } = useMyProfile()
   const [status, setStatus] = useState<'open' | 'actioned' | 'dismissed'>('open')
-  const { data, isLoading, error } = useReports(status, !!me?.is_admin)
+  const moderator = useIsModerator()
+  const { data, isLoading, error } = useReports(status, moderator)
   const qc = useQueryClient()
 
   const act = useMutation({
@@ -67,7 +70,7 @@ export function AdminModeration() {
   })
 
   if (meLoading) return <PageSkeleton />
-  if (!me?.is_admin) return <Navigate to="/" replace />
+  if (!moderator) return <Navigate to="/" replace />
 
   const tabs: { id: typeof status; label: string }[] = [
     { id: 'open', label: 'Open' },
@@ -133,7 +136,63 @@ export function AdminModeration() {
             ))}
           </ul>
         )}
+        <SlowMode />
       </Page>
     </div>
+  )
+}
+
+const SECONDS = [0, 10, 30, 60, 300, 900]
+
+/** Slow mode for any group or channel: one message per person every N seconds. Moderators and admins; logged. */
+function SlowMode() {
+  const qc = useQueryClient()
+  const groups = useQuery({
+    queryKey: ['admin-slow-groups'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_groups_for_moderation')
+      if (error) throw error
+      return data as { id: string; name: string; kind: string; slow_mode_seconds: number; members: number }[]
+    },
+  })
+  const [id, setId] = useState('')
+  const set = useMutation({
+    mutationFn: async ({ group, seconds }: { group: string; seconds: number }) => {
+      const { error } = await supabase.rpc('admin_set_slow_mode', { p_group: group, p_seconds: seconds })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-slow-groups'] }),
+  })
+  const current = groups.data?.find((g) => g.id === id)
+  return (
+    <section className="space-y-2 pt-4" aria-label="Slow mode">
+      <h2 className="text-[13px] font-bold uppercase tracking-wide text-muted">Slow mode</h2>
+      <Card className="space-y-3 p-4">
+        {groups.isError ? (
+          <Notice tone="danger" title={friendlyError(groups.error)} />
+        ) : (
+          <>
+            <Field label="Group or channel" hint={current ? (current.slow_mode_seconds ? `Now: one message every ${current.slow_mode_seconds} seconds` : 'Now: off') : 'Slows down how often each member can post.'}>
+              {(p) => (
+                <Select {...p} value={id} onChange={(e) => setId(e.target.value)}>
+                  <option value="">Choose…</option>
+                  {groups.data?.map((g) => <option key={g.id} value={g.id}>{g.name} ({g.members})</option>)}
+                </Select>
+              )}
+            </Field>
+            {id && (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Seconds between messages">
+                {SECONDS.map((n) => (
+                  <Button key={n} size="sm" variant={current?.slow_mode_seconds === n ? 'primary' : 'secondary'} loading={set.isPending && set.variables?.seconds === n}
+                    onClick={() => set.mutate({ group: id, seconds: n }, { onSuccess: () => toast.success(n ? `Slow mode: ${n} seconds` : 'Slow mode off'), onError: (e) => toast.error(friendlyError(e)) })}>
+                    {n === 0 ? 'Off' : n >= 60 ? `${n / 60} min` : `${n} s`}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+    </section>
   )
 }

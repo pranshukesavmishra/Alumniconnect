@@ -13,7 +13,9 @@ export interface EventMessage {
   title: string
   body: string
   audience: Record<string, unknown>
-  status: 'scheduled' | 'sending' | 'sent' | 'cancelled'
+  status: 'pending_approval' | 'scheduled' | 'sending' | 'sent' | 'cancelled' | 'rejected'
+  created_by: string | null
+  review_note: string | null
   scheduled_for: string
   sent_at: string | null
   recipient_count: number | null
@@ -30,7 +32,7 @@ export function useEventMessages(eventId: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('event_messages')
-        .select('id, event_id, kind, title, body, audience, status, scheduled_for, sent_at, recipient_count, created_at, author:profiles!event_messages_created_by_fkey(full_name)')
+        .select('id, event_id, kind, title, body, audience, status, created_by, review_note, scheduled_for, sent_at, recipient_count, created_at, author:profiles!event_messages_created_by_fkey(full_name)')
         .eq('event_id', eventId)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -43,6 +45,8 @@ export function useEventMessages(eventId: string) {
 export interface MessagePreview {
   count: number
   sample: string[]
+  needs_approval: boolean
+  approval_over: number
 }
 
 export function useMessagePreview(eventId: string, audience: Record<string, string>, enabled: boolean) {
@@ -70,6 +74,22 @@ export function useSendMessage(eventId: string) {
       return data as unknown as EventMessage
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: messagesKey(eventId) }),
+  })
+}
+
+export function useReviewMessage(eventId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string; approve: boolean; note?: string }) => {
+      const { data, error } = await supabase.rpc('admin_review_event_message', { p_id: input.id, p_approve: input.approve, p_note: input.note ?? null })
+      if (error) throw error
+      return data as unknown as EventMessage
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: messagesKey(eventId) })
+      void qc.invalidateQueries({ queryKey: ['admin-inbox'] })
+      void qc.invalidateQueries({ queryKey: ['admin-attention'] })
+    },
   })
 }
 

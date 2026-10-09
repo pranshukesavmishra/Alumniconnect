@@ -68,12 +68,30 @@ export const AUDIT_LABELS: Record<string, string> = {
   run_waitlist: 'Offered free places to the waiting list',
   remove_waitlist: 'Removed someone from the waiting list',
   add_waitlist: 'Added someone to the waiting list',
+  role_grant: 'Gave a role',
+  role_revoke: 'Removed a role',
+  message_needs_approval: 'Submitted a large message for approval',
+  approve_event_message: 'Approved a large message',
+  reject_event_message: 'Rejected a large message',
+  view_as_member: 'Previewed what a member sees',
+  import_job_start: 'Started a member import',
+  import_job_retry: 'Retried failed import rows',
   save_event_ops: 'Changed waiting list or daily capacity settings',
 }
+
+/** Filter chips on the activity log: a label and the actions it covers. */
+export const AUDIT_GROUPS: { id: string; label: string; actions: string[] }[] = [
+  { id: 'roles', label: 'Roles', actions: ['role_grant', 'role_revoke', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'] },
+  { id: 'moderation', label: 'Moderation', actions: ['hide_post', 'restore_post', 'hide_comment', 'restore_comment', 'hide_job', 'restore_job', 'hide_help', 'restore_help', 'hide_business', 'restore_business', 'remove_message', 'dismiss_reports', 'slow_mode', 'meetup_hidden', 'meetup_closed', 'meetup_restored', 'meetup_member_removed'] },
+  { id: 'messages', label: 'Messages', actions: ['send_event_message', 'schedule_event_message', 'cancel_event_message', 'message_needs_approval', 'approve_event_message', 'reject_event_message', 'post_announcement'] },
+  { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
+  { id: 'members', label: 'Members', actions: ['update_member', 'create_member', 'merge_member', 'export_members', 'import_preview', 'import_job_start', 'import_job_retry', 'view_member_email', 'view_as_member', 'search_contact'] },
+]
 
 export function auditSummary(details: Record<string, unknown>): string {
   const d = details as Record<string, any>
   const parts: string[] = []
+  if (typeof d.role === 'string') parts.push(`${d.name ? `${String(d.name)}: ` : ''}${d.role}${d.event ? ` on ${String(d.event)}` : ''}`)
   if (d.code) parts.push(String(d.code))
   if (typeof d.amount === 'number') parts.push(formatPaise(d.amount))
   if (d.amount?.from !== undefined && d.amount.from !== d.amount.to) parts.push(`${formatPaise(d.amount.from)} → ${formatPaise(d.amount.to)}`)

@@ -9,7 +9,8 @@ import { audienceJson, describeAudience, emptyAudience, SEGMENTS, supportsTicket
 import { friendlyError } from '../../lib/errors'
 import { formatDateTime, plural, relativeTime } from '../../lib/format'
 import { useTicketTypes } from '../events/queries'
-import { useCancelMessage, useEventMessages, useMessagePreview, useSendMessage, sendDueMessages, type EventMessage } from './opsQueries'
+import { useMyProfile } from '../auth/AuthProvider'
+import { useCancelMessage, useEventMessages, useMessagePreview, useReviewMessage, useSendMessage, sendDueMessages, type EventMessage } from './opsQueries'
 import { useMemberViews } from './queries'
 
 type Kind = 'announcement' | 'payment_reminder' | 'reminder'
@@ -30,6 +31,8 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
   const views = useMemberViews(isAdmin)
   const send = useSendMessage(eventId)
   const cancel = useCancelMessage(eventId)
+  const review = useReviewMessage(eventId)
+  const { data: me } = useMyProfile()
 
   const [aud, setAud] = useState<AudienceDraft>(emptyAudience('registered'))
   const [kind, setKind] = useState<Kind>('announcement')
@@ -80,13 +83,16 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
   function submit() {
     if (!ready) return
     const who = count === undefined ? 'the audience' : plural(count, 'person', 'people')
-    const text = when === 'now' ? `Send “${title.trim()}” to ${who} now? It cannot be recalled.` : `Schedule “${title.trim()}” for ${formatDateTime(sendAtIso)}? The audience is looked up again when it is sent.`
+    const final = `“${title.trim()}”\n${body.trim()}`
+    const text = preview.data?.needs_approval
+      ? `${final}\n\nThis goes to ${who}. Because that is more than ${preview.data.approval_over} people, a second admin must approve it before anyone receives it. Submit it for approval?`
+      : when === 'now' ? `${final}\n\nSend this to ${who} now? It cannot be recalled.` : `${final}\n\nSchedule this for ${formatDateTime(sendAtIso)}? The audience is looked up again when it is sent.`
     if (!window.confirm(text)) return
     send.mutate(
       { kind, title: title.trim(), body: body.trim(), audience: json, sendAt: sendAtIso },
       {
         onSuccess: (m) => {
-          toast.success(m.status === 'sent' ? `Sent to ${plural(m.recipient_count ?? 0, 'person', 'people')}.` : `Scheduled for ${formatDateTime(m.scheduled_for)}.`)
+          toast.success(m.status === 'pending_approval' ? 'Saved. A second admin must approve it before it is sent.' : m.status === 'sent' ? `Sent to ${plural(m.recipient_count ?? 0, 'person', 'people')}.` : `Scheduled for ${formatDateTime(m.scheduled_for)}.`)
           setTitle('')
           setBody('')
           setWhen('now')
@@ -183,8 +189,19 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
               {(p) => <Input {...p} type="datetime-local" value={sendAt} onChange={(e) => setSendAt(e.target.value)} />}
             </Field>
           )}
+          {ready && (
+            <div data-testid="message-preview" className="rounded-2xl border border-border bg-surface-2 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-muted">How it will look</p>
+              <p className="mt-1 font-semibold">{title.trim()}</p>
+              <p className="text-[15px]">{body.trim()}</p>
+              <p className="mt-1 text-xs text-muted">{count === undefined ? 'Counting…' : `To ${plural(count, 'person', 'people')}`}{when === 'later' ? `, ${formatDateTime(sendAtIso)}` : ''}</p>
+            </div>
+          )}
+          {preview.data?.needs_approval && (
+            <Notice tone="warning" title={`More than ${preview.data.approval_over} people`}>A second admin must approve this message before anyone receives it.</Notice>
+          )}
           <Button block size="lg" loading={send.isPending} disabled={!ready || count === 0} icon={when === 'now' ? <Send className="size-5" /> : <CalendarClock className="size-5" />} onClick={submit}>
-            {when === 'now' ? (count ? `Send to ${plural(count, 'person', 'people')}` : 'Send') : 'Schedule message'}
+            {preview.data?.needs_approval ? 'Submit for approval' : when === 'now' ? (count ? `Send to ${plural(count, 'person', 'people')}` : 'Send') : 'Schedule message'}
           </Button>
         </Card>
       </section>
@@ -200,7 +217,13 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
         ) : (
           <ul className="space-y-3">
             {messages.data.map((m) => (
-              <MessageCard key={m.id} m={m} ticketNames={ticketNames} viewNames={viewNames} onCancel={() => {
+              <MessageCard key={m.id} m={m} ticketNames={ticketNames} viewNames={viewNames}
+                canReview={isAdmin && m.status === 'pending_approval' && m.created_by !== me?.id}
+                onReview={(approve) => {
+                  if (!window.confirm(approve ? `Approve “${m.title}”? It goes out to the whole audience now.` : `Reject “${m.title}”? It will never be sent.`)) return
+                  review.mutate({ id: m.id, approve }, { onSuccess: () => toast.success(approve ? 'Approved and sent' : 'Rejected'), onError: (e) => toast.error(friendlyError(e)) })
+                }}
+                onCancel={() => {
                 if (!window.confirm(`Cancel “${m.title}”? It will not be sent.`)) return
                 cancel.mutate(m.id, { onSuccess: () => toast.success('Cancelled'), onError: (e) => toast.error(friendlyError(e)) })
               }} />
@@ -212,8 +235,8 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
   )
 }
 
-function MessageCard({ m, ticketNames, viewNames, onCancel }: { m: EventMessage; ticketNames: Map<string, string>; viewNames: Map<string, string>; onCancel: () => void }) {
-  const tone = m.status === 'sent' ? 'success' : m.status === 'scheduled' ? 'accent' : 'neutral'
+function MessageCard({ m, ticketNames, viewNames, onCancel, canReview, onReview }: { m: EventMessage; ticketNames: Map<string, string>; viewNames: Map<string, string>; onCancel: () => void; canReview: boolean; onReview: (approve: boolean) => void }) {
+  const tone = m.status === 'sent' ? 'success' : m.status === 'scheduled' || m.status === 'pending_approval' ? 'accent' : 'neutral'
   return (
     <li>
       <Card className={clsx('space-y-2 p-4', m.status === 'cancelled' && 'opacity-70')}>
@@ -223,13 +246,19 @@ function MessageCard({ m, ticketNames, viewNames, onCancel }: { m: EventMessage;
             <p className="text-sm text-muted">{KIND_LABEL[m.kind]} · {describeAudience(m.audience, { tickets: ticketNames, views: viewNames })}</p>
           </div>
           <Badge tone={tone}>
-            {m.status === 'sent' ? `Sent to ${m.recipient_count ?? 0}` : m.status === 'scheduled' ? `Scheduled ${formatDateTime(m.scheduled_for)}` : m.status === 'sending' ? 'Sending…' : 'Cancelled'}
+            {m.status === 'sent' ? `Sent to ${m.recipient_count ?? 0}` : m.status === 'scheduled' ? `Scheduled ${formatDateTime(m.scheduled_for)}` : m.status === 'sending' ? 'Sending…' : m.status === 'pending_approval' ? 'Waiting for a second admin' : m.status === 'rejected' ? 'Rejected' : 'Cancelled'}
           </Badge>
         </div>
         <p className="text-[15px]">{m.body}</p>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           <span>{m.author?.full_name ?? 'An organiser'} · {relativeTime(m.status === 'sent' && m.sent_at ? m.sent_at : m.created_at)}</span>
-          {m.status === 'scheduled' && (
+          {canReview && (
+            <span className="flex gap-2">
+              <Button size="sm" onClick={() => onReview(true)}>Approve</Button>
+              <Button size="sm" variant="danger-ghost" onClick={() => onReview(false)}>Reject</Button>
+            </span>
+          )}
+          {(m.status === 'scheduled' || m.status === 'pending_approval') && !canReview && (
             <Button size="sm" variant="danger-ghost" icon={<X className="size-4" />} onClick={onCancel} aria-label={`Cancel ${m.title}`}>
               Cancel
             </Button>

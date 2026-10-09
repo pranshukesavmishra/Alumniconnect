@@ -88,7 +88,7 @@ begin
   n0 := (select count(*) from public.admin_audit);
   update public.events set title = 'Alumni Meet' where id = '30000000-0000-0000-0000-0000000000e1';
   update public.event_ticket_types set price_paise = 120000 where id = '30000000-0000-0000-0000-0000000000f1';
-  insert into public.event_staff (event_id, user_id, role) values ('30000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-00000000000a', 'checkin');
+  perform public.admin_grant_role('30000000-0000-0000-0000-00000000000a', 'checkin', '30000000-0000-0000-0000-0000000000e1');
   assert (select count(*) from public.admin_audit) = n0 + 3, 'event, ticket and team changes are audited';
   assert exists (select 1 from public.admin_audit where action = 'events_update' and details -> 'changed' ? 'title'), 'changed fields recorded';
 end $$;

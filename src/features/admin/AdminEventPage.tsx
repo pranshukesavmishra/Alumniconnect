@@ -21,7 +21,7 @@ import { AdminResponses } from './AdminResponses'
 import { AdminTeam } from './AdminTeam'
 import { AdminWaitlist } from './AdminWaitlist'
 import { fundTotals, ticketRevenue } from './responses'
-import { useAdminData, useAdminEvent, useEventRole, type AdminData } from './queries'
+import { useAdminData, useAdminEvent, useEventCaps, type AdminData } from './queries'
 
 type Tab = 'overview' | 'payments' | 'people' | 'responses' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'settings' | 'team'
 
@@ -31,8 +31,8 @@ export function AdminEventPage() {
   const { data: me } = useMyProfile()
   const isNew = slug === 'new'
   const { data, isLoading, error } = useAdminEvent(isNew ? '__none__' : slug)
-  const role = useEventRole(data?.event.id)
-  const admin = useAdminData(data?.event.id, role)
+  const caps = useEventCaps(data?.event.id)
+  const admin = useAdminData(data?.event.id, caps)
 
   if (isNew) {
     if (!me?.is_admin) return <Navigate to="/admin" replace />
@@ -47,23 +47,24 @@ export function AdminEventPage() {
   }
   if (isLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
-  if (!data || !role) return <Navigate to="/admin" replace />
+  if (!data || !caps) return <Navigate to="/admin" replace />
 
-  const manager = role === 'manager'
-  const tabs: { id: Tab; label: string; count?: number }[] = manager
-    ? [
-        { id: 'overview', label: 'Overview' },
-        { id: 'payments', label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
-        { id: 'people', label: 'People' },
-        { id: 'responses', label: 'Responses' },
-        { id: 'programme', label: 'Programme' },
-        { id: 'messages', label: 'Messages' },
-        { id: 'finance', label: 'Finance' },
-        { id: 'waitlist', label: 'Waitlist' },
-        { id: 'dayof', label: 'Day-of' },
-        ...(me.is_admin ? ([{ id: 'settings', label: 'Settings' }, { id: 'team', label: 'Team' }] as const) : []),
-      ]
-    : [{ id: 'people', label: 'People' }, { id: 'dayof', label: 'Day-of' }]
+  const manager = caps.finance
+  // each tab needs its own capability; the database checks the same thing again for every call
+  type TabDef = { id: Tab; label: string; count?: number }
+  const tabs: TabDef[] = ([
+    caps.finance && { id: 'overview' as const, label: 'Overview' },
+    caps.finance && { id: 'payments' as const, label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
+    caps.checkin && { id: 'people' as const, label: 'People' },
+    caps.finance && { id: 'responses' as const, label: 'Responses' },
+    caps.programme && { id: 'programme' as const, label: 'Programme' },
+    caps.messages && { id: 'messages' as const, label: 'Messages' },
+    caps.finance && { id: 'finance' as const, label: 'Finance' },
+    caps.registrations && { id: 'waitlist' as const, label: 'Waitlist' },
+    caps.checkin && { id: 'dayof' as const, label: 'Day-of' },
+    !!me.is_admin && { id: 'settings' as const, label: 'Settings' },
+    !!me.is_admin && { id: 'team' as const, label: 'Team' },
+  ] as (TabDef | false)[]).filter((t): t is TabDef => !!t)
   const tab = (tabs.find((t) => t.id === params.get('tab'))?.id ?? tabs[0]!.id) as Tab
 
   return (
@@ -97,7 +98,7 @@ export function AdminEventPage() {
       </div>
       <Page wide className="space-y-4">
         {admin.error && <Notice tone="danger" title={friendlyError(admin.error)} />}
-        {tab !== 'settings' && tab !== 'team' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && (
+        {tab !== 'settings' && tab !== 'team' && tab !== 'programme' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && (
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" icon={<RefreshCw className={clsx('size-4', admin.isFetching && 'animate-spin')} />} onClick={() => admin.refetch()}>
               Refresh
@@ -114,7 +115,7 @@ export function AdminEventPage() {
         {tab === 'waitlist' && <AdminWaitlist event={data.event} />}
         {tab === 'dayof' && <AdminDayOf event={data.event} manager={manager} />}
         {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
-        {tab === 'team' && <AdminTeam eventId={data.event.id} />}
+        {tab === 'team' && <AdminTeam eventId={data.event.id} eventTitle={data.event.title} />}
       </Page>
     </div>
   )

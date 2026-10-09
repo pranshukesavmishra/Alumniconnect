@@ -1,9 +1,10 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMyProfile } from '../auth/AuthProvider'
-import { useMyStaffEvents } from '../events/queries'
+import { useMySiteRoles, useMyStaffEvents } from '../events/queries'
+import { capsFor, rolesOnEvent, type Caps, type EventRole } from '../../lib/roles'
 import { supabase } from '../../lib/supabase'
 import type { Attention } from '../../lib/adminAttention'
-import type { EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, StaffRole, TicketType, VerificationStatus } from '../../lib/types'
+import type { EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, TicketType, VerificationStatus } from '../../lib/types'
 
 /** PostgREST returns at most 1000 rows per request; page through everything. */
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
@@ -16,27 +17,39 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
   }
 }
 
+export function useIsModerator(): boolean {
+  const { data: me } = useMyProfile()
+  const { data: site } = useMySiteRoles()
+  return !!me?.is_admin || !!site?.includes('moderator')
+}
+
 export function useManagedEvents() {
   const { data: me } = useMyProfile()
   const { data: staff } = useMyStaffEvents()
   return useQuery({
-    queryKey: ['managed-events', me?.id, me?.is_admin, staff?.length],
+    queryKey: ['managed-events', me?.id, me?.is_admin, staff?.map((s) => `${s.event_id}:${s.role}`).join()],
     enabled: !!me && staff !== undefined,
     queryFn: async () => {
       let q = supabase.from('events').select('*').order('starts_at', { ascending: false })
-      if (!me!.is_admin) q = q.in('id', staff!.map((s) => s.event_id))
+      if (!me!.is_admin) q = q.in('id', [...new Set(staff!.map((s) => s.event_id))])
       const { data, error } = await q
       if (error) throw error
-      return (data as EventRow[]).map((e) => ({ event: e, role: (me!.is_admin ? 'manager' : staff!.find((s) => s.event_id === e.id)?.role) as StaffRole }))
+      return (data as EventRow[]).map((e) => {
+        const roles = me!.is_admin ? [] : rolesOnEvent(staff!, e.id)
+        return { event: e, roles, caps: capsFor(!!me!.is_admin, roles) }
+      })
     },
   })
 }
 
-export function useEventRole(eventId: string | undefined): StaffRole | null {
+/** What I may do on one event (null when I have no role there). */
+export function useEventCaps(eventId: string | undefined): Caps | null {
   const { data: me } = useMyProfile()
   const { data: staff } = useMyStaffEvents()
-  if (me?.is_admin) return 'manager'
-  return staff?.find((s) => s.event_id === eventId)?.role ?? null
+  if (me?.is_admin) return capsFor(true, [])
+  if (!eventId || !staff) return null
+  const roles = rolesOnEvent(staff, eventId)
+  return roles.length ? capsFor(false, roles) : null
 }
 
 export function useAdminEvent(slug: string) {
@@ -61,19 +74,19 @@ export interface AdminData {
 
 export const adminDataKey = (eventId: string) => ['admin-data', eventId] as const
 
-export function useAdminData(eventId: string | undefined, role: StaffRole | null) {
+export function useAdminData(eventId: string | undefined, caps: Caps | null) {
   return useQuery({
-    queryKey: adminDataKey(eventId ?? ''),
-    enabled: !!eventId && !!role,
+    queryKey: [...adminDataKey(eventId ?? ''), caps?.finance ? 'full' : 'names'],
+    enabled: !!eventId && !!caps,
     refetchInterval: 60_000,
     queryFn: async (): Promise<AdminData> => {
       // Managers read whole rows. Check-in volunteers get the attendee list without phone, email, notes or amounts.
       const registrations = await fetchAll<Registration>((a, b) =>
-        role === 'manager'
+        caps!.finance
           ? supabase.from('event_registrations').select('*').eq('event_id', eventId!).order('created_at', { ascending: false }).range(a, b)
           : supabase.rpc('event_attendees', { p_event: eventId! }).range(a, b),
       )
-      if (role !== 'manager') return { registrations, items: [], payments: [] }
+      if (!caps!.finance) return { registrations, items: [], payments: [] }
       const ids = new Set(registrations.map((r) => r.id))
       // items/payments are filtered by RLS to events I manage; filter to this event client-side
       const [items, payments] = await Promise.all([
@@ -160,33 +173,47 @@ export function useSaveEvent() {
   })
 }
 
+export type StaffRow = { role: EventRole; user_id: string; profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url' | 'grad_year' | 'branch'> }
+
 export function useEventStaff(eventId: string | undefined) {
   return useQuery({
     queryKey: ['event-staff', eventId],
     enabled: !!eventId,
     queryFn: async () => {
-      const { data, error } = await supabase.from('event_staff').select('role, user_id, profiles(id, full_name, avatar_url, grad_year, branch)').eq('event_id', eventId!)
+      const { data, error } = await supabase.from('event_staff').select('role, user_id, profiles!event_staff_user_id_fkey(id, full_name, avatar_url, grad_year, branch)').eq('event_id', eventId!)
       if (error) throw error
-      return data as unknown as { role: StaffRole; user_id: string; profiles: Pick<Profile, 'id' | 'full_name' | 'avatar_url' | 'grad_year' | 'branch'> }[]
+      return data as unknown as StaffRow[]
     },
   })
 }
 
-export function useStaffMutations(eventId: string) {
+export type GrantableRole = 'admin' | 'moderator' | 'treasurer' | 'content' | 'checkin'
+
+/** Give or remove one role. Both return false when nothing changed (already had / never had it), so a double tap is harmless. */
+export function useRoleMutations(eventId?: string) {
   const qc = useQueryClient()
-  const done = () => void qc.invalidateQueries({ queryKey: ['event-staff', eventId] })
+  const done = () => {
+    void qc.invalidateQueries({ queryKey: ['event-staff'] })
+    void qc.invalidateQueries({ queryKey: ['admin-roles'] })
+    void qc.invalidateQueries({ queryKey: ['my-staff-events'] })
+    void qc.invalidateQueries({ queryKey: ['my-site-roles'] })
+    void qc.invalidateQueries({ queryKey: ['managed-events'] })
+    void qc.invalidateQueries({ queryKey: ['admin-audit'] })
+  }
   return {
-    add: useMutation({
-      mutationFn: async (input: { userId: string; role: StaffRole }) => {
-        const { error } = await supabase.from('event_staff').upsert({ event_id: eventId, user_id: input.userId, role: input.role })
+    grant: useMutation({
+      mutationFn: async (input: { userId: string; role: GrantableRole; eventId?: string; note?: string }) => {
+        const { data, error } = await supabase.rpc('admin_grant_role', { p_user: input.userId, p_role: input.role, p_event: input.eventId ?? eventId ?? null, p_note: input.note ?? null })
         if (error) throw error
+        return data as boolean
       },
       onSuccess: done,
     }),
-    remove: useMutation({
-      mutationFn: async (userId: string) => {
-        const { error } = await supabase.from('event_staff').delete().eq('event_id', eventId).eq('user_id', userId)
+    revoke: useMutation({
+      mutationFn: async (input: { userId: string; role: GrantableRole; eventId?: string; note?: string }) => {
+        const { data, error } = await supabase.rpc('admin_revoke_role', { p_user: input.userId, p_role: input.role, p_event: input.eventId ?? eventId ?? null, p_note: input.note ?? null })
         if (error) throw error
+        return data as boolean
       },
       onSuccess: done,
     }),
@@ -242,7 +269,8 @@ export function useAdminSearch(q: string, limit = 8) {
 
 export interface RolesOverview {
   admins: { id: string; full_name: string; avatar_url: string | null; grad_year: number | null; branch: string | null }[]
-  staff: { user_id: string; full_name: string; avatar_url: string | null; role: StaffRole; event_id: string; event_slug: string; event_title: string; is_admin: boolean }[]
+  moderators: { id: string; full_name: string; avatar_url: string | null; grad_year: number | null; branch: string | null; granted_at: string }[]
+  staff: { user_id: string; full_name: string; avatar_url: string | null; role: EventRole; event_id: string; event_slug: string; event_title: string; is_admin: boolean; granted_at: string }[]
   circle_admins: number
 }
 
@@ -377,6 +405,100 @@ export function useMergePreview(keep: string | null, drop: string | null) {
       const { data, error } = await supabase.rpc('admin_merge_preview', { p_keep: keep!, p_drop: drop! })
       if (error) throw error
       return data as unknown as MergePreview
+    },
+  })
+}
+
+// ------------------------------------------------------------------ inbox, activity log, view as member
+export interface InboxItem {
+  kind: 'report' | 'flagged' | 'refund' | 'waitlist' | 'approval'
+  key: string
+  at: string
+  count: number
+  title: string
+  detail: string | null
+  href: string
+  event_slug?: string
+}
+
+/** Everything waiting for a decision that my roles allow me to act on. */
+export function useInbox(enabled = true) {
+  return useQuery({
+    queryKey: ['admin-inbox'],
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_inbox')
+      if (error) throw error
+      return (data as unknown as { items: InboxItem[] }).items
+    },
+  })
+}
+
+export interface AuditRow {
+  id: number
+  action: string
+  target_table: string
+  target_id: string | null
+  details: Record<string, unknown>
+  created_at: string
+  actor: string | null
+  actor_name: string | null
+}
+export interface AuditFilter { actions: string[]; actor: string; q: string; from: string; to: string }
+export const AUDIT_PAGE = 50
+
+function auditArgs(f: AuditFilter, limit: number, before?: number) {
+  return {
+    p_actions: f.actions.length ? f.actions : null,
+    p_actor: f.actor || null,
+    p_q: f.q.trim() || null,
+    p_from: f.from ? new Date(f.from).toISOString() : null,
+    p_to: f.to ? new Date(new Date(f.to).getTime() + 86_400_000).toISOString() : null,
+    p_limit: limit,
+    p_before: before ?? null,
+  }
+}
+
+export function useAuditSearch(filter: AuditFilter, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: ['admin-audit', filter],
+    enabled,
+    initialPageParam: undefined as number | undefined,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await supabase.rpc('admin_audit_search', auditArgs(filter, AUDIT_PAGE, pageParam))
+      if (error) throw error
+      return data as unknown as AuditRow[]
+    },
+    getNextPageParam: (last) => (last.length === AUDIT_PAGE ? last[last.length - 1]!.id : undefined),
+  })
+}
+
+/** Up to 1000 rows for the CSV download. */
+export async function fetchAuditForExport(filter: AuditFilter): Promise<AuditRow[]> {
+  const { data, error } = await supabase.rpc('admin_audit_search', auditArgs(filter, 1000))
+  if (error) throw error
+  return data as unknown as AuditRow[]
+}
+
+export interface MemberPreview {
+  profile: { id: string; full_name: string; avatar_url: string | null; headline: string | null; branch: string | null; grad_year: number | null; city: string | null; current_title: string | null; current_company: string | null; verification: VerificationStatus; onboarded: boolean; is_admin: boolean; language: string | null; roles: string[] }
+  registrations: { id: string; code: string; status: RegistrationStatus; headcount: number; amount_paise: number; event_title: string; event_slug: string; starts_at: string | null; checked_in: boolean; payments: { status: PaymentStatus; amount_paise: number; method: string }[] }[]
+  groups: { id: string; name: string; kind: string; role: string }[]
+  notifications: { kind: string; body: string | null; created_at: string; unread: boolean }[]
+  unread: number
+}
+
+export function useViewAsMember(id: string | undefined) {
+  return useQuery({
+    queryKey: ['admin-view-as', id],
+    enabled: !!id,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_view_as_member', { p_member: id! })
+      if (error) throw error
+      return data as unknown as MemberPreview
     },
   })
 }

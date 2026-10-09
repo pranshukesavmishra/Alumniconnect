@@ -262,6 +262,21 @@ export function useMyStaffEvents() {
   })
 }
 
+/** Site-wide roles I hold (moderator). */
+export function useMySiteRoles() {
+  const uid = useUserId()
+  return useQuery({
+    queryKey: ['my-site-roles', uid],
+    enabled: !!uid,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('site_roles').select('role').eq('user_id', uid!)
+      if (error) throw error
+      return (data as { role: 'moderator' }[]).map((r) => r.role)
+    },
+  })
+}
+
 export function registrationOpen(event: EventRow): boolean {
   return !event.registration_closes_at || new Date(event.registration_closes_at) > new Date()
 }

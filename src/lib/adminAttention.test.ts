@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { attentionTotal, buildQueue, describeAccess, type Attention, type AttentionEvent } from './adminAttention'
+import { attentionTotal, buildQueue, type Attention, type AttentionEvent } from './adminAttention'
 
 const NOW = Date.parse('2026-10-09T10:00:00Z')
 const ev = (o: Partial<AttentionEvent> = {}): AttentionEvent => ({
@@ -88,10 +88,15 @@ describe('attentionTotal', () => {
   })
 })
 
-describe('describeAccess', () => {
-  it('names every role the person holds', () => {
-    const r = describeAccess(true, [{ role: 'manager', title: 'Meet' }, { role: 'checkin', title: 'Dinner' }])
-    expect(r.map((x) => x.label)).toEqual(['Admin', 'Treasurer / manager', 'Check-in volunteer'])
-    expect(describeAccess(false, [])).toEqual([])
+describe('moderators and approvals', () => {
+  it('a moderator sees only the reports', () => {
+    const q = buildQueue(att({ global: { reports_open: 2 }, events: [] }), NOW)
+    expect(q.map((x) => x.id)).toEqual(['reports'])
+  })
+  it('messages waiting for a second admin get their own item and count', () => {
+    const a = att({ global: { ...global, messages_to_approve: 2 }, events: [] })
+    const q = buildQueue(a, NOW)
+    expect(q.find((x) => x.id === 'approvals')).toMatchObject({ count: 2, href: '/admin/inbox' })
+    expect(attentionTotal(a)).toBe(2)
   })
 })

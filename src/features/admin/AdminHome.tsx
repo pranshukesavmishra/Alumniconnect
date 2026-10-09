@@ -1,24 +1,26 @@
-import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, History, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
 import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
-import { buildQueue, describeAccess, type QueueItem } from '../../lib/adminAttention'
+import { buildQueue, type QueueItem } from '../../lib/adminAttention'
+import { describeAccess, ROLE_INFO } from '../../lib/roles'
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange } from '../../lib/format'
 import { useMyProfile } from '../auth/AuthProvider'
 import { AdminSearch } from './AdminSearch'
-import { useAttention, useManagedEvents } from './queries'
+import { useAttention, useIsModerator, useManagedEvents } from './queries'
 
 export function AdminHome() {
   const { data: me } = useMyProfile()
   const { data, isLoading, error } = useManagedEvents()
-  const canManage = !!me?.is_admin || !!data?.some((d) => d.role === 'manager')
+  const moderator = useIsModerator()
+  const canManage = !!me?.is_admin || moderator || !!data?.some((d) => d.caps.manage)
   const attention = useAttention(canManage)
   if (isLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
-  if (!me.is_admin && !data?.length) return <Navigate to="/" replace />
-  if (data?.length === 1 && !me.is_admin && data[0]!.role === 'checkin') return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
+  if (!me.is_admin && !moderator && !data?.length) return <Navigate to="/" replace />
+  if (data?.length === 1 && !me.is_admin && !moderator && !data[0]!.caps.manage) return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
 
   return (
     <div>
@@ -30,10 +32,10 @@ export function AdminHome() {
       <Page className="space-y-3">
         <p className="text-sm text-muted" data-testid="my-access">
           Signed in as{' '}
-          {describeAccess(me.is_admin, (data ?? []).map((d) => ({ role: d.role, title: d.event.title }))).map((a) => a.label).filter((l, i, all) => all.indexOf(l) === i).join(' + ') || 'member'}.
+          {describeAccess(me.is_admin, moderator, (data ?? []).flatMap((d) => d.roles.map((role) => ({ role, title: d.event.title })))).map((a) => a.label).filter((l, i, all) => all.indexOf(l) === i).join(' + ') || 'member'}.
           {me.is_admin && <> <Link to="/admin/roles" className="font-semibold text-primary">Who can do what</Link></>}
         </p>
-        {canManage && <AdminSearch members={me.is_admin} />}
+        {canManage && (me.is_admin || data?.some((d) => d.caps.finance)) && <AdminSearch members={me.is_admin} />}
         {canManage && (
           <section aria-label="Needs your attention" className="space-y-2 pt-1">
             <SectionTitle>Needs your attention</SectionTitle>
@@ -45,6 +47,21 @@ export function AdminHome() {
               <Queue items={buildQueue(attention.data)} />
             )}
           </section>
+        )}
+        {(moderator || me.is_admin || data?.some((d) => d.caps.finance)) && (
+          <Link to="/admin/inbox" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+            <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Inbox className="size-5" aria-hidden /></span>
+            <span className="flex-1"><span className="block font-semibold">Inbox</span><span className="block text-sm text-muted">Everything waiting for a decision</span></span>
+            <ChevronRight className="size-5 text-muted" aria-hidden />
+          </Link>
+        )}
+        {moderator && !me.is_admin && (
+          <Link to="/admin/reports" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+            <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Flag className="size-5" aria-hidden /></span>
+            <span className="flex-1"><span className="block font-semibold">Reports and slow mode</span><span className="block text-sm text-muted">Posts and messages members flagged</span></span>
+            {!!attention.data?.global?.reports_open && <Badge tone="danger">{attention.data.global.reports_open}</Badge>}
+            <ChevronRight className="size-5 text-muted" aria-hidden />
+          </Link>
         )}
         {me.is_admin && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -71,7 +88,7 @@ export function AdminHome() {
             </Link>
             <Link to="/admin/roles" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><KeyRound className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Roles</span><span className="block text-sm text-muted">Who is an admin, treasurer or volunteer</span></span>
+              <span className="flex-1"><span className="block font-semibold">Roles</span><span className="block text-sm text-muted">Admins, treasurers, content managers, moderators</span></span>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
             <Link to="/admin/activity" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
@@ -87,14 +104,14 @@ export function AdminHome() {
             Create the event, set the fees and UPI details, then publish it.
           </EmptyState>
         ) : (
-          data.map(({ event, role }) => (
+          data.map(({ event, roles }) => (
             <Link key={event.id} to={`/admin/events/${event.slug}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{event.title}</p>
                 <p className="text-sm text-muted">{formatDateRange(event.starts_at, event.ends_at)}</p>
               </div>
               {!event.is_published && <Badge tone="warning">Draft</Badge>}
-              <Badge tone="primary">{role === 'manager' ? 'Manager' : 'Check-in'}</Badge>
+              <Badge tone="primary">{me.is_admin ? 'Admin' : roles.map((x) => ROLE_INFO[x].label).join(' + ')}</Badge>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
           ))
