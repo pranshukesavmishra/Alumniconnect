@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { toast } from 'sonner'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Notice, PageSkeleton } from '../../components/ui/Display'
@@ -8,7 +9,7 @@ import { friendlyError } from '../../lib/errors'
 import { safeNext } from '../../lib/safeNext'
 import type { MemberType } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
-import { useMyPrivate, useUpdateProfile } from '../profile/queries'
+import { isOurAvatar, useImportProviderPhoto, useMyPrivate, useUpdateProfile } from '../profile/queries'
 
 const PHONE = /^\+?[0-9 ]{10,16}$/
 
@@ -16,6 +17,15 @@ const PHONE = /^\+?[0-9 ]{10,16}$/
 export function WelcomePage() {
   const { session } = useAuth()
   const { data: profile, isLoading } = useMyProfile()
+  const importPhoto = useImportProviderPhoto()
+  // signed in with LinkedIn/Google: keep a permanent copy of the shared photo (the provider's link expires)
+  const migrated = useRef(false)
+  useEffect(() => {
+    if (!profile || migrated.current || !profile.avatar_url || isOurAvatar(profile.avatar_url)) return
+    migrated.current = true
+    importPhoto.mutate('any', { onSuccess: (r) => toast.success(r.source === 'linkedin' ? 'We used your LinkedIn photo. You can change it anytime in your profile.' : 'We used your Google photo. You can change it anytime in your profile.') })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit
+  }, [profile])
   const { data: priv } = useMyPrivate()
   const update = useUpdateProfile()
   const navigate = useNavigate()

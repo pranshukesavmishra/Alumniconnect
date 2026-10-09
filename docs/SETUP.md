@@ -81,6 +81,7 @@ The app writes to **one Google account's Drive**, using the permission `drive.fi
    npx supabase secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... GOOGLE_DRIVE_REFRESH_TOKEN=... \
      APP_ORIGINS=https://<your-address> BACKUP_SECRET=<long-random-string>
    npx supabase functions deploy drive-upload
+   npx supabase functions deploy import-avatar
    npx supabase functions deploy nightly-backup --no-verify-jwt
    ```
 5. After the first admin exists (step 8), go to **Organise → the event → Settings → Create the Drive folder**.
@@ -140,3 +141,16 @@ npm run check               # typecheck + lint + unit tests
 npm run test:db             # database security tests (Docker)
 PW_CHROMIUM=/path/to/chromium npm run test:e2e   # full journey in a phone-sized browser
 ```
+
+
+## LinkedIn / Google profile photo
+
+The profile photo is copied from the member's sign-in (LinkedIn or Google) by the `import-avatar` function, so it stays
+available after LinkedIn's own picture link expires. LinkedIn's "Save to PDF" and data-export files do **not** contain
+the photo, so sign-in is the only automatic source; members can always upload a different photo or remove it.
+
+1. Deploy the function (see step above). It needs no extra secrets.
+2. In the Supabase dashboard open **Authentication → Sign In / Providers** and switch on **Allow manual linking**.
+   This lets someone who signed up by email press "Use my LinkedIn photo" in *Edit profile*, connect LinkedIn once
+   and have the photo imported, without creating a second account. (Local config already has it on.)
+3. Make sure the LinkedIn provider uses the "Sign In with LinkedIn using OpenID Connect" product (scopes `openid profile email`).

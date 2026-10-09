@@ -2,19 +2,20 @@ import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
 import { Camera, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Card, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Form'
+import { LinkedInIcon } from '../../components/ui/Icons'
 import { BRANCHES, CURRENT_YEAR, HELP_TAGS, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { normalizeLinkedInUrl } from '../../lib/linkedin/common'
 import { supabase } from '../../lib/supabase'
 import type { Experience } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
-import { useMember, useMyPrivate, useUpdateProfile, useUploadAvatar } from './queries'
+import { PhotoImportError, useImportProviderPhoto, useMember, useMyPrivate, useRemoveAvatar, useUpdateProfile, useUploadAvatar, type PhotoProvider } from './queries'
 
 const PHONE = /^\+?[0-9 ]{10,16}$/
 
@@ -23,6 +24,36 @@ export function EditProfilePage() {
   const { data: priv } = useMyPrivate()
   const update = useUpdateProfile()
   const avatar = useUploadAvatar()
+  const photo = useImportProviderPhoto()
+  const removeAvatar = useRemoveAvatar()
+  const [params, setParams] = useSearchParams()
+
+  async function importPhoto(provider: PhotoProvider, quiet = false) {
+    try {
+      const r = await photo.mutateAsync(provider)
+      toast.success(r.source === 'linkedin' ? 'Your LinkedIn photo is now your profile photo. You can change it anytime.' : 'Photo updated')
+    } catch (e) {
+      if (e instanceof PhotoImportError && e.code === 'no_identity' && provider === 'linkedin_oidc') {
+        // not signed in with LinkedIn: offer to connect it (LinkedIn then shares the photo with us)
+        if (window.confirm('Connect your LinkedIn account to use its photo? You will sign in to LinkedIn once, and your profile stays the same.')) {
+          const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent('/me/edit?photo=linkedin')}`
+          const { error } = await supabase.auth.linkIdentity({ provider: 'linkedin_oidc', options: { redirectTo } })
+          if (error) toast.error(friendlyError(error))
+        }
+        return
+      }
+      if (!quiet) toast.error(e instanceof PhotoImportError && e.code === 'no_photo' ? 'LinkedIn didn’t share a photo with us. Please upload one instead.' : friendlyError(e))
+    }
+  }
+
+  // coming back from "Connect LinkedIn": finish the import automatically
+  const wantsLinkedIn = params.get('photo') === 'linkedin'
+  useEffect(() => {
+    if (!wantsLinkedIn) return
+    setParams((p) => { p.delete('photo'); return p }, { replace: true })
+    void importPhoto('linkedin_oidc')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per return from LinkedIn
+  }, [wantsLinkedIn])
   const navigate = useNavigate()
   const [f, setF] = useState<Record<string, string>>({})
   const [helpTags, setHelpTags] = useState<string[]>([])
@@ -125,23 +156,39 @@ export function EditProfilePage() {
       <PageHeader title="Edit profile" back="/me" />
       <Page>
         <form onSubmit={save} noValidate className="space-y-7">
-          <section className="flex items-center gap-4">
-            <Avatar src={profile.avatar_url} name={profile.full_name} size={80} />
-            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border bg-surface px-4 font-semibold text-primary hover:bg-primary-soft">
-              <Camera className="size-4" aria-hidden />
-              {avatar.isPending ? 'Uploading…' : 'Change photo'}
-              <input
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                disabled={avatar.isPending}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  e.target.value = ''
-                  if (file) avatar.mutate(file, { onSuccess: () => toast.success('Photo updated'), onError: (err) => toast.error(friendlyError(err)) })
-                }}
-              />
-            </label>
+          <section className="space-y-3" aria-label="Profile photo">
+            <div className="flex items-center gap-4">
+              <Avatar src={profile.avatar_url} name={profile.full_name} size={80} />
+              <div className="min-w-0 text-sm text-muted">
+                <p className="font-semibold text-text">Profile photo</p>
+                <p>A clear, professional photo helps batchmates recognise you.</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" icon={<LinkedInIcon className="size-4" />} loading={photo.isPending} onClick={() => void importPhoto('linkedin_oidc')}>
+                Use my LinkedIn photo
+              </Button>
+              <label className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-full border border-border bg-surface px-6 text-[15px] font-semibold shadow-sm hover:bg-surface-2">
+                <Camera className="size-4" aria-hidden />
+                {avatar.isPending ? 'Uploading…' : 'Upload a photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={avatar.isPending}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (file) avatar.mutate(file, { onSuccess: () => toast.success('Photo updated'), onError: (err) => toast.error(friendlyError(err)) })
+                  }}
+                />
+              </label>
+              {profile.avatar_url && (
+                <Button type="button" variant="danger-ghost" loading={removeAvatar.isPending} onClick={() => removeAvatar.mutate(undefined, { onSuccess: () => toast.success('Photo removed'), onError: (err) => toast.error(friendlyError(err)) })}>
+                  Remove
+                </Button>
+              )}
+            </div>
           </section>
 
           <section className="space-y-4">

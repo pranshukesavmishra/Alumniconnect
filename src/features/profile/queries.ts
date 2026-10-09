@@ -67,6 +67,44 @@ export function useUploadAvatar() {
   })
 }
 
+export type PhotoProvider = 'linkedin_oidc' | 'google' | 'any'
+
+export class PhotoImportError extends Error {
+  code: string
+  constructor(code: string, message: string) {
+    super(message)
+    this.code = code
+  }
+}
+
+/** True when the picture is a permanent copy in our own storage (not a provider link that can expire). */
+export const isOurAvatar = (url: string | null | undefined) => !!url && url.includes('/storage/v1/object/public/avatars/')
+
+/**
+ * Copies the member's LinkedIn (or Google) photo into our storage, then makes it the profile photo.
+ * Throws PhotoImportError with code 'no_identity' when that sign-in isn't connected to the account.
+ */
+export function useImportProviderPhoto() {
+  const update = useUpdateProfile()
+  return useMutation({
+    mutationFn: async (provider: PhotoProvider = 'linkedin_oidc') => {
+      const { data, error } = await supabase.functions.invoke('import-avatar', { body: { provider } })
+      if (error) {
+        const body = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new PhotoImportError(body?.error ?? 'failed', body?.message ?? 'Could not import the photo. Please try again or upload one.')
+      }
+      const url = publicUrl('avatars', (data as { path: string }).path)
+      await update.mutateAsync({ profile: { avatar_url: url } })
+      return { url, source: (data as { source: string }).source }
+    },
+  })
+}
+
+export function useRemoveAvatar() {
+  const update = useUpdateProfile()
+  return useMutation({ mutationFn: () => update.mutateAsync({ profile: { avatar_url: null } }) })
+}
+
 export function useMember(id: string | undefined) {
   return useQuery({
     queryKey: ['member', id],
