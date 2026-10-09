@@ -803,6 +803,20 @@ export function ChatThreadPage() {
           if (actionMsg) pin.mutate(chat?.pinned_message === actionMsg.id ? null : actionMsg.id, { onError: (e) => toast.error(friendlyError(e)) })
           setActionFor(null)
         }}
+        onBan={
+          actionMsg && chat?.group_kind === 'meetup' && chat.group_id && chat.is_group_admin && actionMsg.sender_id && actionMsg.sender_id !== uid && actionMsg.kind !== 'system'
+            ? () => {
+                const m = actionMsg
+                setActionFor(null)
+                if (!window.confirm('Remove this person from the meetup? They will not be able to join it again.')) return
+                void supabase.rpc('remove_meetup_member', { p_group: chat.group_id!, p_user: m.sender_id! }).then(({ error: err }) => {
+                  if (err) return toast.error(friendlyError(err))
+                  toast.success('Removed from the meetup')
+                  void qc.invalidateQueries({ queryKey: ['chats'] })
+                })
+              }
+            : undefined
+        }
         onClose={() => setActionFor(null)}
         onReact={(emoji) => {
           if (actionMsg) react.mutate({ id: actionMsg.id, emoji }, { onError: (e) => toast.error(friendlyError(e)) })

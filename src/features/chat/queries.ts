@@ -18,7 +18,7 @@ export interface ChatSummary {
   other_id: string | null
   group_id: string | null
   group_slug: string | null
-  group_kind: 'batch' | 'year' | 'circle' | 'channel' | null
+  group_kind: 'batch' | 'year' | 'circle' | 'channel' | 'meetup' | null
   joined: boolean
   is_group_admin: boolean
   is_request: boolean

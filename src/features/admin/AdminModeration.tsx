@@ -54,8 +54,11 @@ export function AdminModeration() {
   const qc = useQueryClient()
 
   const act = useMutation({
-    mutationFn: async ({ r, action }: { r: ReportRow; action: 'remove' | 'dismiss' }) => {
-      if (action === 'dismiss') {
+    mutationFn: async ({ r, action }: { r: ReportRow; action: 'remove' | 'dismiss' | 'restore' }) => {
+      if (action === 'restore') {
+        const { error } = await supabase.rpc('moderate', { p_type: r.target_type, p_id: r.target_id, p_hide: false, p_report_status: 'actioned' })
+        if (error) throw error
+      } else if (action === 'dismiss') {
         const { error } = await supabase.rpc('admin_dismiss_reports', { p_type: r.target_type, p_id: r.target_id })
         if (error) throw error
       } else if (r.target_type === 'message') {
@@ -130,6 +133,17 @@ export function AdminModeration() {
                         Dismiss
                       </Button>
                     </div>
+                  )}
+                  {status === 'actioned' && r.removed && ['post', 'comment', 'job', 'help', 'business'].includes(r.target_type) && (
+                    <Button
+                      variant="secondary"
+                      loading={act.isPending && act.variables?.r === r && act.variables.action === 'restore'}
+                      onClick={() => {
+                        if (window.confirm('Show this to members again?')) act.mutate({ r, action: 'restore' }, { onSuccess: () => toast.success('Restored'), onError: (e) => toast.error(friendlyError(e)) })
+                      }}
+                    >
+                      Restore
+                    </Button>
                   )}
                 </Card>
               </li>

@@ -11,6 +11,7 @@ import { dateLocale } from '../../i18n/core'
 import { useT } from '../../i18n'
 import { friendlyError } from '../../lib/errors'
 import { shortBranch } from '../../lib/constants'
+import { useIsModerator } from '../admin/queries'
 import { useMyProfile } from '../auth/AuthProvider'
 import { tripDates, useCityInfo, useCityMeetups, useCityTrips, useMeetupActions, type Meetup } from './trips'
 
@@ -94,7 +95,7 @@ function StartMeetup({ cityId, cityName, onClose }: { cityId: number; cityName: 
 function MeetupCard({ m, cityId }: { m: Meetup; cityId: number }) {
   const t = useT()
   const navigate = useNavigate()
-  const { data: me } = useMyProfile()
+  const moderator = useIsModerator()
   const { join, leave, close, adminSet } = useMeetupActions(cityId)
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     try {
@@ -151,7 +152,7 @@ function MeetupCard({ m, cityId }: { m: Meetup; cityId: number }) {
             {t('meetup.close')}
           </Button>
         )}
-        {me?.is_admin && (
+        {moderator && (
           m.status === 'hidden' || m.status === 'closed' ? (
             <Button size="sm" variant="secondary" onClick={() => run(() => adminSet.mutateAsync({ group: m.group_id, status: 'active' }))}>
               {t('meetup.restore')}
