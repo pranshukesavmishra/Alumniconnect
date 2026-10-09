@@ -94,6 +94,7 @@ export function RegisterPage() {
         needs_accommodation: reg.needs_accommodation,
         arrival_note: reg.arrival_note ?? '',
         notes: reg.notes ?? '',
+        photo_consent: reg.photo_consent, // keep the member's earlier choice when editing
       }))
     } else {
       // Drop draft entries for tickets that no longer exist, and pick the main ticket if none valid is chosen.

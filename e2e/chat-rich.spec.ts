@@ -52,7 +52,7 @@ test('polls and voice notes work between two members', async ({ browser }) => {
 
   // voice note: record ~2s, send, and the other member can play it
   await b.page.getByRole('button', { name: 'Record voice message' }).click()
-  await expect(b.page.getByRole('status')).toContainText('Recording')
+  await expect(b.page.getByRole('status').filter({ hasText: 'Recording' })).toBeVisible()
   await b.page.waitForTimeout(2200)
   await b.page.getByRole('button', { name: 'Send voice message' }).click()
   await expect(b.page.getByRole('button', { name: 'Play voice message' })).toBeVisible()

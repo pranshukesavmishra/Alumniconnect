@@ -1,4 +1,4 @@
-import { BadgeCheck, Briefcase, GraduationCap, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
+import { BadgeCheck, Briefcase, Globe, GraduationCap, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import type { Education, Experience } from '../../lib/types'
 import { signOut, useMyProfile, useUserId } from '../auth/AuthProvider'
+import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
@@ -110,6 +111,16 @@ export function ProfilePage({ self }: { self?: boolean }) {
               </>
             ) : (
               <ProfileActions profile={p} />
+            )}
+            {p.website_url && /^https?:\/\//i.test(p.website_url) && (
+              <a
+                href={p.website_url}
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-5 font-semibold text-primary hover:bg-primary-soft"
+              >
+                <Globe className="size-4" aria-hidden /> {new URL(p.website_url).hostname.replace(/^www\./, '')}
+              </a>
             )}
             {!isMe && (
               p.linkedin_url && (
@@ -221,6 +232,12 @@ export function ProfilePage({ self }: { self?: boolean }) {
               Import from LinkedIn
             </ButtonLink>
           </Card>
+        )}
+
+        {isMe && (
+          <section className="pt-2">
+            <DownloadMyData />
+          </section>
         )}
 
         {isMe && (

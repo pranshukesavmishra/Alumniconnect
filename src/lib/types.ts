@@ -3,7 +3,7 @@
 export type MemberType = 'student' | 'alumnus' | 'faculty'
 export type VerificationStatus = 'pending' | 'verified' | 'rejected'
 export type RegistrationStatus = 'pending_payment' | 'under_review' | 'confirmed' | 'cancelled'
-export type PaymentStatus = 'submitted' | 'verified' | 'rejected'
+export type PaymentStatus = 'submitted' | 'verified' | 'rejected' | 'refunded'
 export type StaffRole = 'manager' | 'checkin'
 export type FoodPref = 'veg' | 'non_veg' | 'jain'
 export type TshirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'

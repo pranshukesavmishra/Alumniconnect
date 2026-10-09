@@ -7,7 +7,7 @@
 //         job title 11.5 · dates/location/description/degree/multi-role duration 10.5
 // - sidebar: headers 13 · skills/contact 10.5 · URLs 11
 // - section titles are translated into the member's UI language, so we rely on structure, not titles
-import { cleanText, normalizeLinkedInUrl, type ImportedProfile } from './common'
+import { cleanText, decodeEntities, normalizeLinkedInUrl, type ImportedProfile } from './common'
 
 export interface PdfLine {
   page: number
@@ -52,8 +52,9 @@ export function itemsToLines(pages: TextItemLike[][]): { main: PdfLine[]; sideba
         .replace(/ /g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
-      if (!text) continue
-      ;(key.startsWith('s') ? sidebar : main).push({ page: pageIdx, y: b.y, size: b.size, text })
+      const decoded = decodeEntities(text)
+      if (!decoded) continue
+      ;(key.startsWith('s') ? sidebar : main).push({ page: pageIdx, y: b.y, size: b.size, text: decoded })
     }
   })
   const order = (p: PdfLine, q: PdfLine) => p.page - q.page || q.y - p.y
@@ -67,18 +68,27 @@ function gap(prev: PdfLine | undefined, cur: PdfLine): number {
 
 // ---------------------------------------------------------------- parsing helpers
 
-const MONTHS: Record<string, number> = {
-  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-  jan: 1, feb: 2, mar: 3, apr: 4, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
-}
+const MONTHS: Record<string, number> = {}
+// English, then the other languages LinkedIn's PDF export is written in (month names as they appear at the start of a date)
+const MONTH_NAMES: string[][] = [
+  ['january jan', 'february feb', 'march mar', 'april apr', 'may', 'june jun', 'july jul', 'august aug', 'september sep sept', 'october oct', 'november nov', 'december dec'],
+  ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre setiembre', 'octubre', 'noviembre', 'diciembre'],
+  ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'],
+  ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+  ['januar', 'februar', 'märz', 'april', 'mai', 'juni', 'juli', 'august', 'september', 'oktober', 'november', 'dezember'],
+  ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'],
+  ['январь января', 'февраль февраля', 'март марта', 'апрель апреля', 'май мая', 'июнь июня', 'июль июля', 'август августа', 'сентябрь сентября', 'октябрь октября', 'ноябрь ноября', 'декабрь декабря'],
+  ['जनवरी', 'फ़रवरी फरवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर सितम्बर', 'अक्टूबर', 'नवंबर नवम्बर', 'दिसंबर दिसम्बर'],
+]
+for (const lang of MONTH_NAMES) lang.forEach((names, i) => names.split(' ').forEach((n) => (MONTHS[n] = i + 1)))
 
-/** "August 2022" -> 2022-08-01, "2008" -> 2008-01-01, localised month names fall back to the year. */
+/** "August 2022" -> 2022-08-01, "2008" -> 2008-01-01; month names in several languages (unknown ones fall back to January). */
 function parsePoint(s: string): { date: string | null; present: boolean } {
   const t = s.trim().toLowerCase()
-  if (/present|presente|настоящее|aujourd|heute|atual/.test(t)) return { date: null, present: true }
+  if (/present|presente|actualidad|настоящее|aujourd|heute|atual|oggi|वर्तमान/.test(t)) return { date: null, present: true }
   const year = t.match(/(19|20)\d{2}/)?.[0]
   if (!year) return { date: null, present: false }
-  const word = t.match(/^([a-z]+)\.?\s/)?.[1]
+  const word = t.match(/^([\p{L}\p{M}]+)\.?\s/u)?.[1]
   const month = word ? MONTHS[word] : undefined
   return { date: `${year}-${String(month ?? 1).padStart(2, '0')}-01`, present: false }
 }
@@ -181,15 +191,40 @@ export function parseLinkedInPdfLines(main: PdfLine[], sidebar: PdfLine[]): Impo
   return out
 }
 
+
+/** "City, State, Country" style line (used when a page break hides the spacing that normally tells location from description). */
+function looksLikePlace(text: string): boolean {
+  if (text.length > 80 || /[.!?:;]$/.test(text) || /^[-–—•·◦▪*]\s/.test(text)) return false
+  const words = text.split(/\s+/)
+  if (words.length > 8) return false
+  if (/,/.test(text)) return true
+  return words.length <= 3 && words.every((w) => /^\p{Lu}/u.test(w))
+}
+
+/**
+ * Description text from PDF lines: lines wrapped by the PDF layout (≈18pt apart) join with a space, a blank line
+ * (≈36pt) is a paragraph break, and bullet lines each start on their own line.
+ */
+function joinDescription(lines: { text: string; gap: number }[]): string {
+  let out = ''
+  lines.forEach((l, i) => {
+    if (i === 0) out = l.text
+    else if (l.gap !== Infinity && l.gap > 26) out += `\n\n${l.text}`
+    else if (/^[-–—•·◦▪*]\s/.test(l.text)) out += `\n${l.text}`
+    else out += ` ${l.text}`
+  })
+  return out
+}
+
 function parseExperience(lines: PdfLine[], out: ImportedProfile) {
   let company = ''
-  type Role = ImportedProfile['experiences'][number] & { _desc: string[] }
+  type Role = ImportedProfile['experiences'][number] & { _desc: { text: string; gap: number }[] }
   let role: Role | null = null
   let stage: 'company' | 'title' | 'date' | 'body' = 'company'
   const flush = () => {
     if (role && role.title && role.company) {
       const { _desc, ...r } = role
-      out.experiences.push({ ...r, description: cleanText(_desc.join('\n')) ?? null })
+      out.experiences.push({ ...r, description: cleanText(joinDescription(_desc)) ?? null })
     }
     role = null
   }
@@ -228,12 +263,13 @@ function parseExperience(lines: PdfLine[], out: ImportedProfile) {
     if (stage === 'date' && role) {
       stage = 'body'
       // location sits ~14.7pt below the date line; a description starts ~20pt below
-      if (gap(prev, l) < 17) {
+      // (when the page breaks right after the date line there is no gap to measure: decide by what the line looks like)
+      if (gap(prev, l) < 17 || (gap(prev, l) === Infinity && looksLikePlace(l.text))) {
         role.location = l.text.slice(0, 120)
         return
       }
     }
-    if (role) role._desc.push(l.text)
+    if (role) role._desc.push({ text: l.text, gap: gap(prev, l) })
   })
   flush()
 }
@@ -306,8 +342,8 @@ function parseSidebar(lines: PdfLine[], out: ImportedProfile) {
 // ---------------------------------------------------------------- browser entry point
 
 export async function readLinkedInPdf(file: Blob): Promise<ImportedProfile> {
-  const pdfjs = await import('pdfjs-dist')
-  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs') // legacy build: works on older phones too
+  const workerUrl = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
   const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) })
   let doc

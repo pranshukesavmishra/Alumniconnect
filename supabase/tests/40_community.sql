@@ -289,6 +289,23 @@ do $$ begin
 end $$;
 reset role;
 
+-- profile data rules: impossible birthdays and non-web links are refused by the database itself
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  begin update public.profiles set birth_day = 31, birth_month = 2 where id = auth.uid(); assert false, '31 Feb refused';
+  exception when check_violation then null; end;
+  begin update public.profiles set birth_day = 5, birth_month = null where id = auth.uid(); assert false, 'day without month refused';
+  exception when check_violation then null; end;
+  update public.profiles set birth_day = 29, birth_month = 2 where id = auth.uid(); -- leap day is a real birthday
+  begin update public.profiles set website_url = 'javascript:alert(1)' where id = auth.uid(); assert false, 'javascript: link refused';
+  exception when check_violation then null; end;
+  begin update public.profiles set website_url = 'https://not a website' where id = auth.uid(); assert false, 'spaces refused';
+  exception when check_violation then null; end;
+  update public.profiles set website_url = 'https://asha.example.com/', linkedin_url = 'https://www.linkedin.com/in/asha' where id = auth.uid();
+end $$;
+reset role;
+
 -- reports: three reports hide a post
 insert into auth.users (id, email) values ('40000000-0000-0000-0000-0000000000d1', 'd1@x.com'), ('40000000-0000-0000-0000-0000000000d2', 'd2@x.com');
 update public.profiles set verification = 'verified' where id in ('40000000-0000-0000-0000-0000000000d1', '40000000-0000-0000-0000-0000000000d2');

@@ -2,6 +2,12 @@
 -- Every table has row-level security. Columns that users must not change themselves
 -- (is_admin, verification) are protected with column-level grants.
 
+-- Safety net: tables and sequences created by ANY later migration are NOT reachable by the app roles until a
+-- migration grants exactly what is needed (Supabase would otherwise grant everything to anon/authenticated).
+alter default privileges in schema public revoke all on tables from anon, authenticated;
+alter default privileges in schema public revoke all on sequences from anon, authenticated;
+
+
 create extension if not exists pg_trgm with schema extensions;
 
 create type public.member_type as enum ('student', 'alumnus', 'faculty');
@@ -22,8 +28,8 @@ create table public.profiles (
   city text check (char_length(city) <= 80),
   country text default 'India' check (char_length(country) <= 80),
   about text check (char_length(about) <= 3000),
-  linkedin_url text check (char_length(linkedin_url) <= 300),
-  website_url text check (char_length(website_url) <= 300),
+  linkedin_url text check (char_length(linkedin_url) <= 300 and linkedin_url ~* '^https?://[^[:space:]]+$'),
+  website_url text check (char_length(website_url) <= 300 and website_url ~* '^https?://[^[:space:]]+$'),
   skills text[] not null default '{}' check (cardinality(skills) <= 50),
   help_tags text[] not null default '{}' check (cardinality(help_tags) <= 12),
   interests text[] not null default '{}' check (cardinality(interests) <= 30),

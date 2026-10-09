@@ -64,5 +64,34 @@ begin
   assert exists (select 1 from public.admin_audit where action = 'record_cash'), 'payment audit trigger';
 end $$;
 reset role;
+
+-- contact lookup, skills, configuration audit
+select pg_temp.login('30000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  begin perform public.admin_member_email('30000000-0000-0000-0000-00000000000a'); assert false, 'members cannot look up emails';
+  exception when insufficient_privilege then null; end;
+  begin update public.events set title = 'Hijacked' where id = '30000000-0000-0000-0000-0000000000e1'; assert (select title from public.events where id = '30000000-0000-0000-0000-0000000000e1') = 'T', 'members cannot edit events';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+select pg_temp.login('30000000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$
+declare n0 int;
+begin
+  assert public.admin_member_email('30000000-0000-0000-0000-00000000000a') = 'm@example.com', 'admin sees email';
+  assert exists (select 1 from public.admin_audit where action = 'view_member_email'), 'email lookups are logged';
+  perform public.admin_update_member('30000000-0000-0000-0000-00000000000a', '{"headline": "Cloud architect", "about": "Hi", "linkedin_url": "https://www.linkedin.com/in/m", "website_url": "https://m.example.com", "country": "India", "skills": ["Go", " AWS ", ""]}'::jsonb);
+  assert (select skills from public.profiles where id = '30000000-0000-0000-0000-00000000000a') = array['Go', 'AWS'], 'skills saved clean';
+  assert (select headline from public.profiles where id = '30000000-0000-0000-0000-00000000000a') = 'Cloud architect', 'headline saved';
+  n0 := (select count(*) from public.admin_audit);
+  update public.events set title = 'Alumni Meet' where id = '30000000-0000-0000-0000-0000000000e1';
+  update public.event_ticket_types set price_paise = 120000 where id = '30000000-0000-0000-0000-0000000000f1';
+  insert into public.event_staff (event_id, user_id, role) values ('30000000-0000-0000-0000-0000000000e1', '30000000-0000-0000-0000-00000000000a', 'checkin');
+  assert (select count(*) from public.admin_audit) = n0 + 3, 'event, ticket and team changes are audited';
+  assert exists (select 1 from public.admin_audit where action = 'events_update' and details -> 'changed' ? 'title'), 'changed fields recorded';
+end $$;
+reset role;
 select 'ALL ADMIN TESTS PASSED';
 rollback;

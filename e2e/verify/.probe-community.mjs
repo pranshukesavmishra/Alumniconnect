@@ -1,0 +1,10 @@
+import { chromium } from '@playwright/test'
+const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+const p = await b.newPage()
+p.on('console', m => console.log('console', m.type(), m.text().slice(0,400)))
+p.on('response', r => { if (r.status() >= 400) console.log('HTTP', r.status(), r.request().method(), r.url().slice(0,200)) })
+p.on('pageerror', e => console.log('pageerror', e.message.slice(0,400)))
+await p.goto(process.argv[2] || 'http://localhost:5185/people')
+await p.waitForTimeout(5000)
+console.log('URL', p.url()); console.log((await p.content()).slice(0,300))
+await b.close()

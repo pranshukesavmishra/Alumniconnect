@@ -1,12 +1,13 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Search, ShieldCheck, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { BadgeCheck, Copy, Eye, Plus, Search, ShieldCheck, X } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
+import { Sheet } from '../../components/ui/Sheet'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Badge, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
-import { ChoiceGroup, Field, Input, Select } from '../../components/ui/Form'
+import { ChoiceGroup, Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { BRANCHES, CURRENT_YEAR, MEMBER_TYPES, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
@@ -22,6 +23,7 @@ export function AdminMembers() {
   const [dq, setDq] = useState('')
   const [filter, setFilter] = useState<'all' | VerificationStatus | 'admins'>('all')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     const t = setTimeout(() => setDq(q.trim()), 250)
@@ -53,7 +55,12 @@ export function AdminMembers() {
 
   return (
     <div>
-      <PageHeader title="Members" subtitle="Edit any profile, verify members, manage admins" back="/admin" />
+      <PageHeader
+        title="Members"
+        subtitle="Edit any profile, verify members, manage admins"
+        back="/admin"
+        action={<Button size="sm" icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>Add member</Button>}
+      />
       <Page wide className="space-y-4">
         <div className="grid gap-2 sm:grid-cols-[1fr_14rem]">
           <div className="relative">
@@ -98,6 +105,15 @@ export function AdminMembers() {
           </Button>
         )}
       </Page>
+      <AddMemberSheet
+        open={adding}
+        onClose={() => setAdding(false)}
+        onCreated={(newId) => {
+          setAdding(false)
+          void list.refetch()
+          setOpenId(newId)
+        }}
+      />
       {openId && <MemberEditor id={openId} isSelf={openId === me.id} onClose={() => setOpenId(null)} />}
     </div>
   )
@@ -126,6 +142,8 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
         full_name: p.full_name, member_type: p.member_type ?? '', branch: p.branch ?? '', grad_year: p.grad_year ? String(p.grad_year) : '',
         join_year: p.join_year ? String(p.join_year) : '', city: p.city ?? '', current_title: p.current_title ?? '', current_company: p.current_company ?? '',
         phone: data.phone,
+        headline: p.headline ?? '', about: p.about ?? '', linkedin_url: p.linkedin_url ?? '', website_url: p.website_url ?? '', country: p.country ?? '',
+        skills: p.skills.join(', '),
       })
     }
   }, [data, f])
@@ -139,7 +157,8 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
   async function save() {
     if (!f) return
     setBusy(true)
-    const { phone, ...fields } = f
+    const { phone, skills, ...rest } = f
+    const fields = { ...rest, skills: (skills ?? '').split(',').map((x) => x.trim()).filter(Boolean) }
     const { error } = await supabase.rpc('admin_update_member', { p_id: id, p_fields: fields, p_phone: phone ?? '' })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
@@ -239,7 +258,14 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
               <Field label="Company">{(x) => <Input {...x} value={f.current_company} onChange={set('current_company')} />}</Field>
             </div>
             <Field label="City">{(x) => <Input {...x} value={f.city} onChange={set('city')} />}</Field>
+            <Field label="Country">{(x) => <Input {...x} value={f.country} onChange={set('country')} />}</Field>
             <Field label="Mobile (private)">{(x) => <Input {...x} type="tel" value={f.phone} onChange={set('phone')} />}</Field>
+            <EmailRow id={id} />
+            <Field label="Headline">{(x) => <Input {...x} value={f.headline} onChange={set('headline')} maxLength={160} />}</Field>
+            <Field label="About">{(x) => <Textarea {...x} value={f.about} onChange={set('about')} maxLength={2000} />}</Field>
+            <Field label="LinkedIn profile link">{(x) => <Input {...x} type="url" inputMode="url" value={f.linkedin_url} onChange={set('linkedin_url')} placeholder="https://www.linkedin.com/in/…" />}</Field>
+            <Field label="Website">{(x) => <Input {...x} type="url" inputMode="url" value={f.website_url} onChange={set('website_url')} />}</Field>
+            <Field label="Skills" hint="Separate with commas">{(x) => <Input {...x} value={f.skills} onChange={set('skills')} />}</Field>
             <Button size="lg" block loading={busy} onClick={save}>
               Save changes
             </Button>
@@ -248,5 +274,113 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
         )}
       </div>
     </div>
+  )
+}
+
+/** The member's email lives in the sign-in system; showing it is a deliberate, logged action. */
+function EmailRow({ id }: { id: string }) {
+  const [email, setEmail] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => setEmail(null), [id])
+  async function reveal() {
+    setBusy(true)
+    const { data, error } = await supabase.rpc('admin_member_email', { p_id: id })
+    setBusy(false)
+    if (error) return toast.error(friendlyError(error))
+    setEmail((data as string | null) ?? '')
+  }
+  return (
+    <div>
+      <p className="mb-1.5 text-[15px] font-semibold">Email (private)</p>
+      {email === null ? (
+        <Button type="button" size="sm" variant="secondary" icon={<Eye className="size-4" />} loading={busy} onClick={reveal}>
+          Show email (logged)
+        </Button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate rounded-xl bg-surface-2 px-3 py-2.5 text-[15px]">{email || 'No email on file'}</span>
+          {email && (
+            <Button type="button" size="sm" variant="secondary" icon={<Copy className="size-4" />} onClick={() => void navigator.clipboard?.writeText(email).then(() => toast.success('Copied'))}>
+              Copy
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Add a member who hasn't signed up yet. They claim the profile by signing in with the same email. */
+function AddMemberSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
+  const empty = { full_name: '', email: '', member_type: 'alumnus', branch: '', grad_year: '', city: '', current_title: '', current_company: '', phone: '', verified: true }
+  const [f, setF] = useState(empty)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    if (!open) {
+      setF(empty)
+      setError(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when closing
+  }, [open])
+  const set = (k: keyof typeof empty) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }))
+  const years = yearRange(1960, CURRENT_YEAR + 5)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (f.full_name.trim().length < 2) return setError('Please enter the member’s full name.')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) return setError('Please enter a valid email address.')
+    setBusy(true)
+    const { data, error: err } = await supabase.functions.invoke('admin-create-member', { body: f })
+    setBusy(false)
+    if (err) {
+      const body = await (err as { context?: Response }).context?.json?.().catch(() => null)
+      return setError(body?.message ?? friendlyError(err))
+    }
+    toast.success(`${f.full_name.trim()} was added. They can sign in with ${f.email.trim().toLowerCase()} to claim their profile.`)
+    onCreated((data as { id: string }).id)
+  }
+
+  return (
+    <Sheet open={open} onClose={onClose} label="Add a member">
+      <form onSubmit={submit} noValidate className="space-y-4 px-5 pb-3 pt-1">
+        <div>
+          <h2 className="text-lg font-bold">Add a member</h2>
+          <p className="text-sm text-muted">For someone who hasn’t signed up yet. When they sign in with this email, the profile is theirs to confirm.</p>
+        </div>
+        <Field label="Full name">{(x) => <Input {...x} value={f.full_name} onChange={set('full_name')} autoComplete="off" />}</Field>
+        <Field label="Email">{(x) => <Input {...x} type="email" inputMode="email" value={f.email} onChange={set('email')} autoComplete="off" />}</Field>
+        <ChoiceGroup label="Member type" columns={3} options={MEMBER_TYPES.map((m) => ({ value: m.value, label: m.label.split(' /')[0]! }))} value={f.member_type as never} onChange={(v) => setF({ ...f, member_type: v })} />
+        <Field label="Branch" optional>
+          {(x) => (
+            <Select {...x} value={f.branch} onChange={set('branch')}>
+              <option value="">—</option>
+              {BRANCHES.map((b) => <option key={b}>{b}</option>)}
+            </Select>
+          )}
+        </Field>
+        <Field label="Passing-out year" optional>
+          {(x) => (
+            <Select {...x} value={f.grad_year} onChange={set('grad_year')}>
+              <option value="">—</option>
+              {years.map((y) => <option key={y}>{y}</option>)}
+            </Select>
+          )}
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Current role" optional>{(x) => <Input {...x} value={f.current_title} onChange={set('current_title')} />}</Field>
+          <Field label="Company" optional>{(x) => <Input {...x} value={f.current_company} onChange={set('current_company')} />}</Field>
+        </div>
+        <Field label="City" optional>{(x) => <Input {...x} value={f.city} onChange={set('city')} />}</Field>
+        <Field label="Mobile (private)" optional>{(x) => <Input {...x} type="tel" value={f.phone} onChange={set('phone')} />}</Field>
+        <label className="flex min-h-11 items-center gap-3">
+          <input type="checkbox" checked={f.verified} onChange={(e) => setF({ ...f, verified: e.target.checked })} className="size-5 accent-[var(--primary)]" />
+          <span>Mark as a verified JECian</span>
+        </label>
+        {error && <Notice tone="danger" title={error} />}
+        <Button type="submit" size="lg" block loading={busy}>Add member</Button>
+      </form>
+    </Sheet>
   )
 }

@@ -63,7 +63,7 @@ export function profileFromCsvFiles(files: { profile?: string; positions?: strin
       out.educations.push({
         school: school.slice(0, 200),
         degree: get(r, 'Degree Name')?.slice(0, 160) ?? null,
-        field: get(r, 'Field Of Study', 'Notes')?.slice(0, 160) ?? null,
+        field: get(r, 'Field Of Study')?.slice(0, 160) ?? null,
         start_year: yearOf(get(r, 'Start Date')),
         end_year: yearOf(get(r, 'End Date')),
         source: 'linkedin',

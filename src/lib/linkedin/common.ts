@@ -30,6 +30,17 @@ export function yearOf(input: string | undefined | null): number | null {
   return m ? Number(m[0]) : null
 }
 
+/** LinkedIn sometimes leaves HTML entities in exported text ("P&amp;L"). */
+export function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]{1,6});/gi, (m, h: string) => safeChar(parseInt(h, 16), m))
+    .replace(/&#(\d{1,7});/g, (m, d: string) => safeChar(Number(d), m))
+    .replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (_m, n: string) => ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' })[n.toLowerCase()]!)
+}
+function safeChar(code: number, fallback: string): string {
+  return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : fallback
+}
+
 export function cleanText(s: string | undefined | null, max = 3000): string | undefined {
   const t = s?.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
   return t ? t.slice(0, max) : undefined
@@ -58,4 +69,23 @@ export function normalizeLinkedInUrl(input: string): string | null {
 /** Is this education entry Jabalpur Engineering College? */
 export function isJec(school: string): boolean {
   return /jabalpur engineering college|\bjec\b.*jabalpur|government engineering college,? jabalpur/i.test(school)
+}
+
+/** A web address typed by a member: adds https:// when missing; returns null for anything that isn't a real http(s) address. */
+export function normalizeWebUrl(input: string): string | null {
+  const t = input.trim()
+  if (!t || /\s/.test(t)) return null
+  try {
+    const u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`)
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return null
+    if (!/^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,}|xn--[a-z0-9-]+)$/i.test(u.hostname)) return null
+    return u.toString()
+  } catch {
+    return null
+  }
+}
+
+/** Days in a month for birthdays (February allows the 29th). */
+export function maxBirthDay(month: number): number {
+  return [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] ?? 31
 }

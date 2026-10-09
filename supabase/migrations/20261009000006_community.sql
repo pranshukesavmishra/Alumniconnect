@@ -6,6 +6,8 @@
 alter table public.profiles
   add column birth_day smallint check (birth_day between 1 and 31),
   add column birth_month smallint check (birth_month between 1 and 12),
+  add constraint birthday_is_a_real_date check ((birth_day is null) = (birth_month is null)
+    and (birth_day is null or birth_day <= (array[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31])[birth_month])),
   add column invite_code text unique,
   add column invited_by uuid references public.profiles (id) on delete set null,
   add column message_policy text not null default 'jec' check (message_policy in ('jec', 'batch_and_connections', 'connections'));

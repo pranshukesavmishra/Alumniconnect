@@ -71,7 +71,7 @@ describe('LinkedIn profile PDF', () => {
   })
   it('parses date and degree variants', () => {
     expect(parseDateRange('2022 - 2022 (less than a year)')).toEqual({ start: '2022-01-01', end: '2022-01-01', current: false })
-    expect(parseDateRange('noviembre de 2023 - Present (1 año)')).toEqual({ start: '2023-01-01', end: null, current: true })
+    expect(parseDateRange('noviembre de 2023 - Present (1 año)')).toEqual({ start: '2023-11-01', end: null, current: true })
     expect(parseDegreeLine('Master of Business Administration - MBA, Marketing')).toEqual({ degree: 'Master of Business Administration - MBA', field: 'Marketing', start: null, end: null })
     expect(parseDegreeLine('Information Technology · (2019 - 2020)')).toMatchObject({ degree: 'Information Technology', start: 2019, end: 2020 })
     expect(parseDegreeLine("Bachelor's degree, Computer Science · (January 2025)")).toMatchObject({ start: null, end: 2025 })

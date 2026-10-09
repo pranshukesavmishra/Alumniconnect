@@ -47,7 +47,9 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
   async function setCancelled(cancel: boolean) {
     const why = window.prompt(cancel ? 'Reason for cancelling (kept in the activity log):' : 'Reason for reopening:')
     if (!why?.trim()) return
-    const { error } = await supabase.rpc('admin_set_registration_status', { p_registration: reg.id, p_cancel: cancel, p_reason: why.trim() })
+    // cancelling a paid registration: was the money given back? (then it stops counting as collected)
+    const refunded = cancel && reg.amount_paise > 0 && window.confirm('Has the money been refunded to the member?\n\nOK = refunded (it stops counting as collected and they can register and pay again).\nCancel = keep the payment on record.')
+    const { error } = await supabase.rpc('admin_set_registration_status', { p_registration: reg.id, p_cancel: cancel, p_reason: why.trim(), p_refunded: refunded })
     if (error) return toast.error(friendlyError(error))
     toast.success(cancel ? 'Registration cancelled' : 'Registration reopened')
     await done()

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Camera, Plus, Trash2, X } from 'lucide-react'
+import { Camera, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -11,7 +11,7 @@ import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Fo
 import { LinkedInIcon } from '../../components/ui/Icons'
 import { BRANCHES, CURRENT_YEAR, HELP_TAGS, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
-import { normalizeLinkedInUrl } from '../../lib/linkedin/common'
+import { maxBirthDay, normalizeLinkedInUrl, normalizeWebUrl } from '../../lib/linkedin/common'
 import { supabase } from '../../lib/supabase'
 import type { Experience } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
@@ -111,13 +111,11 @@ export function EditProfilePage() {
     }
     let website: string | null = null
     if (f.website_url?.trim()) {
-      try {
-        const u = new URL(/^https?:\/\//.test(f.website_url) ? f.website_url.trim() : `https://${f.website_url.trim()}`)
-        website = u.toString()
-      } catch {
-        errs.website_url = 'Please enter a valid web address.'
-      }
+      website = normalizeWebUrl(f.website_url)
+      if (!website) errs.website_url = 'Please enter a valid web address.'
     }
+    if ((f.birth_day && !f.birth_month) || (!f.birth_day && f.birth_month)) errs.birth_day = 'Please choose both the day and the month.'
+    else if (f.birth_day && f.birth_month && Number(f.birth_day) > maxBirthDay(Number(f.birth_month))) errs.birth_day = 'That date doesn’t exist. Please check the day and month.'
     setErrors(errs)
     if (Object.keys(errs).length) return
     const n = (v?: string) => (v?.trim() ? v.trim() : null)
@@ -326,11 +324,11 @@ export function EditProfilePage() {
               )}
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Birthday: day" optional hint="Only the day and month. Shown to your batch and connections.">
+              <Field label="Birthday: day" optional hint="Only the day and month. Shown to your batch and connections." error={errors.birth_day}>
                 {(p) => (
                   <Select {...p} value={f.birth_day} onChange={set('birth_day')}>
                     <option value="">—</option>
-                    {Array.from({ length: 31 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}
+                    {Array.from({ length: f.birth_month ? maxBirthDay(Number(f.birth_month)) : 31 }, (_, i) => <option key={i + 1}>{i + 1}</option>)}
                   </Select>
                 )}
               </Field>
@@ -376,29 +374,55 @@ function ExperienceEditor() {
   const qc = useQueryClient()
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [x, setX] = useState({ title: '', company: '', location: '', start: '', end: '', current: true })
+  const blank = { title: '', company: '', location: '', description: '', start: '', end: '', current: true }
+  const [x, setX] = useState(blank)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ['member', uid] })
   }
 
-  async function add(e: FormEvent) {
+  function startEdit(ex: Experience) {
+    setEditingId(ex.id)
+    setX({
+      title: ex.title,
+      company: ex.company,
+      location: ex.location ?? '',
+      description: ex.description ?? '',
+      start: ex.start_date?.slice(0, 7) ?? '',
+      end: ex.end_date?.slice(0, 7) ?? '',
+      current: ex.is_current,
+    })
+    setAdding(true)
+  }
+
+  function close() {
+    setAdding(false)
+    setEditingId(null)
+    setX(blank)
+  }
+
+  async function save(e: FormEvent) {
     e.preventDefault()
     if (!x.title.trim() || !x.company.trim()) return toast.error('Please enter both the role and the company.')
+    if (!x.current && x.start && x.end && x.end < x.start) return toast.error('The end date can’t be before the start date.')
     setBusy(true)
-    const { error } = await supabase.from('experiences').insert({
-      profile_id: uid,
+    const row = {
       title: x.title.trim().slice(0, 160),
       company: x.company.trim().slice(0, 160),
       location: x.location.trim() || null,
+      description: x.description.trim().slice(0, 3000) || null,
       start_date: x.start ? `${x.start}-01` : null,
       end_date: !x.current && x.end ? `${x.end}-01` : null,
       is_current: x.current,
-    })
+    }
+    const { error } = editingId
+      ? await supabase.from('experiences').update(row).eq('id', editingId)
+      : await supabase.from('experiences').insert({ profile_id: uid, ...row })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
-    setX({ title: '', company: '', location: '', start: '', end: '', current: true })
-    setAdding(false)
+    toast.success(editingId ? 'Experience updated' : 'Experience added')
+    close()
     refresh()
   }
 
@@ -433,9 +457,14 @@ function ExperienceEditor() {
                   {ex.is_current && ' · Current'}
                 </p>
               </div>
-              <button type="button" className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => remove(ex)} aria-label={`Remove ${ex.title}`}>
-                <Trash2 className="size-4" />
-              </button>
+              <div className="flex shrink-0 items-center">
+                <button type="button" className="grid size-11 place-items-center rounded-full text-muted hover:bg-primary-soft hover:text-primary" onClick={() => startEdit(ex)} aria-label={`Edit ${ex.title}`}>
+                  <Pencil className="size-4" />
+                </button>
+                <button type="button" className="grid size-11 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => remove(ex)} aria-label={`Remove ${ex.title}`}>
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
             </div>
           ))}
         </Card>
@@ -444,10 +473,11 @@ function ExperienceEditor() {
       )}
       {adding && (
         <Card className="p-4">
-          <form onSubmit={add} className="space-y-4">
+          <form onSubmit={save} className="space-y-4">
             <Field label="Role">{(p) => <Input {...p} value={x.title} onChange={(e) => setX({ ...x, title: e.target.value })} maxLength={160} />}</Field>
             <Field label="Company">{(p) => <Input {...p} value={x.company} onChange={(e) => setX({ ...x, company: e.target.value })} maxLength={160} />}</Field>
             <Field label="Location" optional>{(p) => <Input {...p} value={x.location} onChange={(e) => setX({ ...x, location: e.target.value })} maxLength={120} />}</Field>
+            <Field label="Description" optional>{(p) => <Textarea {...p} value={x.description} onChange={(e) => setX({ ...x, description: e.target.value })} maxLength={3000} />}</Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="From">{(p) => <Input {...p} type="month" value={x.start} onChange={(e) => setX({ ...x, start: e.target.value })} />}</Field>
               {!x.current && <Field label="To">{(p) => <Input {...p} type="month" value={x.end} onChange={(e) => setX({ ...x, end: e.target.value })} />}</Field>}
@@ -457,9 +487,9 @@ function ExperienceEditor() {
             </Checkbox>
             <div className="flex gap-2">
               <Button type="submit" loading={busy}>
-                Add experience
+                {editingId ? 'Save changes' : 'Add experience'}
               </Button>
-              <Button variant="ghost" onClick={() => setAdding(false)}>
+              <Button variant="ghost" onClick={close}>
                 Cancel
               </Button>
             </div>

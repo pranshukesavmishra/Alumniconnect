@@ -18,6 +18,7 @@ export function PaymentBadge({ status }: { status: PaymentStatus }) {
     submitted: ['primary', 'Awaiting verification'],
     verified: ['success', 'Verified'],
     rejected: ['danger', 'Not verified'],
+  refunded: ['neutral', 'Refunded'],
   } as const
   const [tone, text] = map[status]
   return <Badge tone={tone}>{text}</Badge>

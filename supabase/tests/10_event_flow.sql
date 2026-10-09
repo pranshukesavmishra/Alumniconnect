@@ -162,7 +162,10 @@ grant select on t_ids to authenticated;
 select pg_temp.login('00000000-0000-0000-0000-00000000000d');
 set local role authenticated;
 do $$ begin
-  assert (select count(*) from public.event_registrations) = 2, 'volunteer sees registrations';
+  assert (select count(*) from public.event_registrations) = 0, 'volunteer cannot read the registrations table (it holds phone/email)';
+  assert (select count(*) from public.event_attendees('00000000-0000-0000-0000-0000000000e1')) = 2, 'volunteer sees attendees';
+  assert not exists (select 1 from public.event_attendees('00000000-0000-0000-0000-0000000000e1')
+                      where phone <> '' or email is not null or notes is not null or admin_note is not null or amount_paise <> 0), 'attendee list leaves out phone, email, notes, amounts';
   assert (select count(*) from public.event_payments) = 0, 'volunteer cannot see payments';
   assert (select count(*) from public.event_registration_items) = 0, 'volunteer cannot see items';
   begin
@@ -171,7 +174,7 @@ do $$ begin
   exception when insufficient_privilege then null; end;
   -- not yet confirmed: check-in does not mark arrival
   assert (select (c.registration).checked_in_at is null from public.check_in('00000000-0000-0000-0000-0000000000e1',
-          (select code from public.event_registrations where full_name = 'Asha Rao')) c), 'unconfirmed not checked in';
+          (select code from public.event_attendees('00000000-0000-0000-0000-0000000000e1') where full_name = 'Asha Rao')) c), 'unconfirmed not checked in';
 end $$;
 reset role;
 
@@ -198,10 +201,10 @@ do $$
 declare c record;
 begin
   select * into c from public.check_in('00000000-0000-0000-0000-0000000000e1',
-    lower((select code from public.event_registrations where full_name = 'Asha Rao')));
+    lower((select code from public.event_attendees('00000000-0000-0000-0000-0000000000e1') where full_name = 'Asha Rao')));
   assert (c.registration).checked_in_at is not null and not c.already_checked_in, 'checked in';
   select * into c from public.check_in('00000000-0000-0000-0000-0000000000e1',
-    (select code from public.event_registrations where full_name = 'Asha Rao'));
+    (select code from public.event_attendees('00000000-0000-0000-0000-0000000000e1') where full_name = 'Asha Rao'));
   assert c.already_checked_in, 'second scan flags duplicate';
 end $$;
 reset role;

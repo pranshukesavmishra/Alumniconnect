@@ -5,7 +5,7 @@
 -- below, which validate input and calculate the amount on the server.
 
 create type public.registration_status as enum ('pending_payment', 'under_review', 'confirmed', 'cancelled');
-create type public.payment_status as enum ('submitted', 'verified', 'rejected');
+create type public.payment_status as enum ('submitted', 'verified', 'rejected', 'refunded');
 create type public.staff_role as enum ('manager', 'checkin');
 
 create table public.events (
@@ -223,10 +223,12 @@ create policy "staff see staff list" on public.event_staff
 create policy "admins manage staff" on public.event_staff
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
-create policy "own registration or staff" on public.event_registrations
-  for select to authenticated using (user_id = auth.uid() or public.is_event_staff(event_id));
+-- Managers see whole rows. Check-in volunteers do NOT read this table: they use event_attendees(), which leaves
+-- out phone, email, notes and amounts (row-level security can't hide individual columns).
+create policy "own registration or manager" on public.event_registrations
+  for select to authenticated using (user_id = auth.uid() or public.is_event_manager(event_id));
 
--- Check-in volunteers see registrations (names, headcount) but not tickets bought or payments.
+-- Check-in volunteers get names and headcount through event_attendees(), not tickets bought or payments.
 create policy "own items or managers" on public.event_registration_items
   for select to authenticated using (exists (
     select 1 from public.event_registrations r
@@ -384,6 +386,10 @@ begin
   if primaries <> 1 then
     raise exception 'Choose exactly one main (alumnus) ticket';
   end if;
+  -- the guest list can't name more people than the extra tickets paid for
+  if jsonb_array_length(v_guests) > heads - primaries then
+    raise exception 'The guest list has more names than the tickets you selected';
+  end if;
 
   -- Lock order everywhere: event row, then registration row.
   perform 1 from public.events where id = p_event for update;
@@ -447,6 +453,9 @@ begin
     insert into public.event_registration_items (registration_id, ticket_type_id, label, unit_price_paise, quantity)
       select reg.id, (l ->> 'id')::uuid, l ->> 'label', (l ->> 'price')::int, (l ->> 'qty')::int
         from jsonb_array_elements(v_lines) l;
+    -- a registration that is re-activated after cancellation may already be paid for (money still held): settle it
+    perform public._refresh_registration_status(reg.id);
+    select * into reg from public.event_registrations where id = reg.id;
   end if;
 
   return reg;
@@ -639,6 +648,32 @@ end;
 $$;
 
 -- Scan a ticket at the gate. Returns the registration and whether it was already checked in.
+-- A registration as a check-in volunteer may see it: no phone, email, notes or amounts. Managers get the full row.
+create or replace function public._sanitized_registration(r public.event_registrations)
+returns public.event_registrations
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case when public.is_event_manager(r.event_id) then r
+              else jsonb_populate_record(r, jsonb_build_object('phone', '', 'email', null, 'notes', null, 'admin_note', null, 'amount_paise', 0)) end;
+$$;
+
+-- Attendee list for volunteers and managers (volunteer view is sanitized).
+create or replace function public.event_attendees(p_event uuid)
+returns setof public.event_registrations
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select (public._sanitized_registration(r)).*
+    from public.event_registrations r
+   where r.event_id = p_event and public.is_event_staff(p_event)
+   order by r.created_at desc;
+$$;
+
 create or replace function public.check_in(p_event uuid, p_code text, p_undo boolean default false)
 returns table (registration public.event_registrations, already_checked_in boolean)
 language plpgsql
@@ -665,7 +700,7 @@ begin
     update public.event_registrations set checked_in_at = now(), checked_in_by = auth.uid()
      where id = reg.id returning * into reg;
   end if;
-  return query select reg, was_in;
+  return query select public._sanitized_registration(reg), was_in;
 end;
 $$;
 
@@ -691,6 +726,9 @@ revoke execute on function public._assert_capacity(uuid, uuid, int) from anon, a
 revoke execute on function public._verify_member_from_payment(uuid) from anon, authenticated, public;
 revoke execute on function public._refresh_registration_status(uuid) from anon, authenticated, public;
 revoke execute on function public.new_registration_code() from anon, authenticated, public;
+revoke execute on function public._sanitized_registration(public.event_registrations) from anon, authenticated, public;
+revoke execute on function public.event_attendees(uuid) from anon, public;
+grant execute on function public.event_attendees(uuid) to authenticated;
 revoke execute on function public.moderate_photo(uuid, boolean) from anon, public;
 grant execute on function public.moderate_photo(uuid, boolean) to authenticated;
 

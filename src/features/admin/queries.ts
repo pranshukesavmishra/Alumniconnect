@@ -66,8 +66,11 @@ export function useAdminData(eventId: string | undefined, role: StaffRole | null
     enabled: !!eventId && !!role,
     refetchInterval: 60_000,
     queryFn: async (): Promise<AdminData> => {
+      // Managers read whole rows. Check-in volunteers get the attendee list without phone, email, notes or amounts.
       const registrations = await fetchAll<Registration>((a, b) =>
-        supabase.from('event_registrations').select('*').eq('event_id', eventId!).order('created_at', { ascending: false }).range(a, b),
+        role === 'manager'
+          ? supabase.from('event_registrations').select('*').eq('event_id', eventId!).order('created_at', { ascending: false }).range(a, b)
+          : supabase.rpc('event_attendees', { p_event: eventId! }).range(a, b),
       )
       if (role !== 'manager') return { registrations, items: [], payments: [] }
       const ids = new Set(registrations.map((r) => r.id))

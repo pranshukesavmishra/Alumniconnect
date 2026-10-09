@@ -43,7 +43,7 @@ declare
   before public.profiles;
   after public.profiles;
   allowed constant text[] := array['full_name', 'headline', 'member_type', 'branch', 'join_year', 'grad_year', 'current_title',
-                                   'current_company', 'city', 'country', 'about', 'linkedin_url', 'website_url', 'onboarded'];
+                                   'current_company', 'city', 'country', 'about', 'linkedin_url', 'website_url', 'skills', 'onboarded'];
   k text;
 begin
   if not public.is_admin() then
@@ -76,6 +76,9 @@ begin
     about = case when p_fields ? 'about' then nullif(btrim(p_fields ->> 'about'), '') else p.about end,
     linkedin_url = case when p_fields ? 'linkedin_url' then nullif(btrim(p_fields ->> 'linkedin_url'), '') else p.linkedin_url end,
     website_url = case when p_fields ? 'website_url' then nullif(btrim(p_fields ->> 'website_url'), '') else p.website_url end,
+    skills = case when p_fields ? 'skills'
+                  then coalesce((select array_agg(left(btrim(x), 40)) from jsonb_array_elements_text(p_fields -> 'skills') x where btrim(x) <> ''), '{}'::text[])
+                  else p.skills end,
     onboarded = case when p_fields ? 'onboarded' then (p_fields ->> 'onboarded')::boolean else p.onboarded end
   where p.id = p_id
   returning * into after;
@@ -217,7 +220,7 @@ end;
 $$;
 
 -- Cancel (e.g. refund handled offline) or reopen a registration.
-create or replace function public.admin_set_registration_status(p_registration uuid, p_cancel boolean, p_reason text)
+create or replace function public.admin_set_registration_status(p_registration uuid, p_cancel boolean, p_reason text, p_refunded boolean default false)
 returns public.event_registrations
 language plpgsql
 security definer
@@ -237,6 +240,10 @@ begin
   before_status := reg.status;
   if p_cancel then
     update public.event_registrations set status = 'cancelled', admin_note = left(btrim(p_reason), 500) where id = reg.id;
+    -- money returned outside the app: it no longer counts as collected, and the member can register and pay again
+    if p_refunded then
+      update public.event_payments set status = 'refunded' where registration_id = reg.id and status = 'verified';
+    end if;
   else
     if reg.status <> 'cancelled' then
       raise exception 'This registration is not cancelled';
@@ -247,7 +254,7 @@ begin
   end if;
   select * into reg from public.event_registrations where id = p_registration;
   perform public._audit(case when p_cancel then 'cancel_registration' else 'reopen_registration' end, 'event_registrations', reg.id,
-    jsonb_build_object('reason', p_reason, 'code', reg.code, 'status', jsonb_build_object('from', before_status, 'to', reg.status)));
+    jsonb_build_object('reason', p_reason, 'code', reg.code, 'refunded', coalesce(p_refunded, false) and p_cancel, 'status', jsonb_build_object('from', before_status, 'to', reg.status)));
   return reg;
 end;
 $$;
@@ -275,11 +282,70 @@ create trigger event_payments_audit after insert or update on public.event_payme
 
 revoke execute on function public.admin_update_member(uuid, jsonb, text) from anon, public;
 revoke execute on function public.admin_update_registration(uuid, jsonb, jsonb, text) from anon, public;
-revoke execute on function public.admin_set_registration_status(uuid, boolean, text) from anon, public;
+revoke execute on function public.admin_set_registration_status(uuid, boolean, text, boolean) from anon, public;
 revoke execute on function public._audit_payment_change() from anon, authenticated, public;
 grant execute on function public.admin_update_member(uuid, jsonb, text) to authenticated;
 grant execute on function public.admin_update_registration(uuid, jsonb, jsonb, text) to authenticated;
-grant execute on function public.admin_set_registration_status(uuid, boolean, text) to authenticated;
+grant execute on function public.admin_set_registration_status(uuid, boolean, text, boolean) to authenticated;
+
+
+-- ------------------------------------------------------------------ contact details and configuration audit
+-- Email lives in auth.users; admins can look it up to contact a member. Every lookup is logged.
+create or replace function public.admin_member_email(p_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can do this' using errcode = '42501';
+  end if;
+  select email into v from auth.users where id = p_id;
+  perform public._audit('view_member_email', 'profiles', p_id, '{}'::jsonb);
+  return v;
+end;
+$$;
+revoke execute on function public.admin_member_email(uuid) from anon, public;
+grant execute on function public.admin_member_email(uuid) to authenticated;
+
+-- Changes to events, tickets, team and settings are written to the activity log too (by whoever is signed in).
+create or replace function public._audit_config_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r jsonb := to_jsonb(case when tg_op = 'DELETE' then old else new end);
+  target uuid;
+  changed jsonb;
+begin
+  if auth.uid() is null then
+    return null; -- system changes (seed, backups) are not admin actions
+  end if;
+  target := coalesce((r ->> 'id')::uuid, (r ->> 'event_id')::uuid);
+  if tg_op = 'UPDATE' then
+    select jsonb_agg(key order by key) into changed
+      from jsonb_each(to_jsonb(new)) where to_jsonb(old) -> key is distinct from value;
+    if changed is null then
+      return null;
+    end if;
+  end if;
+  -- names of changed fields only for settings (they hold payment details); readable summary otherwise
+  perform public._audit(tg_table_name || '_' || lower(tg_op), tg_table_name, target,
+    jsonb_build_object('name', coalesce(r ->> 'title', r ->> 'label', r ->> 'user_id'), 'changed', changed,
+                       'event_id', r ->> 'event_id'));
+  return null;
+end;
+$$;
+revoke execute on function public._audit_config_change() from anon, authenticated, public;
+create trigger events_audit after insert or update or delete on public.events for each row execute function public._audit_config_change();
+create trigger event_ticket_types_audit after insert or update or delete on public.event_ticket_types for each row execute function public._audit_config_change();
+create trigger event_staff_audit after insert or update or delete on public.event_staff for each row execute function public._audit_config_change();
+create trigger event_settings_audit after insert or update or delete on public.event_settings for each row execute function public._audit_config_change();
 
 -- ------------------------------------------------------------------ LinkedIn import (members)
 -- Replaces the member's previously imported experience/education and applies profile fields in ONE

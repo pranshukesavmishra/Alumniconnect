@@ -40,6 +40,10 @@ function toPaise(c: unknown): number | null {
 const CREDIT = /^(credit|credits|deposit|deposits|credit amount|credit amt\.?|deposit amt\.?|deposit amount|cr|cr\.|cr amount|credit \(inr\)|deposit \(inr\)|deposit amount \(inr\)|deposit \(cr\))$/i
 const DEBIT = /^(debit|debits|withdrawal|withdrawals|debit amount|debit amt\.?|withdrawal amt\.?|withdrawal amount|dr|dr\.|dr amount|debit \(inr\)|withdrawal \(inr\)|withdrawal amount \(inr\)|withdrawal \(dr\))$/i
 
+// A real transaction table header also names a date or narration column. Summary blocks printed above the table
+// ("Opening Balance | Debits | Credits | ...") have none, so they must never be mistaken for the header.
+const TXN_HEADER = /^(txn date|tran date|transaction date|trans date|date|value date|value dt\.?|post(ing)? date|narration|description|particulars|transaction (remarks|description|details)|remarks|details)$/i
+
 const norm = (c: unknown) => cellText(c).replace(/\s+/g, ' ').replace(/\(\s*/g, '(').replace(/\s*\)/g, ')').trim()
 
 /** Finds the header row and the credit / debit columns, if the statement has them. */
@@ -47,7 +51,7 @@ export function findCreditColumn(rows: unknown[][]): { headerRow: number; credit
   for (let r = 0; r < Math.min(rows.length, 40); r++) {
     const row = rows[r] ?? []
     const creditCol = row.findIndex((c) => CREDIT.test(norm(c)))
-    if (creditCol >= 0) return { headerRow: r, creditCol, debitCol: row.findIndex((c) => DEBIT.test(norm(c))) }
+    if (creditCol >= 0 && row.some((c) => TXN_HEADER.test(norm(c)))) return { headerRow: r, creditCol, debitCol: row.findIndex((c) => DEBIT.test(norm(c))) }
   }
   return null
 }
