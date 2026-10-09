@@ -55,13 +55,19 @@ test('notifications: turn on/off, sign-out removes the device, a real push shows
   })
   await cdp.send('ServiceWorker.enable')
   await expect.poll(() => registrationId).toBeTruthy()
-  await cdp.send('ServiceWorker.deliverPushMessage', {
-    origin: 'http://localhost:5190',
-    registrationId: registrationId!,
-    data: JSON.stringify({ title: `Asha ${run}`, body: 'See you at JEC!', url: '/chat/abc', tag: 'chat:abc' }),
-  })
+  // deliver once the worker is active; retry while it settles (a push to a worker that isn't ready yet is dropped)
+  await expect.poll(() => page.evaluate(async () => (await navigator.serviceWorker.ready).active?.state)).toBe('activated')
   const shown = () => page.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => `${n.title}|${n.body}|${n.tag}`))
-  await expect.poll(shown).toContain(`Asha ${run}|See you at JEC!|chat:abc`)
+  await expect
+    .poll(async () => {
+      await cdp.send('ServiceWorker.deliverPushMessage', {
+        origin: 'http://localhost:5190',
+        registrationId: registrationId!,
+        data: JSON.stringify({ title: `Asha ${run}`, body: 'See you at JEC!', url: '/chat/abc', tag: 'chat:abc' }),
+      })
+      return shown()
+    }, { timeout: 20_000, intervals: [500, 1000, 1500] })
+    .toContain(`Asha ${run}|See you at JEC!|chat:abc`)
 
   // signing out on a shared phone removes the device, so the next person never sees this member's messages
   await page.goto('/notifications')

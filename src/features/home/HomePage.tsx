@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Bell, CalendarHeart, Search, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, Bell, BriefcaseBusiness, CalendarHeart, Search, Send, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
+import type { JobListItem } from '../jobs/queries'
 import { Avatar, Card, PageSkeleton } from '../../components/ui/Display'
 import { LinkedInIcon } from '../../components/ui/Icons'
 import { MEET_SLUG } from '../../lib/constants'
@@ -146,6 +147,7 @@ export function HomePage() {
       {verified ? (
         <>
           <Spotlight />
+          <LatestJobs />
           <Birthdays />
           <Composer groups={groups} />
           <FeedList scope="home" />
@@ -239,5 +241,47 @@ function Spotlight() {
       <p className="mt-2 text-[15px] font-semibold">{data.headline}</p>
       {data.story && <p className="mt-1 line-clamp-3 text-sm text-muted">{data.story}</p>}
     </Link>
+  )
+}
+
+/** The three newest openings, so jobs are visible from Home without hunting for them. */
+function LatestJobs() {
+  const { data } = useQuery({
+    queryKey: ['jobs', 'latest'],
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('search_jobs', { p_limit: 3 })
+      if (error) throw error
+      return data as JobListItem[]
+    },
+  })
+  if (!data?.length) return null
+  return (
+    <section aria-label="Latest jobs">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-muted">Latest jobs</h2>
+        <Link to="/jobs" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">
+          See all
+        </Link>
+      </div>
+      <ul className="space-y-2">
+        {data.map((j) => (
+          <li key={j.id}>
+            <Link to={`/jobs/${j.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:bg-surface-2">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary" aria-hidden>
+                <BriefcaseBusiness className="size-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-semibold">{j.title}</span>
+                <span className="block truncate text-sm text-muted">
+                  {j.company} · {j.poster_name}
+                  {j.can_refer ? ' · can refer' : ''}
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

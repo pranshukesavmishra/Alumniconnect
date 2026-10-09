@@ -23,6 +23,10 @@ const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage').th
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 const AdminEventPage = lazy(() => import('./features/admin/AdminEventPage').then((m) => ({ default: m.AdminEventPage })))
 const AdminMembers = lazy(() => import('./features/admin/AdminMembers').then((m) => ({ default: m.AdminMembers })))
+const JobsPage = lazy(() => import('./features/jobs/JobsPage').then((m) => ({ default: m.JobsPage })))
+const JobDetailPage = lazy(() => import('./features/jobs/JobDetailPage').then((m) => ({ default: m.JobDetailPage })))
+const PostJobPage = lazy(() => import('./features/jobs/PostJobPage').then((m) => ({ default: m.PostJobPage })))
+const MyJobsPage = lazy(() => import('./features/jobs/MyJobsPage').then((m) => ({ default: m.MyJobsPage })))
 const AdminCommunity = lazy(() => import('./features/admin/AdminCommunity').then((m) => ({ default: m.AdminCommunity })))
 const AdminModeration = lazy(() => import('./features/admin/AdminModeration').then((m) => ({ default: m.AdminModeration })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
@@ -140,6 +144,10 @@ export function App() {
             <Route path="groups/:slug" element={m(<GroupPage />)} />
             <Route path="chat" element={m(<ChatListPage />)} />
             <Route path="chat/:id" element={m(<ChatThreadPage />)} />
+            <Route path="jobs" element={m(<JobsPage />)} />
+            <Route path="jobs/new" element={m(<PostJobPage />)} />
+            <Route path="jobs/mine" element={m(<MyJobsPage />)} />
+            <Route path="jobs/:id" element={m(<JobDetailPage />)} />
             <Route path="notifications" element={m(<NotificationsPage />)} />
             <Route path="me/connections" element={m(<ConnectionsPage />)} />
             <Route path="invite" element={m(<InvitePage />)} />

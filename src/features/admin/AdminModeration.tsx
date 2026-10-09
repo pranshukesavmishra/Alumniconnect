@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
 
 interface ReportRow {
-  target_type: 'post' | 'comment' | 'message' | 'profile'
+  target_type: 'post' | 'comment' | 'message' | 'profile' | 'job'
   target_id: string
   report_count: number
   last_reported: string
@@ -24,7 +24,7 @@ interface ReportRow {
   place: string | null
 }
 
-const KIND_LABEL: Record<ReportRow['target_type'], string> = { post: 'Post', comment: 'Comment', message: 'Chat message', profile: 'Profile' }
+const KIND_LABEL: Record<ReportRow['target_type'], string> = { post: 'Post', comment: 'Comment', message: 'Chat message', profile: 'Profile', job: 'Job posting' }
 
 /** Every open report on one screen: read what was reported, then remove/hide it or dismiss the report. */
 export function useReports(status: 'open' | 'actioned' | 'dismissed', enabled = true) {

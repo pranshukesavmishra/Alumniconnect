@@ -57,7 +57,7 @@ test('slow mode limits members; reported messages reach admins who can remove th
   await expect(card).toContainText(`Talker ${run}`)
   boss.page.once('dialog', (d) => void d.accept())
   await card.getByRole('button', { name: 'Remove message' }).click()
-  await expect(boss.page.getByText('Nothing to review')).toBeVisible()
+  await expect(card).toHaveCount(0) // closed reports leave the open list
   await talker.page.reload()
   await expect(talker.page.getByText('This message was deleted')).toBeVisible()
   await expect(talker.page.getByText(`Buy my course now ${run}`)).toHaveCount(0)

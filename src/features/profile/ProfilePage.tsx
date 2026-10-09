@@ -143,6 +143,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
           <nav className="grid gap-2 sm:grid-cols-2" aria-label="Shortcuts">
             {[
               { to: '/me/connections', label: 'Connections', hint: 'Requests and your network', icon: '🤝' },
+              { to: '/jobs', label: 'Jobs', hint: 'Openings and referrals', icon: '💼' },
               { to: '/invite', label: 'Invite friends', hint: 'Bring your batch in', icon: '💌' },
               { to: '/people', label: 'Find JECians', hint: 'Search the directory', icon: '🔎' },
               { to: '/notifications', label: 'Notifications', hint: 'Likes, comments, requests', icon: '🔔' },
