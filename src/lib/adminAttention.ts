@@ -125,7 +125,7 @@ export function buildQueue(a: Attention, now: number = Date.now()): QueueItem[] 
         count: g.members_pending!,
         title: `${plural(g.members_pending!, 'member', 'members')} to verify`,
         detail: `Finished their profile and wait for approval${waiting(g.oldest_member_pending_at ?? null, now)}`,
-        href: '/admin/members?filter=pending',
+        href: '/admin/members?filter=pending&profile=yes&sort=oldest', // exactly the people the count is about: finished profile, waiting, longest first
       })
     }
     if ((g.circles_waiting ?? 0) > 0) {

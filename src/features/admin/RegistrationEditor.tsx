@@ -44,10 +44,10 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
     })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
+    await done() // fresh row first, so the next action does not trip the edit-conflict check on a stale copy
     toast.success('Registration updated')
     setOpen(false)
     setReason('')
-    await done()
   }
 
   async function setCancelled(cancel: boolean) {
@@ -57,8 +57,8 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
     const refunded = cancel && reg.amount_paise > 0 && window.confirm('Has the money been refunded to the member?\n\nOK = refunded (it stops counting as collected and they can register and pay again).\nCancel = keep the payment on record.')
     const { error } = await supabase.rpc('admin_set_registration_status', { p_registration: reg.id, p_cancel: cancel, p_reason: why.trim(), p_refunded: refunded, p_expected: reg.updated_at })
     if (error) return toast.error(friendlyError(error))
-    toast.success(cancel ? 'Registration cancelled' : 'Registration reopened')
     await done()
+    toast.success(cancel ? 'Registration cancelled' : 'Registration reopened')
   }
 
   if (reg.status === 'cancelled') {

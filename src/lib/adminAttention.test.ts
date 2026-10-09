@@ -22,7 +22,7 @@ describe('buildQueue', () => {
     expect(Object.fromEntries(q.map((i) => [i.id, i.href]))).toEqual({
       'pay-e1': '/admin/events/meet?tab=payments',
       reports: '/admin/reports',
-      members: '/admin/members?filter=pending',
+      members: '/admin/members?filter=pending&profile=yes&sort=oldest',
       circles: '/admin/community',
     })
     expect(q.find((i) => i.id === 'members')?.count).toBe(3)
