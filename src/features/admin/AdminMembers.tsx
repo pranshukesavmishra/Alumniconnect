@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, Copy, Download, Eye, History, Plus, Search, ShieldCheck, SlidersHorizontal, Trash2, Upload, Users, X } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
 import { Sheet } from '../../components/ui/Sheet'
 import { toast } from 'sonner'
@@ -19,6 +19,8 @@ import { useMyProfile } from '../auth/AuthProvider'
 import { exportMembers, type MemberExportRow } from './export'
 import { attentionKey, fetchMemberIds, useMemberList, useMemberViews, type MemberView } from './queries'
 
+const EXTRA_FILTERS = ['onboarded', 'older', 'signin', 'branch', 'batch_from', 'batch_to', 'city', 'type', 'sort'] as const
+
 export function AdminMembers() {
   const { data: me, isLoading } = useMyProfile()
   const qc = useQueryClient()
@@ -36,7 +38,18 @@ export function AdminMembers() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [selectingAll, setSelectingAll] = useState(false)
 
+  const latest = useRef(params)
+  useEffect(() => {
+    latest.current = params
+  })
   const setFilter = (f: MemberFilter) => setParams(filterToParams(f), { replace: true })
+  /** The filters sheet owns the "more" filters only. Search and status are read as they are NOW, so a change made a moment ago is never undone. */
+  const applyExtras = (f: MemberFilter) => {
+    const live = filterFromParams(latest.current)
+    const next: Record<string, unknown> = { q: live.q, status: live.status }
+    for (const k of EXTRA_FILTERS) if (f[k] !== undefined) next[k] = f[k]
+    setParams(filterToParams(next as MemberFilter), { replace: true })
+  }
   const setOpenId = (id: string | null) => {
     setOpenIdState(id)
     if (params.has('open')) setParams(filterToParams(filter), { replace: true })
@@ -44,10 +57,12 @@ export function AdminMembers() {
 
   useEffect(() => {
     const t = setTimeout(() => {
-      if ((filter.q ?? '') !== q.trim()) setParams(filterToParams({ ...filter, q: q.trim() || undefined }), { replace: true })
+      // read the URL as it is when the timer fires: a filter or saved view chosen meanwhile must not be undone
+      const now = filterFromParams(latest.current)
+      if ((now.q ?? '') !== q.trim()) setParams(filterToParams({ ...now, q: q.trim() || undefined }), { replace: true })
     }, 300)
     return () => clearTimeout(t)
-  }, [q, filter, setParams])
+  }, [q, setParams])
   // a different filter is a different list: never act on members the admin can no longer see
   useEffect(() => setSelected(new Set()), [filterKey])
 
@@ -105,7 +120,7 @@ export function AdminMembers() {
             <Input type="search" aria-label="Search members" placeholder="Name, city, company, branch…" className="pl-11" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="grid grid-cols-[1fr_auto] gap-2 sm:contents">
-            <Select aria-label="Filter" value={filter.status ?? 'all'} onChange={(e) => setFilter({ ...filter, status: e.target.value as MemberStatus })}>
+            <Select aria-label="Filter" value={filter.status ?? 'all'} onChange={(e) => setFilter({ ...filterFromParams(latest.current), status: e.target.value as MemberStatus })}>
               <option value="all">All members</option>
               <option value="pending">Not yet verified</option>
               <option value="verified">Verified</option>
@@ -233,7 +248,7 @@ export function AdminMembers() {
           setOpenId(newId)
         }}
       />
-      <FiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filter={{ ...filter, q: q.trim() || undefined }} views={views.data ?? []} onApply={(f) => { setQ(f.q ?? ''); setFilter(f) }} />
+      <FiltersSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} filter={{ ...filter, q: q.trim() || undefined }} views={views.data ?? []} onApply={applyExtras} />
       <BulkSheet
         to={bulk}
         ids={[...selected]}
@@ -447,7 +462,7 @@ function FiltersSheet({ open, onClose, filter, views, onApply }: { open: boolean
           )}
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="secondary" onClick={() => { onApply({ q: f.q, status: f.status }); onClose() }}>Clear these</Button>
+          <Button variant="secondary" onClick={() => { onApply({}); onClose() }}>Clear these</Button>
           <Button onClick={() => { onApply(cleanFilter(f as Record<string, unknown>)); onClose() }}>Show members</Button>
         </div>
 

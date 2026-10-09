@@ -381,10 +381,13 @@ end $$;
 select pg_temp.login('97000000-0000-0000-0000-0000000000c0');
 set local role authenticated;
 do $$
-declare res jsonb;
 begin
-  res := public.admin_bulk_review_payments(array['97000000-0000-0000-0000-0000000000b2'::uuid], true, 'x');
-  assert (res ->> 'done')::int = 0 and jsonb_array_length(res -> 'failed') = 1, 'a volunteer cannot verify anything through the bulk door either';
+  begin
+    perform public.admin_bulk_review_payments(array['97000000-0000-0000-0000-0000000000b2'::uuid], true, 'x');
+    assert false, 'a volunteer must not get through the bulk door';
+  exception when insufficient_privilege then
+    null; -- refused up front: only admins and treasurers may call it
+  end;
 end $$;
 reset role;
 select pg_temp.login('97000000-0000-0000-0000-0000000000b0');

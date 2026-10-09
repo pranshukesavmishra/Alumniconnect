@@ -7,15 +7,15 @@ security definer
 set search_path = ''
 as $$
 begin
-  if auth.uid() is null or not (public.is_event_manager(p_event) or public.has_event_cap('checkin', p_event)) then
+  if auth.uid() is null or not public.has_event_cap('checkin', p_event) then
     raise exception 'Only event organisers can do this' using errcode = '42501';
   end if;
   if p_what not in ('registrations', 'attendees', 'payments', 'responses', 'performers', 'song_requests', 'not_arrived') then
     raise exception 'Unknown export.';
   end if;
-  -- the finance-only lists need a manager; a gate volunteer may only export the not-arrived list
-  if p_what <> 'not_arrived' and not public.is_event_manager(p_event) then
-    raise exception 'Only event managers can do this' using errcode = '42501';
+  -- the lists with money, phones and emails need a treasurer; a gate volunteer may only export the not-arrived list
+  if p_what <> 'not_arrived' and not public.has_event_cap('finance', p_event) then
+    raise exception 'Only treasurers can do this' using errcode = '42501';
   end if;
   perform public._audit('export_event_data', 'events', p_event,
     jsonb_build_object('what', p_what, 'count', greatest(coalesce(p_count, 0), 0), 'event_id', p_event));
