@@ -12,22 +12,24 @@ describe('member CSV import', () => {
     const p = parseMemberCsv(IMPORT_TEMPLATE)
     expect(p.error).toBeNull()
     expect(p.rows).toEqual([
-      { line: 1, full_name: 'Asha Rao', email: 'asha.rao@example.com', phone: '+91 98765 43210', member_type: 'alumnus', branch: 'Computer Science & Engineering', grad_year: '2005', join_year: '2001', city: 'Pune', current_title: 'Engineering Manager', current_company: 'Acme Ltd' },
+      { line: 1, full_name: 'Asha Rao', email: 'asha.rao@example.com', phone: '+91 98765 43210', member_type: 'alumnus', branch: 'B.E. in Computer Science & Engineering', grad_year: '2005', join_year: '2001', city: 'Pune', current_title: 'Engineering Manager', current_company: 'Acme Ltd' },
     ])
   })
 
   it('normalises values the way the app stores them', () => {
     const p = parseMemberCsv('﻿Name,Email,Phone,Type,Branch,Batch\n"  Ravi   Kumar ",RAVI@X.COM,(+91) 98765-43210,Alumni,CSE,Batch of 1998\nSita,s@x.com,,Staff,mech,2001-2005\n\n')
     expect(p.rows).toHaveLength(2)
-    expect(p.rows[0]).toMatchObject({ full_name: 'Ravi Kumar', email: 'ravi@x.com', phone: '+91 98765 43210', member_type: 'alumnus', branch: 'Computer Science & Engineering', grad_year: '1998' })
-    expect(p.rows[1]).toMatchObject({ line: 2, member_type: 'faculty', branch: 'Mechanical Engineering', grad_year: '2005' })
+    expect(p.rows[0]).toMatchObject({ full_name: 'Ravi Kumar', email: 'ravi@x.com', phone: '+91 98765 43210', member_type: 'alumnus', branch: 'B.E. in Computer Science & Engineering', grad_year: '1998' })
+    expect(p.rows[1]).toMatchObject({ line: 2, member_type: 'faculty', branch: 'B.E. in Mechanical Engineering', grad_year: '2005' })
   })
 
   it('leaves unknown values for the server to flag', () => {
     expect(normaliseType('guest')).toBe('guest')
     expect(normaliseYear('05')).toBe('05')
     expect(normaliseBranch('Aeronautics')).toBe('Aeronautics')
-    expect(normaliseBranch('information technology')).toBe('Information Technology')
+    expect(normaliseBranch('information technology')).toBe('B.E. in Information Technology')
+    expect(normaliseBranch('B.E. Electronics & Telecommunication Engineering')).toBe('B.E. in Electronics & Telecommunications')
+    expect(normaliseBranch('Civil')).toBe('B.E. in Civil Engineering')
     expect(normalisePhone("'9876543210")).toBe('9876543210')
   })
 

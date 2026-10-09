@@ -55,13 +55,25 @@ export function mapColumns(headers: string[]): { columns: Partial<Record<ImportF
   return { columns, unknown: headers.filter((h) => !used.has(h) && h.trim() !== '') }
 }
 
+const B = {
+  cse: 'B.E. in Computer Science & Engineering',
+  it: 'B.E. in Information Technology',
+  etc: 'B.E. in Electronics & Telecommunications',
+  ee: 'B.E. in Electrical Engineering',
+  me: 'B.E. in Mechanical Engineering',
+  ce: 'B.E. in Civil Engineering',
+  ip: 'B.E. Industrial & Production Engineering',
+} as const
 const SHORT_BRANCHES: Record<string, string> = {
-  cse: 'Computer Science & Engineering', cs: 'Computer Science & Engineering', 'computer science': 'Computer Science & Engineering',
-  it: 'Information Technology', ece: 'Electronics & Telecommunication Engineering', ec: 'Electronics & Telecommunication Engineering',
-  etc: 'Electronics & Telecommunication Engineering', entc: 'Electronics & Telecommunication Engineering', electronics: 'Electronics & Telecommunication Engineering',
-  ee: 'Electrical Engineering', electrical: 'Electrical Engineering', me: 'Mechanical Engineering', mech: 'Mechanical Engineering',
-  mechanical: 'Mechanical Engineering', ce: 'Civil Engineering', civil: 'Civil Engineering', ip: 'Industrial & Production Engineering',
-  ipe: 'Industrial & Production Engineering', production: 'Industrial & Production Engineering',
+  cse: B.cse, cs: B.cse, 'computer science': B.cse, 'computer science engineering': B.cse,
+  it: B.it, 'information technology': B.it,
+  ece: B.etc, ec: B.etc, etc: B.etc, entc: B.etc, electronics: B.etc, 'electronics telecommunication': B.etc,
+  'electronics telecommunications': B.etc, 'electronics telecommunication engineering': B.etc,
+  ee: B.ee, electrical: B.ee, 'electrical engineering': B.ee,
+  me: B.me, mech: B.me, mechanical: B.me, 'mechanical engineering': B.me,
+  ce: B.ce, civil: B.ce, 'civil engineering': B.ce,
+  ip: B.ip, ipe: B.ip, production: B.ip, 'industrial production': B.ip, 'industrial production engineering': B.ip,
+  'ai ds': 'Artificial Intelligence & Data Science', aids: 'Artificial Intelligence & Data Science',
 }
 
 export function normaliseBranch(v: string): string {
@@ -69,7 +81,8 @@ export function normaliseBranch(v: string): string {
   if (!t) return ''
   const exact = BRANCHES.find((b) => b.toLowerCase() === t.toLowerCase())
   if (exact) return exact
-  return SHORT_BRANCHES[t.toLowerCase().replace(/[.&]/g, '').replace(/\s+/g, ' ').trim()] ?? t
+  const key = t.toLowerCase().replace(/[.&/,-]/g, ' ').replace(/^(b e|be)( in)?\s+/, '').replace(/\s+/g, ' ').trim()
+  return SHORT_BRANCHES[key] ?? t
 }
 
 export function normaliseType(v: string): string {
@@ -132,4 +145,4 @@ export function parseMemberCsv(textIn: string): ParsedImport {
 
 export const IMPORT_TEMPLATE =
   'Full name,Email,Mobile,Member type,Branch,Passing-out year,Joining year,City,Current role,Company\n' +
-  'Asha Rao,asha.rao@example.com,+91 98765 43210,alumnus,Computer Science & Engineering,2005,2001,Pune,Engineering Manager,Acme Ltd\n'
+  'Asha Rao,asha.rao@example.com,+91 98765 43210,alumnus,B.E. in Computer Science & Engineering,2005,2001,Pune,Engineering Manager,Acme Ltd\n'
