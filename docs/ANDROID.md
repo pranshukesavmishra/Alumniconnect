@@ -44,10 +44,14 @@ Create `public/.well-known/assetlinks.json` in this repository, with the package
 Check it opens at `https://YOUR-SITE/.well-known/assetlinks.json`. Install the `.apk` on a phone: if a thin address bar
 shows, the file or fingerprint is wrong.
 
-## 3. Publish
+## 3. Publish in stages (never straight to everyone)
 
-Play Console → Create app → upload the `.aab` to an internal test track first, add yourselves as testers, confirm
-sign-in, notifications and the entry pass, then promote to production. Prepare: 512×512 icon (`public/pwa-512.png`),
+1. **Internal testing** (up to 100 testers, instant): upload the `.aab`, add the committee's Google accounts.
+2. **Closed testing** with 20-50 real alumni across different phones (Android versions, low-end and flagship), for at least a
+   week before the meet. Use the checklist in docs/TEST_PLAN.md and fix what they find.
+3. Only then **production**, or a staged rollout (10% → 50% → 100%) so a problem reaches few people first.
+
+Within each stage confirm sign-in, notifications and the entry pass, then promote. Prepare: 512×512 icon (`public/pwa-512.png`),
 a feature graphic (1024×500), at least 2 phone screenshots, a short and full description, and the privacy policy link
 `https://YOUR-SITE/privacy`. Under "Data safety" declare: name, email, phone, photos, messages and purchase info are
 collected, encrypted in transit, and deletable on request.
