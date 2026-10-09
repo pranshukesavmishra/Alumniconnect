@@ -23,6 +23,7 @@ const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage').th
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 const AdminEventPage = lazy(() => import('./features/admin/AdminEventPage').then((m) => ({ default: m.AdminEventPage })))
 const AdminMembers = lazy(() => import('./features/admin/AdminMembers').then((m) => ({ default: m.AdminMembers })))
+const HelpPage = lazy(() => import('./features/help/HelpPage').then((m) => ({ default: m.HelpPage })))
 const JobsPage = lazy(() => import('./features/jobs/JobsPage').then((m) => ({ default: m.JobsPage })))
 const JobDetailPage = lazy(() => import('./features/jobs/JobDetailPage').then((m) => ({ default: m.JobDetailPage })))
 const PostJobPage = lazy(() => import('./features/jobs/PostJobPage').then((m) => ({ default: m.PostJobPage })))
@@ -144,6 +145,7 @@ export function App() {
             <Route path="groups/:slug" element={m(<GroupPage />)} />
             <Route path="chat" element={m(<ChatListPage />)} />
             <Route path="chat/:id" element={m(<ChatThreadPage />)} />
+            <Route path="help" element={m(<HelpPage />)} />
             <Route path="jobs" element={m(<JobsPage />)} />
             <Route path="jobs/new" element={m(<PostJobPage />)} />
             <Route path="jobs/mine" element={m(<MyJobsPage />)} />

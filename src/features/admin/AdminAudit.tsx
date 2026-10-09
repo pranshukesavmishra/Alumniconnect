@@ -31,6 +31,8 @@ const LABELS: Record<string, string> = {
   record_cash: 'Recorded a cash payment',
   record_bank_transfer: 'Recorded a bank transfer',
   record_waiver: 'Waived a fee',
+  hide_help: 'Hid a help request',
+  restore_help: 'Restored a help request',
   hide_job: 'Hid a job posting',
   restore_job: 'Restored a job posting',
   hide_post: 'Hid a post',

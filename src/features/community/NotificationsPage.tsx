@@ -25,6 +25,8 @@ function describe(n: Notification): { text: string; to: string } {
       return { text: `${who} sent you a message: “${n.body ?? ''}”`, to: `/chat/${n.target_id}` }
     case 'mention':
       return { text: `${who} mentioned you: “${n.body ?? ''}”`, to: `/chat/${n.target_id}` }
+    case 'help_request':
+      return { text: `${who} asked for help: “${n.body ?? ''}”`, to: '/help' }
     case 'invite_joined':
       return { text: `${who} joined JEC Alumni Connect through your invite 🎉`, to: `/people/${n.actor?.id}` }
     default:
