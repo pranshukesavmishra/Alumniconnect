@@ -64,8 +64,8 @@ test.describe('registration rules', () => {
     expect(call([[ev.primary, 1], [ev.primary, 1]])).toContain('Ticket selection is not valid')
     expect(call([[ev.primary, 1]], { accept_terms: false })).toContain('Please accept the terms')
     expect(call([[ev.primary, 1]], { phone: '12345' })).toContain('valid mobile number')
-    expect(call([[ev.primary, 1]], { tshirt_size: 'XXXXL' })).toMatch(/check constraint|tshirt/)
-    expect(call([[ev.primary, 1]], { food_pref: 'vegan' })).toMatch(/check constraint|food/)
+    expect(call([[ev.primary, 1]], { tshirt_size: 'XXXXL' })).toMatch(/check constraint|T-shirt/)
+    expect(call([[ev.primary, 1]], { food_pref: 'vegan' })).toMatch(/check constraint|food preference/)
     expect(call([[ev.primary, 1]], { full_name: '  ' })).toContain('full name')
     // not signed in: the function is not even executable
     expect(errAs(null, `select upsert_registration('${ev.id}', '{}'::jsonb, '[]'::jsonb)`)).toContain('permission denied')

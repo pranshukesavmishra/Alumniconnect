@@ -14,6 +14,7 @@ import { PaymentBadge, StatusBadge } from '../events/StatusBadge'
 import { exportAttendees, exportPayments, exportRegistrations } from './export'
 import { useRecordOfflinePayment, type AdminData } from './queries'
 import { RegistrationAdjustments } from './RegistrationAdjustments'
+import { AdminReunionDetail } from './AdminReunionDetail'
 import { RegistrationEditor } from './RegistrationEditor'
 
 const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
@@ -97,12 +98,13 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
           ))}
         </ul>
       )}
-      {open && <Detail reg={open} data={data} manager={manager} eventId={event.id} onClose={() => setOpenId(null)} />}
+      {open && <Detail reg={open} data={data} manager={manager} event={event} onClose={() => setOpenId(null)} />}
     </div>
   )
 }
 
-function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; data: AdminData; manager: boolean; eventId: string; onClose: () => void }) {
+function Detail({ reg, data, manager, event, onClose }: { reg: Registration; data: AdminData; manager: boolean; event: EventRow; onClose: () => void }) {
+  const eventId = event.id
   const items = data.items.filter((i) => i.registration_id === reg.id)
   const payments = data.payments.filter((p) => p.registration_id === reg.id)
   const covered = payments.filter((p) => p.status === 'submitted' || p.status === 'verified').reduce((a, p) => a + p.amount_paise, 0)
@@ -170,6 +172,8 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
             {manager && <KeyValue label="Total">{formatPaise(reg.amount_paise)}</KeyValue>}
           </dl>
         </Card>
+
+        <AdminReunionDetail event={event} reg={reg} manager={manager} />
 
         {manager && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
         {manager && <RegistrationAdjustments key={`adj:${reg.id}:${reg.updated_at}`} reg={reg} payments={payments} due={due} onClose={onClose} />}

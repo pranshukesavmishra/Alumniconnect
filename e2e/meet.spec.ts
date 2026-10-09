@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { onboard, signInWithEmail, sql } from './helpers'
+import { onboard, registerForReunion, signInWithEmail, sql } from './helpers'
 
 const run = Date.now().toString(36)
 const member = `asha.${run}@example.com`
@@ -10,8 +10,8 @@ const name = `Asha Rao ${run.slice(-4).toUpperCase()}`
 test('alumnus registers, pays by UPI, treasurer verifies, ticket is scanned at the gate', async ({ page, browser }) => {
   // 1. Public event page (no sign-in needed, shareable on WhatsApp)
   await page.goto('/meet')
-  await expect(page.getByRole('heading', { name: 'JEC Alumni Meet 2026' })).toBeVisible()
-  await expect(page.getByText('Alumnus / Alumna').first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Alumni Connect Grand Reunion 2026' })).toBeVisible()
+  await expect(page.getByText('Both days · 26 & 27 Dec').first()).toBeVisible()
   await page.screenshot({ path: `${shots}/01-meet.png`, fullPage: true })
   await page.getByRole('link', { name: 'Register now' }).filter({ visible: true }).first().click()
 
@@ -21,22 +21,10 @@ test('alumnus registers, pays by UPI, treasurer verifies, ticket is scanned at t
   await signInWithEmail(page, member)
   await onboard(page, name, '2005')
 
-  // 3. Three-step registration
+  // 3. Five-step registration: details from the profile (missing ones completed inline), days and family, involvement, extras, review
   await expect(page).toHaveURL(/\/meet\/register/)
   await expect(page.getByText('Registering as')).toBeVisible()
-  await page.getByRole('button', { name: 'More: Spouse' }).click()
-  await page.getByLabel('Spouse 1 name').fill('Rahul Rao')
-  await page.screenshot({ path: `${shots}/03-register-step1.png`, fullPage: true })
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByText('Vegetarian', { exact: true }).click()
-  await page.getByLabel('Your T-shirt size').selectOption('L')
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await expect(page.getByText('₹4,000').first()).toBeVisible()
-  await page.getByRole('button', { name: 'Confirm and pay' }).click()
-  await expect(page.getByText('Please accept to continue.')).toBeVisible() // terms are required
-  await page.getByRole('checkbox', { name: /My details are correct/ }).check()
-  await page.screenshot({ path: `${shots}/04-register-review.png`, fullPage: true })
-  await page.getByRole('button', { name: 'Confirm and pay' }).click()
+  await registerForReunion(page, { adults: 1, adultName: 'Rahul Rao', shots: `${shots}/03-register` })
 
   // 4. Pay by UPI and submit the UTR
   await expect(page).toHaveURL(/\/meet\/my/)

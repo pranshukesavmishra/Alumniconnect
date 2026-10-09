@@ -5,7 +5,7 @@ export type VerificationStatus = 'pending' | 'verified' | 'rejected'
 export type RegistrationStatus = 'pending_payment' | 'under_review' | 'confirmed' | 'cancelled'
 export type PaymentStatus = 'submitted' | 'verified' | 'rejected' | 'refunded'
 export type StaffRole = 'manager' | 'checkin'
-export type FoodPref = 'veg' | 'non_veg' | 'jain'
+export type FoodPref = 'veg' | 'non_veg' | 'jain' | 'none'
 export type TshirtSize = 'XS' | 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL'
 
 export interface Profile {
@@ -91,6 +91,8 @@ export interface EventRow {
   contact_email: string | null
   cover_url: string | null
   is_published: boolean
+  /** registration asks (and requires) the reunion questions */
+  ask_reunion_questions: boolean
   updated_at: string
 }
 
@@ -103,7 +105,26 @@ export interface TicketType {
   is_primary: boolean
   max_per_registration: number
   sort: number
+  /** event days this ticket covers (1 = first day); null = every day */
+  days: number[] | null
 }
+
+export type QuestionKind = 'yes_no' | 'single' | 'multi' | 'short_text' | 'long_text'
+
+/** A question the organisers added to an event's registration. */
+export interface EventQuestion {
+  id: string
+  event_id: string
+  kind: QuestionKind
+  label: string
+  help: string | null
+  options: string[]
+  required: boolean
+  is_active: boolean
+  sort: number
+}
+
+export type CustomAnswer = boolean | string | string[]
 
 export interface Guest {
   name: string
@@ -111,6 +132,8 @@ export interface Guest {
   ticket_type_id?: string
   relation?: string
   age?: number | null
+  /** guest's own food choice (for exact catering counts) */
+  food?: FoodPref | null
 }
 
 export interface Registration {
@@ -140,6 +163,43 @@ export interface Registration {
   checked_in_by: string | null
   created_at: string
   updated_at: string
+  // snapshot of the profile at registration
+  country: string | null
+  designation: string | null
+  company: string | null
+  past_experience: string | null
+  /** days the main ticket covers (null = all) and people per day {"1": 1, "2": 4} */
+  days: number[] | null
+  day_heads: Record<string, number>
+  fund_interest: boolean | null
+  fund_paise: number
+  org_team_interest: boolean | null
+  org_teams: string[]
+  needs_local_travel: boolean
+  sponsor_interest: boolean | null
+  sponsor_level: string | null
+  sponsor_org: string | null
+  sponsor_note: string | null
+  perform_interest: boolean | null
+  perform_types: string[]
+  perform_group: boolean | null
+  perform_members: string | null
+  perform_description: string | null
+  perform_minutes: number | null
+  feedback: string | null
+  nickname: string | null
+  hostel: string | null
+  faculty_wish: string | null
+  song_requests: string[]
+  memory: string | null
+  memory_wall_consent: boolean
+  arrival_from: string | null
+  arrival_date: string | null
+  arrival_mode: string | null
+  emergency_name: string | null
+  emergency_phone: string | null
+  medical_notes: string | null
+  custom_answers: Record<string, CustomAnswer>
 }
 
 export interface RegistrationItem {

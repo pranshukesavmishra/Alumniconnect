@@ -94,7 +94,7 @@ test('members: edit every field in the editor; saved in DB and audited', async (
   await expect(dlg.getByLabel('Full name')).toHaveValue(`Target Person ${ts}`)
   await dlg.getByLabel('Full name').fill(`Target Edited ${ts}`)
   await dlg.getByText('Faculty or staff', { exact: true }).click()
-  await dlg.getByLabel('Branch').selectOption('Mechanical Engineering')
+  await dlg.getByLabel('Branch').selectOption('B.E. in Mechanical Engineering')
   await dlg.getByLabel('Passing-out year').selectOption('2008')
   await dlg.getByLabel('Joining year').selectOption('2004')
   await dlg.getByLabel('Current role').fill('Principal Engineer')
@@ -105,7 +105,7 @@ test('members: edit every field in the editor; saved in DB and audited', async (
   await dlg.getByRole('button', { name: 'Save changes' }).click()
   await expect(page.getByText('Profile updated')).toBeVisible()
   expect(sql(`select concat_ws('|', full_name, member_type, branch, grad_year, join_year, current_title, current_company, city) from profiles where id = '${target.id}'`)).toBe(
-    `Target Edited ${ts}|faculty|Mechanical Engineering|2008|2004|Principal Engineer|Acme|Indore`,
+    `Target Edited ${ts}|faculty|B.E. in Mechanical Engineering|2008|2004|Principal Engineer|Acme|Indore`,
   )
   expect(sql(`select phone from profile_private where id = '${target.id}'`)).toBe('+91 98111 22333')
   expect(auditCount(`action = 'update_member' and target_id = '${target.id}' and actor = '${adminId}'`)).toBe(before + 1)

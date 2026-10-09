@@ -1,6 +1,7 @@
 import { Briefcase, FileText, FolderArchive, GraduationCap, Loader2, X } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import { safeNext } from '../../lib/safeNext'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
@@ -47,6 +48,8 @@ export function LinkedInImportPage() {
   const { data: profile } = useMyProfile()
   const save = useSaveImport()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = params.get('next') ? safeNext(params.get('next')) : '/me'
   const [source, setSource] = useState<Source>('pdf')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -85,7 +88,7 @@ export function LinkedInImportPage() {
         current: profile,
       })
       toast.success('Profile updated from LinkedIn')
-      navigate('/me')
+      navigate(next)
     } catch {
       /* shown below */
     }

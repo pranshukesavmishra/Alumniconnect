@@ -10,7 +10,9 @@ import { friendlyError } from '../../lib/errors'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import type { EventRow, TicketType } from '../../lib/types'
 import { isValidUpiId } from '../../lib/upi'
+import { dayLabel, eventDayCount } from '../events/reunion'
 import { DriveArchive } from './DriveArchive'
+import { QuestionsEditor } from './AdminQuestions'
 import { useSaveEvent } from './queries'
 
 /** ISO -> "2026-12-26T10:00" in India time, for <input type="datetime-local"> */
@@ -31,6 +33,7 @@ interface TicketDraft {
   price: string
   is_primary: boolean
   max: string
+  days: number[]
   _delete?: boolean
 }
 
@@ -48,8 +51,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     starts_at: toLocalIst(e?.starts_at ?? null),
     ends_at: toLocalIst(e?.ends_at ?? null),
     registration_closes_at: toLocalIst(e?.registration_closes_at ?? null),
-    eligible_from_year: String(e?.eligible_from_year ?? 2001),
-    eligible_to_year: String(e?.eligible_to_year ?? 2010),
+    eligible_from_year: String(e?.eligible_from_year ?? 2003),
+    eligible_to_year: String(e?.eligible_to_year ?? 2012),
     capacity: e?.capacity ? String(e.capacity) : '',
     upi_id: e?.upi_id ?? '',
     upi_payee_name: e?.upi_payee_name ?? '',
@@ -57,15 +60,16 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     contact_phone: e?.contact_phone ?? '',
     contact_email: e?.contact_email ?? '',
     is_published: e?.is_published ?? false,
+    ask_reunion_questions: e?.ask_reunion_questions ?? false,
   })
   const [tickets, setTickets] = useState<TicketDraft[]>(
     existing?.tickets.length
-      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), is_primary: t.is_primary, max: String(t.max_per_registration) }))
+      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), is_primary: t.is_primary, max: String(t.max_per_registration), days: t.days ?? [] }))
       : [
-          { label: 'Alumnus / Alumna', description: '', price: '', is_primary: true, max: '1' },
-          { label: 'Spouse', description: '', price: '', is_primary: false, max: '1' },
-          { label: 'Child (5–12 years)', description: '', price: '', is_primary: false, max: '4' },
-          { label: 'Child (under 5)', description: 'Free', price: '0', is_primary: false, max: '4' },
+          { label: 'Alumnus / Alumna', description: '', price: '', is_primary: true, max: '1', days: [] },
+          { label: 'Spouse', description: '', price: '', is_primary: false, max: '1', days: [] },
+          { label: 'Child (5–12 years)', description: '', price: '', is_primary: false, max: '4', days: [] },
+          { label: 'Child (under 5)', description: 'Free', price: '0', is_primary: false, max: '4', days: [] },
         ],
   )
   const [errors, setErrors] = useState<string[]>([])
@@ -81,6 +85,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       ;[c[i], c[j]] = [c[j]!, c[i]!]
       return c
     })
+  const nDays = eventDayCount({ starts_at: fromLocalIst(f.starts_at), ends_at: fromLocalIst(f.ends_at) })
   const visibleIdx = tickets.map((t, i) => (t._delete ? -1 : i)).filter((i) => i >= 0)
   const live = tickets.filter((t) => !t._delete)
 
@@ -134,6 +139,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           contact_phone: n(f.contact_phone),
           contact_email: n(f.contact_email),
           is_published: f.is_published,
+          ask_reunion_questions: f.ask_reunion_questions,
         },
         tickets: tickets.map((t) => ({
           id: t.id,
@@ -143,6 +149,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           price_paise: parseRupeesToPaise(t.price) ?? 0,
           is_primary: t.is_primary,
           max_per_registration: Number(t.max),
+          days: t.days.length === 0 || t.days.length >= nDays ? null : [...t.days].sort((a, b) => a - b),
         })),
       })
       toast.success('Event saved')
@@ -172,8 +179,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
 
       <section className="space-y-4">
         <SectionTitle>Event</SectionTitle>
-        <Field label="Title">{(p) => <Input {...p} value={f.title} onChange={set('title')} maxLength={120} placeholder="e.g. JEC Alumni Meet 2026" />}</Field>
-        <Field label="Tagline" optional>{(p) => <Input {...p} value={f.tagline} onChange={set('tagline')} maxLength={200} placeholder="e.g. Batches 2001–2010" />}</Field>
+        <Field label="Title">{(p) => <Input {...p} value={f.title} onChange={set('title')} maxLength={120} placeholder="e.g. Alumni Connect Grand Reunion 2026" />}</Field>
+        <Field label="Tagline" optional>{(p) => <Input {...p} value={f.tagline} onChange={set('tagline')} maxLength={200} placeholder="e.g. Batches 2003–2012 · A Decade of JECians" />}</Field>
         <Field label="Description / programme" optional>{(p) => <Textarea {...p} rows={6} value={f.description} onChange={set('description')} maxLength={5000} />}</Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Starts (India time)">{(p) => <Input {...p} type="datetime-local" value={f.starts_at} onChange={set('starts_at')} />}</Field>
@@ -191,6 +198,11 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-4">
         <SectionTitle>Registration</SectionTitle>
         <Field label="Registration closes (India time)" optional>{(p) => <Input {...p} type="datetime-local" value={f.registration_closes_at} onChange={set('registration_closes_at')} />}</Field>
+        <Card className="p-4">
+          <Checkbox checked={f.ask_reunion_questions} onChange={(v) => setF((s) => ({ ...s, ask_reunion_questions: v }))}>
+            <strong>Ask the reunion questions</strong>: profile snapshot, days and family, organising teams, help needed, Reunion Fund, sponsorship, performances and memories
+          </Checkbox>
+        </Card>
         <div className="grid grid-cols-3 gap-3">
           <Field label="Batches from" optional>{(p) => <Input {...p} inputMode="numeric" value={f.eligible_from_year} onChange={set('eligible_from_year')} />}</Field>
           <Field label="to" optional>{(p) => <Input {...p} inputMode="numeric" value={f.eligible_to_year} onChange={set('eligible_to_year')} />}</Field>
@@ -201,7 +213,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-3">
         <SectionTitle
           action={
-            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', is_primary: false, max: '1' }])}>
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', is_primary: false, max: '1', days: [] }])}>
               Add ticket
             </Button>
           }
@@ -219,6 +231,19 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                 <Field label="Max each">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
               </div>
               <Field label="What it includes" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
+              {nDays > 1 && (
+                <fieldset>
+                  <legend className="mb-1 text-sm font-semibold">Valid on <span className="font-normal text-muted">(none ticked = every day)</span></legend>
+                  <div className="flex flex-wrap gap-x-5">
+                    {Array.from({ length: nDays }, (_, d) => d + 1).map((d) => (
+                      <Checkbox key={d} checked={t.days.includes(d)} onChange={(on) => setT(i, { days: on ? [...t.days, d] : t.days.filter((x) => x !== d) })}>
+                        {dayLabel({ starts_at: fromLocalIst(f.starts_at) }, d)}
+                      </Checkbox>
+                    ))}
+                  </div>
+                  {!t.is_primary && <p className="text-sm text-muted">A family ticket can only be bought with a main ticket that covers all of its days.</p>}
+                </fieldset>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Checkbox checked={t.is_primary} onChange={(v) => setT(i, { is_primary: v })}>
                   Main ticket (the alumnus; exactly one per registration)
@@ -253,6 +278,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       </section>
 
       {e && <DriveArchive eventId={e.id} />}
+      {e && <QuestionsEditor eventId={e.id} />}
 
       <section className="space-y-4">
         <SectionTitle>Contact</SectionTitle>

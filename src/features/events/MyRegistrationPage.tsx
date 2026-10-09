@@ -1,9 +1,9 @@
 import clsx from 'clsx'
-import { CalendarPlus, Check, Copy, Pencil, Smartphone, Upload, X } from 'lucide-react'
+import { CalendarPlus, Check, Copy, Images, Pencil, Smartphone, Upload, UserPlus, X } from 'lucide-react'
 import { readCachedTicket, ticketKey, type CachedTicket } from './ticketCache'
 import { useOnline } from '../../hooks/useOnline'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
@@ -14,7 +14,7 @@ import { QrCode } from '../../components/ui/QrCode'
 import { MEET_SLUG } from '../../lib/constants'
 import { useT } from '../../i18n'
 import { tr } from '../../i18n/core'
-import { foodLabel } from '../../i18n/labels'
+import { foodLabel, modeLabel, performLabel, sponsorLabel, teamLabel, tshirtLabel } from '../../i18n/labels'
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange, formatDateTime } from '../../lib/format'
 import { buildIcs, downloadFile } from '../../lib/ics'
@@ -23,7 +23,8 @@ import { formatPaise } from '../../lib/money'
 import type { EventRow, Payment } from '../../lib/types'
 import { buildUpiLink, isValidUpiId, normalizeUtr } from '../../lib/upi'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
-import { useCancelRegistration, useEvent, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
+import { useCancelRegistration, useEvent, useEventQuestions, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
+import { answerText, dayLabel, eventDayCount } from './reunion'
 import { PaymentBadge, StatusBadge } from './StatusBadge'
 
 const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
@@ -45,6 +46,7 @@ export function MyRegistrationPage() {
   const { data: mine, isLoading: lm, isFetching, error } = useMyRegistration(event?.id)
   const uid = useUserId()
   const online = useOnline()
+  const justRegistered = !!(useLocation().state as { justRegistered?: boolean } | null)?.justRegistered
 
   // Keep the entry pass on the phone so it can be shown at the gate without network.
   useEffect(() => {
@@ -80,12 +82,14 @@ export function MyRegistrationPage() {
     <div>
       <PageHeader title={tx('my.title')} subtitle={event.title} back="/meet" action={<StatusBadge status={reg.status} />} />
       <Page className="space-y-6">
+        {justRegistered && <WhatNext mine={mine} />}
         <Timeline status={reg.status} hasPayment={mine.payments.some((p) => p.status !== 'rejected')} free={reg.amount_paise === 0} />
         {reg.status === 'confirmed' && <TicketCard event={event} mine={mine} />}
         {reg.status === 'pending_payment' && <PaymentPanel event={event} mine={mine} />}
         {reg.status === 'under_review' && <UnderReview mine={mine} />}
-        <Details mine={mine} />
+        <Details mine={mine} event={event} />
         <Actions event={event} mine={mine} />
+        <BringBatch />
       </Page>
     </div>
   )
@@ -220,6 +224,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           <p className="text-sm font-semibold text-primary">{tx('my.step1')}</p>
           <p className="mt-1 text-3xl font-bold tabular-nums">{formatPaise(due)}</p>
           <p className="text-sm text-muted">{tx('my.payTo', { name: event.upi_payee_name ?? '' })}</p>
+          {reg.fund_paise > 0 && <p className="mt-1 text-sm text-muted">{tx('rr.payBreakdown', { tickets: formatPaise(reg.amount_paise - reg.fund_paise, { zeroAsFree: false }), fund: formatPaise(reg.fund_paise) })}</p>}
         </div>
         <div className="space-y-4 p-4">
           {isIos && link && (
@@ -401,9 +406,14 @@ function TicketCard({ event, mine }: { event: EventRow; mine: MyRegistration }) 
   )
 }
 
-function Details({ mine }: { mine: MyRegistration }) {
+function Details({ mine, event }: { mine: MyRegistration; event: EventRow }) {
   const tx = useT()
   const reg = mine.registration
+  const { data: questions } = useEventQuestions(event.id)
+  const nDays = eventDayCount(event)
+  const yn = (v: boolean | null) => (v === null ? '—' : v ? tx('common.yes') : tx('common.no'))
+  const reunion = event.ask_reunion_questions
+  const ticketsTotal = reg.amount_paise - reg.fund_paise
   return (
     <section>
       <SectionTitle>{tx('my.details')}</SectionTitle>
@@ -417,10 +427,41 @@ function Details({ mine }: { mine: MyRegistration }) {
               {formatPaise(i.unit_price_paise * i.quantity)}
             </KeyValue>
           ))}
-          {reg.guests.length > 0 && <KeyValue label={tx('my.withYou')}>{reg.guests.map((g) => g.name || g.relation).join(', ')}</KeyValue>}
+          {nDays > 1 && Object.keys(reg.day_heads ?? {}).length > 0 && (
+            <KeyValue label={tx('rr.peoplePerDay')}>
+              {Array.from({ length: nDays }, (_, i) => `${dayLabel(event, i + 1)}: ${reg.day_heads[String(i + 1)] ?? 0}`).join(' · ')}
+            </KeyValue>
+          )}
+          {reg.guests.length > 0 && (
+            <KeyValue label={tx('my.withYou')}>{reg.guests.map((g) => [g.name || g.relation, g.food ? `(${foodLabel(tx, g.food)})` : ''].filter(Boolean).join(' ')).join(', ')}</KeyValue>
+          )}
           <KeyValue label={tx('reg.foodShort')}>{foodLabel(tx, reg.food_pref) || '—'}</KeyValue>
-          <KeyValue label={tx('reg.tshirtShort')}>{reg.tshirt_size ?? '—'}</KeyValue>
+          <KeyValue label={tx('reg.tshirtShort')}>{tshirtLabel(tx, reg.tshirt_size) || '—'}</KeyValue>
           <KeyValue label={tx('reg.accomShort')}>{reg.needs_accommodation ? tx('my.requested') : tx('common.no')}</KeyValue>
+          {reunion && <KeyValue label={tx('rr.travelShort')}>{reg.needs_local_travel ? tx('my.requested') : tx('common.no')}</KeyValue>}
+          {reunion && (reg.org_team_interest ?? null) !== null && <KeyValue label={tx('rr.teamShort')}>{reg.org_team_interest ? reg.org_teams.map((v) => teamLabel(tx, v)).join(', ') : tx('common.no')}</KeyValue>}
+          {reunion && reg.perform_interest && (
+            <KeyValue label={tx('rr.performShort')}>{`${reg.perform_types.map((v) => performLabel(tx, v)).join(', ')} · ${tx('rr.minutes', { n: reg.perform_minutes ?? 0 })}`}</KeyValue>
+          )}
+          {reunion && reg.sponsor_interest && <KeyValue label={tx('rr.sponsorShort')}>{`${sponsorLabel(tx, reg.sponsor_level)} · ${reg.sponsor_org ?? ''}`}</KeyValue>}
+          {reunion && reg.arrival_mode && <KeyValue label={tx('rr.arrivalTitle')}>{[reg.arrival_from, reg.arrival_date, modeLabel(tx, reg.arrival_mode)].filter(Boolean).join(' · ')}</KeyValue>}
+          {(questions ?? [])
+            .filter((q) => reg.custom_answers[q.id] !== undefined)
+            .map((q) => (
+              <KeyValue key={q.id} label={q.label}>
+                {answerText(reg.custom_answers[q.id], tx('common.yes'), tx('common.no'))}
+              </KeyValue>
+            ))}
+          {reg.feedback && <KeyValue label={tx('rr.feedbackShort')}>{reg.feedback}</KeyValue>}
+          {reunion && (
+            <KeyValue label={tx('rr.fundShort')}>{reg.fund_paise > 0 ? tx('rr.fundThanks') : yn(reg.fund_interest)}</KeyValue>
+          )}
+          {reg.fund_paise > 0 && (
+            <>
+              <KeyValue label={tx('rr.ticketsSubtotalShort')}>{formatPaise(ticketsTotal, { zeroAsFree: false })}</KeyValue>
+              <KeyValue label={tx('rr.fundLine')}>{formatPaise(reg.fund_paise)}</KeyValue>
+            </>
+          )}
           <div className="flex items-center justify-between py-3">
             <dt className="font-semibold">{tx('my.totalLabel')}</dt>
             <dd className="text-lg font-bold tabular-nums">{formatPaise(reg.amount_paise)}</dd>
@@ -436,6 +477,57 @@ function Details({ mine }: { mine: MyRegistration }) {
   )
 }
 
+/** Shown right after registering: the code and what happens next. */
+function WhatNext({ mine }: { mine: MyRegistration }) {
+  const tx = useT()
+  const reg = mine.registration
+  const free = reg.amount_paise === 0
+  return (
+    <Card className="overflow-hidden border-success/40">
+      <div className="bg-success-soft p-4">
+        <p className="flex items-center gap-2 font-bold text-success">
+          <Check className="size-5" aria-hidden /> {tx('rr.doneTitle')}
+        </p>
+        <p className="mt-1 text-sm">
+          {tx('rr.doneCode')} <span className="font-mono text-base font-bold tracking-wide">{reg.code}</span>
+        </p>
+      </div>
+      <ol className="space-y-2 p-4 text-[15px]">
+        <li>{free ? tx('rr.next1Free') : tx('rr.next1')}</li>
+        {!free && <li>{tx('rr.next2')}</li>}
+        <li>{tx('rr.next3')}</li>
+      </ol>
+    </Card>
+  )
+}
+
+/** End of registration: bring the batch, and add throwback photos. */
+function BringBatch() {
+  const tx = useT()
+  return (
+    <section className="grid gap-3 sm:grid-cols-2" aria-label={tx('rr.bringTitle')}>
+      <Card className="flex flex-col gap-2 p-4">
+        <p className="flex items-center gap-2 font-semibold">
+          <UserPlus className="size-4 text-primary" aria-hidden /> {tx('rr.bringTitle')}
+        </p>
+        <p className="text-sm text-muted">{tx('rr.bringBody')}</p>
+        <ButtonLink to="/invite" variant="secondary" size="sm">
+          {tx('rr.bringCta')}
+        </ButtonLink>
+      </Card>
+      <Card className="flex flex-col gap-2 p-4">
+        <p className="flex items-center gap-2 font-semibold">
+          <Images className="size-4 text-primary" aria-hidden /> {tx('rr.throwbackTitle')}
+        </p>
+        <p className="text-sm text-muted">{tx('rr.throwbackBody')}</p>
+        <ButtonLink to="/meet/photos" variant="secondary" size="sm">
+          {tx('rr.throwbackCta')}
+        </ButtonLink>
+      </Card>
+    </section>
+  )
+}
+
 function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
   const tx = useT()
   const reg = mine.registration
@@ -445,7 +537,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
   return (
     <section className="grid gap-3 sm:grid-cols-2">
       <ButtonLink to="/meet/register" variant="secondary" icon={<Pencil className="size-4" />}>
-        {tx('my.editPrefs')}
+        {reg.status === 'pending_payment' ? tx('my.editPrefs') : tx('rr.editAnswers')}
       </ButtonLink>
       {event.starts_at && (
         <Button
@@ -453,7 +545,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
           icon={<CalendarPlus className="size-4" />}
           onClick={() =>
             downloadFile(
-              'jec-alumni-meet.ics',
+              'jec-reunion.ics',
               buildIcs({ uid: reg.id, title: event.title, start: event.starts_at!, end: event.ends_at, location: event.venue, description: `Registration ${reg.code}`, url: `${window.location.origin}/meet/my` }),
               'text/calendar',
             )
