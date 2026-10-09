@@ -19,16 +19,21 @@ function read<T>(key: string, initial: () => T): T {
 export function useDraft<T>(key: string | null, initial: () => T): [T, (v: T | ((prev: T) => T)) => void, () => void] {
   const [state, setState] = useState<{ key: string | null; value: T }>(() => ({ key, value: key ? read(key, initial) : initial() }))
   const initialRef = useRef(initial)
+  // set by clear() and sticky for this key: a debounced write pending from the last edit, or a late programmatic
+  // update (the form prefilling from the registration just saved), must not bring the draft back
+  const cleared = useRef(false)
 
   // key became known (or changed): load that draft
   if (state.key !== key) {
+    cleared.current = false
     const next = { key, value: key ? read(key, initialRef.current) : initialRef.current() }
     setState(next) // render-phase update for a derived reset (React supports this pattern)
   }
 
   useEffect(() => {
-    if (!key || state.key !== key) return
+    if (!key || state.key !== key || cleared.current) return
     const t = setTimeout(() => {
+      if (cleared.current) return
       try {
         localStorage.setItem(key, JSON.stringify(state.value))
       } catch {
@@ -44,6 +49,7 @@ export function useDraft<T>(key: string | null, initial: () => T): [T, (v: T | (
 
   const clear = useCallback(() => {
     if (!key) return
+    cleared.current = true
     try {
       localStorage.removeItem(key)
     } catch {

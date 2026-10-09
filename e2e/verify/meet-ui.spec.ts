@@ -127,6 +127,9 @@ test('registration: days, family names, draft survives reload, preferences, pais
   r = myReg(email)!
   expect(r).toMatchObject({ amount_paise: both + 2 * kid, headcount: 4, status: 'pending_payment' })
   expect((r.guests as { name: string }[]).map((g) => g.name)).toEqual(['Kid One', 'Kid Two', 'Baby Tester'])
+  // a debounced draft write must not resurrect the form after a successful save (it would prefill the next registration)
+  await page.waitForTimeout(900)
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('reg-draft:')).length)).toBe(0)
 
   // cancel, then register again
   page.once('dialog', (d) => void d.accept())
