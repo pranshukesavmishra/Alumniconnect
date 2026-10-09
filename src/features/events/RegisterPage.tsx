@@ -7,8 +7,10 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Stepper, Textarea } from '../../components/ui/Form'
+import { useT } from '../../i18n'
+import { foodLabel, foodOptions } from '../../i18n/labels'
 import { useDraft } from '../../hooks/useDraft'
-import { FOOD_PREFS, MEET_SLUG, TSHIRT_SIZES } from '../../lib/constants'
+import { MEET_SLUG, TSHIRT_SIZES } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { formatPaise } from '../../lib/money'
 import type { Guest, TicketType } from '../../lib/types'
@@ -28,9 +30,10 @@ interface FormState {
   accept_terms: boolean
 }
 
-const STEPS = ['Who’s coming', 'Preferences', 'Review'] as const
+const STEPS = ['reg.step1', 'reg.step2', 'reg.step3'] as const
 
 export function RegisterPage() {
+  const tx = useT()
   const uid = useUserId()
   const { session } = useAuth()
   const navigate = useNavigate()
@@ -142,12 +145,12 @@ export function RegisterPage() {
 
   function validate(s: number): boolean {
     const e: Record<string, string> = {}
-    if (s === 0 && !selectedPrimary) e.primary = 'Please choose your ticket.'
+    if (s === 0 && !selectedPrimary) e.primary = tx('reg.errTicket')
     if (s === 1) {
-      if (!form.food_pref) e.food_pref = 'Please choose a food preference.'
-      if (!form.tshirt_size) e.tshirt_size = 'Please choose your T-shirt size.'
+      if (!form.food_pref) e.food_pref = tx('reg.errFood')
+      if (!form.tshirt_size) e.tshirt_size = tx('reg.errTshirt')
     }
-    if (s === 2 && !form.accept_terms) e.accept_terms = 'Please accept to continue.'
+    if (s === 2 && !form.accept_terms) e.accept_terms = tx('reg.errTerms')
     setErrors(e)
     const ok = Object.keys(e).length === 0
     // bring the first problem into view (the sticky footer can hide it) and move focus there
@@ -190,7 +193,7 @@ export function RegisterPage() {
       })
       clearDraft()
       if (!locked && saved.amount_paise !== total) {
-        toast.info(`The fees were just updated by the organisers. Your total is ${formatPaise(saved.amount_paise)}.`)
+        toast.info(tx('reg.feesUpdated', { total: formatPaise(saved.amount_paise) }))
       }
       navigate('/meet/my', { replace: true })
     } catch {
@@ -200,15 +203,15 @@ export function RegisterPage() {
 
   return (
     <div ref={topRef} className="scroll-mt-0">
-      <PageHeader title={locked ? 'Update your registration' : 'Register'} subtitle={event.title} back="/meet" />
+      <PageHeader title={locked ? tx('reg.updateTitle') : tx('reg.title')} subtitle={event.title} back="/meet" />
       <Page className="space-y-6">
         {/* step indicator */}
-        <ol className="flex items-center gap-2" aria-label="Progress">
+        <ol className="flex items-center gap-2" aria-label={tx('reg.progress')}>
           {STEPS.map((label, i) => (
             <li key={label} className="flex flex-1 flex-col gap-1.5">
               <span className={clsx('h-1.5 rounded-full', i <= step ? 'bg-primary' : 'bg-surface-2')} />
               <span className={clsx('text-xs font-semibold', i === step ? 'text-primary' : 'text-muted')} aria-current={i === step ? 'step' : undefined}>
-                {i + 1}. {label}
+                {i + 1}. {tx(label)}
               </span>
             </li>
           ))}
@@ -217,24 +220,24 @@ export function RegisterPage() {
         {/* who is registering */}
         <Card className="flex items-center justify-between gap-3 p-4">
           <div className="min-w-0">
-            <p className="text-sm text-muted">Registering as</p>
+            <p className="text-sm text-muted">{tx('reg.registeringAs')}</p>
             <p className="truncate font-semibold">{profile.full_name}</p>
             {profile.branch && <p className="text-sm text-muted">{profile.branch}</p>}
-            <p className="text-sm text-muted">{[profile.grad_year && `Batch ${profile.grad_year}`, profile.city].filter(Boolean).join(' · ')}</p>
+            <p className="text-sm text-muted">{[profile.grad_year && tx('common.batch', { year: profile.grad_year }), profile.city].filter(Boolean).join(' · ')}</p>
             <p className="text-sm text-muted">{priv?.phone}</p>
           </div>
-          <Link to="/welcome?edit=1&next=/meet/register" className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label="Edit your details">
+          <Link to="/welcome?edit=1&next=/meet/register" className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={tx('reg.editDetails')}>
             <Pencil className="size-4" />
           </Link>
         </Card>
         {outsideBatch && (
-          <Notice tone="warning" title={`This meet is for batches ${event.eligible_from_year}–${event.eligible_to_year}`}>
-            Your profile says batch {profile.grad_year}. You can still register; the organisers will contact you if needed.
+          <Notice tone="warning" title={tx('reg.outsideTitle', { from: event.eligible_from_year!, to: event.eligible_to_year! })}>
+            {tx('reg.outsideBody', { year: profile.grad_year! })}
           </Notice>
         )}
         {locked && (
-          <Notice tone="info" title="Your payment is already submitted">
-            You can update your preferences. To change who is coming, please contact the organisers.
+          <Notice tone="info" title={tx('reg.lockedTitle')}>
+            {tx('reg.lockedBody')}
           </Notice>
         )}
 
@@ -242,7 +245,7 @@ export function RegisterPage() {
           <section className="space-y-5">
             {primaryTickets.length > 1 ? (
               <ChoiceGroup
-                label="Your ticket"
+                label={tx('reg.yourTicket')}
                 options={primaryTickets.map((t) => ({ value: t.id, label: `${t.label} · ${formatPaise(t.price_paise)}`, hint: t.description ?? undefined }))}
                 value={selectedPrimary?.id ?? null}
                 onChange={(id) => !locked && setPrimary(id)}
@@ -251,7 +254,7 @@ export function RegisterPage() {
             ) : (
               selectedPrimary && (
                 <div>
-                  <SectionTitle>Your ticket</SectionTitle>
+                  <SectionTitle>{tx('reg.yourTicket')}</SectionTitle>
                   <Card className="flex items-center justify-between gap-3 p-4">
                     <div className="min-w-0">
                       <p className="font-semibold">{selectedPrimary.label}</p>
@@ -266,7 +269,7 @@ export function RegisterPage() {
 
             {extraTickets.length > 0 && (
               <div>
-                <SectionTitle>Family coming with you</SectionTitle>
+                <SectionTitle>{tx('reg.family')}</SectionTitle>
                 <Card className="divide-y divide-border">
                   {extraTickets.map((t) => {
                     const n = form.qty[t.id] ?? 0
@@ -276,7 +279,7 @@ export function RegisterPage() {
                           <div className="min-w-0">
                             <p className="font-semibold">{t.label}</p>
                             <p className="text-sm text-muted">
-                              {formatPaise(t.price_paise)} {t.price_paise > 0 && 'each'}
+                              {formatPaise(t.price_paise)} {t.price_paise > 0 && tx('reg.each')}
                               {t.description && ` · ${t.description}`}
                             </p>
                           </div>
@@ -291,8 +294,8 @@ export function RegisterPage() {
                             {Array.from({ length: n }, (_, i) => (
                               <Input
                                 key={i}
-                                aria-label={`${t.label} ${i + 1} name`}
-                                placeholder={`Name of ${t.label.toLowerCase().split(' (')[0]} ${n > 1 ? i + 1 : ''} (for the name badge)`}
+                                aria-label={tx('reg.guestNameLabel', { label: t.label, n: i + 1 })}
+                                placeholder={tx('reg.guestNamePh', { label: t.label.toLowerCase().split(' (')[0]!, n: n > 1 ? i + 1 : '' })}
                                 value={form.guestNames[t.id]?.[i] ?? ''}
                                 maxLength={80}
                                 onChange={(e) =>
@@ -317,11 +320,11 @@ export function RegisterPage() {
 
         {step === 1 && (
           <section className="space-y-5">
-            <ChoiceGroup label="Food preference" options={FOOD_PREFS} value={(form.food_pref || null) as never} onChange={(v) => setForm((f) => ({ ...f, food_pref: v }))} error={errors.food_pref} />
-            <Field label="Your T-shirt size" error={errors.tshirt_size} hint="For the alumni meet kit.">
+            <ChoiceGroup label={tx('reg.food')} options={foodOptions(tx)} value={(form.food_pref || null) as never} onChange={(v) => setForm((f) => ({ ...f, food_pref: v }))} error={errors.food_pref} />
+            <Field label={tx('reg.tshirt')} error={errors.tshirt_size} hint={tx('reg.tshirtHint')}>
               {(p) => (
                 <Select {...p} value={form.tshirt_size} onChange={(e) => setForm((f) => ({ ...f, tshirt_size: e.target.value }))}>
-                  <option value="">Choose size</option>
+                  <option value="">{tx('reg.chooseSize')}</option>
                   {TSHIRT_SIZES.map((s) => (
                     <option key={s}>{s}</option>
                   ))}
@@ -329,19 +332,19 @@ export function RegisterPage() {
               )}
             </Field>
             <ChoiceGroup
-              label="Do you need help with accommodation in Jabalpur?"
+              label={tx('reg.accomQ')}
               options={[
-                { value: 'no', label: 'No, I’ve arranged my stay' },
-                { value: 'yes', label: 'Yes, please share options' },
+                { value: 'no', label: tx('reg.accomNo') },
+                { value: 'yes', label: tx('reg.accomYes') },
               ]}
               value={form.needs_accommodation ? 'yes' : 'no'}
               onChange={(v) => setForm((f) => ({ ...f, needs_accommodation: v === 'yes' }))}
               columns={2}
             />
-            <Field label="Arrival plan" optional hint="e.g. Arriving 25 Dec by train, leaving 27 Dec evening.">
+            <Field label={tx('reg.arrival')} optional hint={tx('reg.arrivalHint')}>
               {(p) => <Input {...p} maxLength={300} value={form.arrival_note} onChange={(e) => setForm((f) => ({ ...f, arrival_note: e.target.value }))} />}
             </Field>
-            <Field label="Anything we should know?" optional hint="Accessibility needs, dietary allergies, or a message for the organisers.">
+            <Field label={tx('reg.notes')} optional hint={tx('reg.notesHint')}>
               {(p) => <Textarea {...p} maxLength={1000} rows={3} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />}
             </Field>
           </section>
@@ -350,7 +353,7 @@ export function RegisterPage() {
         {step === 2 && (
           <section className="space-y-5">
             <div>
-              <SectionTitle>Summary</SectionTitle>
+              <SectionTitle>{tx('reg.summary')}</SectionTitle>
               <Card className="px-4">
                 <dl className="divide-y divide-border">
                   {(tickets ?? [])
@@ -360,12 +363,12 @@ export function RegisterPage() {
                         {formatPaise(t.price_paise * (form.qty[t.id] ?? 0))}
                       </KeyValue>
                     ))}
-                  <KeyValue label="Food">{FOOD_PREFS.find((f) => f.value === form.food_pref)?.label}</KeyValue>
-                  <KeyValue label="T-shirt">{form.tshirt_size}</KeyValue>
-                  <KeyValue label="Accommodation help">{form.needs_accommodation ? 'Yes' : 'No'}</KeyValue>
+                  <KeyValue label={tx('reg.foodShort')}>{foodLabel(tx, form.food_pref)}</KeyValue>
+                  <KeyValue label={tx('reg.tshirtShort')}>{form.tshirt_size}</KeyValue>
+                  <KeyValue label={tx('reg.accomShort')}>{form.needs_accommodation ? tx('common.yes') : tx('common.no')}</KeyValue>
                   <div className="flex items-center justify-between py-3.5">
                     <dt className="font-semibold">
-                      Total · {people} {people === 1 ? 'person' : 'people'}
+                      {tx('reg.total', { people: tx('common.people', { count: people }) })}
                     </dt>
                     <dd className="text-xl font-bold tabular-nums">{formatPaise(total)}</dd>
                   </div>
@@ -374,18 +377,18 @@ export function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Checkbox checked={form.photo_consent} onChange={(v) => setForm((f) => ({ ...f, photo_consent: v }))}>
-                Photos and videos of me taken at the meet may be shared with JEC alumni in the app.
+                {tx('reg.photoConsent')}
               </Checkbox>
               <Checkbox checked={form.accept_terms} onChange={(v) => setForm((f) => ({ ...f, accept_terms: v }))}>
-                My details are correct, and I agree to the{' '}
+                {tx('reg.agree1')}{' '}
                 <a href="/terms" target="_blank" className="font-semibold text-primary underline">
-                  event terms
+                  {tx('reg.eventTerms')}
                 </a>{' '}
-                and{' '}
+                {tx('reg.and')}{' '}
                 <a href="/privacy" target="_blank" className="font-semibold text-primary underline">
-                  privacy notice
+                  {tx('reg.privacyNotice')}
                 </a>
-                .
+                {tx('reg.agree2')}
               </Checkbox>
               {errors.accept_terms && (
                 <p className="text-sm font-semibold text-danger" role="alert" data-field-error>
@@ -401,23 +404,23 @@ export function RegisterPage() {
         <div className="sticky bottom-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
           <div className="mb-2 flex items-center justify-between text-[15px]">
             <span className="text-muted">
-              {people} {people === 1 ? 'person' : 'people'}
+              {tx('common.people', { count: people })}
             </span>
             <span className="font-bold tabular-nums">{formatPaise(total)}</span>
           </div>
           <div className="flex gap-3">
             {step > 0 && (
               <Button variant="secondary" size="lg" onClick={() => setStep((s) => s - 1)}>
-                Back
+                {tx('common.back')}
               </Button>
             )}
             {step < STEPS.length - 1 ? (
               <Button size="lg" className="flex-1" onClick={nextStep}>
-                Continue
+                {tx('common.continue')}
               </Button>
             ) : (
               <Button size="lg" className="flex-1" loading={upsert.isPending} onClick={submit} icon={<Check className="size-5" />}>
-                {locked ? 'Save changes' : total > 0 ? 'Confirm and pay' : 'Confirm registration'}
+                {locked ? tx('reg.save') : total > 0 ? tx('reg.confirmPay') : tx('reg.confirm')}
               </Button>
             )}
           </div>

@@ -9,6 +9,8 @@ import { friendlyError } from '../../lib/errors'
 import { safeNext } from '../../lib/safeNext'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from './AuthProvider'
+import { useT } from '../../i18n'
+import { LanguageSwitch } from '../../i18n/LanguageSwitch'
 
 
 function GoogleLogo() {
@@ -23,6 +25,7 @@ function GoogleLogo() {
 }
 
 export function SignInPage() {
+  const tx = useT()
   const { session, loading } = useAuth()
   const [params] = useSearchParams()
   const next = safeNext(params.get('next'))
@@ -63,7 +66,7 @@ export function SignInPage() {
     setError(null)
     const clean = email.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-      setError('Please enter a valid email address.')
+      setError(tx('auth.badEmail'))
       return
     }
     setBusy('email')
@@ -79,11 +82,11 @@ export function SignInPage() {
   async function verify(e?: FormEvent, value = code) {
     e?.preventDefault()
     setError(null)
-    if (!/^\d{6}$/.test(value)) return setError('Enter the 6-digit code from the email.')
+    if (!/^\d{6}$/.test(value)) return setError(tx('auth.enterCode'))
     setBusy('verify')
     const { error } = await supabase.auth.verifyOtp({ email, token: value, type: 'email' })
     setBusy(null)
-    if (error) setError(/expired|invalid/i.test(error.message) ? 'That code is wrong or has expired. Check the latest email or send a new code.' : friendlyError(error))
+    if (error) setError(/expired|invalid/i.test(error.message) ? tx('auth.wrongCode') : friendlyError(error))
     // on success, the auth listener updates the session and <Navigate> takes over
   }
 
@@ -98,14 +101,14 @@ export function SignInPage() {
             <img src="/pwa-192.png" alt="" className="size-12 rounded-2xl shadow-pop" />
             <div>
               <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
-              <p className="text-sm text-hero-text">Jabalpur Engineering College</p>
+              <p className="text-sm text-hero-text">{tx('brand.college')}</p>
             </div>
           </div>
-          <h2 className="mt-8 text-[32px] font-extrabold leading-[1.1] tracking-tight md:text-5xl">Every JECian,<br />one tap away.</h2>
-          <p className="mt-3 max-w-sm text-hero-text">Find your batch, share your journey and register for the Alumni Meet 2026.</p>
+          <h2 className="mt-8 text-[32px] font-extrabold leading-[1.1] tracking-tight md:text-5xl">{tx('auth.tagline1')}<br />{tx('auth.tagline2')}</h2>
+          <p className="mt-3 max-w-sm text-hero-text">{tx('auth.sub')}</p>
           <ul className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
-            {['Batch communities', 'Alumni directory', 'Meet 2026'].map((t) => (
-              <li key={t} className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{t}</li>
+            {(['auth.chip1', 'auth.chip2', 'auth.chip3'] as const).map((k) => (
+              <li key={k} className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{tx(k)}</li>
             ))}
           </ul>
         </div>
@@ -113,19 +116,22 @@ export function SignInPage() {
 
       <div className="mx-auto flex w-full max-w-md flex-col px-5 pb-safe md:justify-center md:px-10">
       <div className="flex-1 pt-8 md:flex-none md:pt-0">
+        <div className="mb-5 flex justify-end">
+          <LanguageSwitch compact />
+        </div>
         {step === 'choose' && (
           <>
-            <h1 className="text-[26px] font-bold leading-tight tracking-tight">Welcome, JECian</h1>
-            <p className="mt-2 text-muted">Sign in to register for the Alumni Meet and reconnect with your batch. No password needed.</p>
+            <h1 className="text-[26px] font-bold leading-tight tracking-tight">{tx('auth.welcome')}</h1>
+            <p className="mt-2 text-muted">{tx('auth.welcomeBody')}</p>
             <div className="mt-8 space-y-3">
               <Button variant="secondary" size="lg" block icon={<GoogleLogo />} loading={busy === 'google'} onClick={() => oauth('google')}>
-                Continue with Google
+                {tx('auth.google')}
               </Button>
               <Button variant="secondary" size="lg" block icon={<LinkedInIcon />} loading={busy === 'linkedin_oidc'} onClick={() => oauth('linkedin_oidc')}>
-                Continue with LinkedIn
+                {tx('auth.linkedin')}
               </Button>
               <Button variant="ghost" size="lg" block icon={<Mail className="size-5" />} onClick={() => setStep('email')}>
-                Use my email instead
+                {tx('auth.useEmail')}
               </Button>
             </div>
           </>
@@ -134,12 +140,12 @@ export function SignInPage() {
         {step === 'email' && (
           <form onSubmit={sendCode} noValidate>
             <button type="button" className="-ml-2 mb-4 inline-flex min-h-11 items-center gap-1 px-2 text-primary" onClick={() => setStep('choose')}>
-              <ArrowLeft className="size-4" /> Back
+              <ArrowLeft className="size-4" /> {tx('common.back')}
             </button>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight">Sign in with email</h1>
-            <p className="mt-2 text-muted">We’ll email you a 6-digit code.</p>
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight">{tx('auth.emailTitle')}</h1>
+            <p className="mt-2 text-muted">{tx('auth.emailBody')}</p>
             <div className="mt-6 space-y-4">
-              <Field label="Email address">
+              <Field label={tx('auth.emailLabel')}>
                 {(p) => (
                   <Input
                     {...p}
@@ -154,7 +160,7 @@ export function SignInPage() {
                 )}
               </Field>
               <Button type="submit" size="lg" block loading={busy === 'email'}>
-                Send code
+                {tx('auth.sendCode')}
               </Button>
             </div>
           </form>
@@ -163,14 +169,14 @@ export function SignInPage() {
         {step === 'code' && (
           <form onSubmit={verify} noValidate>
             <button type="button" className="-ml-2 mb-4 inline-flex min-h-11 items-center gap-1 px-2 text-primary" onClick={() => setStep('email')}>
-              <ArrowLeft className="size-4" /> Change email
+              <ArrowLeft className="size-4" /> {tx('auth.changeEmail')}
             </button>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight">Check your email</h1>
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight">{tx('auth.checkEmail')}</h1>
             <p className="mt-2 text-muted">
-              Enter the 6-digit code we sent to <strong className="text-text">{email}</strong>. It may take a minute; check Spam too.
+              {tx('auth.codeSentTo')} <strong className="text-text">{email}</strong>{tx('auth.codeSentTail')}
             </p>
             <div className="mt-6 space-y-4">
-              <Field label="6-digit code">
+              <Field label={tx('auth.codeLabel')}>
                 {(p) => (
                   <Input
                     {...p}
@@ -191,10 +197,10 @@ export function SignInPage() {
                 )}
               </Field>
               <Button type="submit" size="lg" block loading={busy === 'verify'}>
-                Sign in
+                {tx('auth.signIn')}
               </Button>
               <Button variant="ghost" block disabled={resendIn > 0 || busy !== null} onClick={() => sendCode()}>
-                {resendIn > 0 ? `Send a new code in ${resendIn}s` : 'Send a new code'}
+                {resendIn > 0 ? tx('auth.resendIn', { n: resendIn }) : tx('auth.resend')}
               </Button>
             </div>
           </form>
@@ -203,7 +209,7 @@ export function SignInPage() {
         {error && <Notice tone="danger" className="mt-5" title={error} />}
       </div>
       <p className="py-6 text-center text-sm text-muted">
-        By continuing you agree to our <a className="inline-flex min-h-11 items-center text-primary underline" href="/privacy">privacy notice</a>.
+        {tx('auth.agree')} <a className="inline-flex min-h-11 items-center text-primary underline" href="/privacy">{tx('reg.privacyNotice')}</a>.
       </p>
       </div>
     </div>
@@ -211,6 +217,7 @@ export function SignInPage() {
 }
 
 export function AuthCallbackPage() {
+  const tx = useT()
   const { session, loading } = useAuth()
   const [params] = useSearchParams()
   const [timedOut, setTimedOut] = useState(false)
@@ -225,18 +232,18 @@ export function AuthCallbackPage() {
   if (errorDescription || (timedOut && !loading)) {
     return (
       <div className="mx-auto max-w-md p-6 pt-20">
-        <Notice tone="danger" title="Sign-in didn’t complete">
-          {errorDescription ?? 'Please try again.'}
+        <Notice tone="danger" title={tx('auth.cbFail')}>
+          {errorDescription ?? tx('auth.tryAgain')}
         </Notice>
         <a href="/signin" className="mt-6 inline-block font-semibold text-primary">
-          Back to sign in
+          {tx('auth.backToSignIn')}
         </a>
       </div>
     )
   }
   return (
     <div className="grid min-h-dvh place-items-center text-muted" role="status">
-      Signing you in…
+      {tx('auth.signingIn')}
     </div>
   )
 }

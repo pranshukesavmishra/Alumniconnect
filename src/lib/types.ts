@@ -33,6 +33,7 @@ export interface Profile {
   invite_code: string
   invited_by: string | null
   message_policy: 'jec' | 'batch_and_connections' | 'connections'
+  language: 'en' | 'hi'
   verification: VerificationStatus
   is_admin: boolean
   created_at: string

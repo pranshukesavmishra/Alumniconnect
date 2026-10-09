@@ -4,6 +4,7 @@ import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
 import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { MEET_SLUG, yearRange } from '../../lib/constants'
+import { useT } from '../../i18n'
 import { friendlyError } from '../../lib/errors'
 import { daysUntil, formatDateRange, formatDateTime } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
@@ -12,6 +13,7 @@ import { registrationOpen, useEvent, useEventStats, useMyRegistration, useTicket
 import { StatusBadge } from './StatusBadge'
 
 export function MeetPage() {
+  const tx = useT()
   const { session } = useAuth()
   const { data: event, isLoading, error } = useEvent(MEET_SLUG)
   const { data: tickets } = useTicketTypes(event?.id)
@@ -19,8 +21,8 @@ export function MeetPage() {
   const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
 
   if (isLoading) return <PageSkeleton />
-  if (error) return <Page><Notice tone="danger" title="Couldn’t load the event">{friendlyError(error)}</Notice></Page>
-  if (!event) return <EmptyState title="The Alumni Meet page isn’t published yet" icon={<CalendarDays />}>Please check back soon.</EmptyState>
+  if (error) return <Page><Notice tone="danger" title={tx('meet.loadError')}>{friendlyError(error)}</Notice></Page>
+  if (!event) return <EmptyState title={tx('meet.notPublished')} icon={<CalendarDays />}>{tx('meet.checkBack')}</EmptyState>
 
   const open = registrationOpen(event)
   const days = daysUntil(event.starts_at)
@@ -32,14 +34,14 @@ export function MeetPage() {
   // while a signed-in member's registration is still loading, show a placeholder, never the wrong button
   const waiting = !!session && regPending
   const cta = waiting ? (
-    <div className="skeleton h-14 w-full rounded-full" aria-busy="true" aria-label="Loading your registration" />
+    <div className="skeleton h-14 w-full rounded-full" aria-busy="true" aria-label={tx('meet.loadingReg')} />
   ) : active ? (
     <ButtonLink to="/meet/my" size="lg" block icon={<Ticket className="size-5" />}>
-      {reg.status === 'confirmed' ? 'View my ticket' : reg.status === 'pending_payment' ? 'Complete payment' : 'View my registration'}
+      {reg.status === 'confirmed' ? tx('meet.viewTicket') : reg.status === 'pending_payment' ? tx('meet.completePayment') : tx('meet.viewReg')}
     </ButtonLink>
   ) : open ? (
     <ButtonLink to={session ? '/meet/register' : '/signin?next=/meet/register'} size="lg" block>
-      Register now
+      {tx('meet.registerNow')}
     </ButtonLink>
   ) : null
 
@@ -50,7 +52,7 @@ export function MeetPage() {
         <div aria-hidden className="absolute -right-24 -top-24 size-72 rounded-full bg-hero-2" />
         <div aria-hidden className="absolute -bottom-20 right-10 size-40 rounded-full bg-accent/15" />
         <div className="relative mx-auto max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-accent">Jabalpur Engineering College</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-accent">{tx('brand.college')}</p>
           <h1 className="mt-2 text-[32px] font-bold leading-[1.1] tracking-tight sm:text-4xl">{event.title}</h1>
           {event.tagline && <p className="mt-2 text-lg text-hero-text">{event.tagline}</p>}
           <ul className="mt-6 space-y-2.5 text-[15px] text-hero-text">
@@ -58,7 +60,7 @@ export function MeetPage() {
               <CalendarDays className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
               <span>
                 {formatDateRange(event.starts_at, event.ends_at)}
-                {days !== null && days > 0 && <span className="text-hero-text"> · in {days} days</span>}
+                {days !== null && days > 0 && <span className="text-hero-text"> · {tx('meet.inDays', { count: days })}</span>}
               </span>
             </li>
             {event.venue && (
@@ -77,7 +79,7 @@ export function MeetPage() {
               <li className="flex items-start gap-3">
                 <Users className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
                 <span>
-                  {stats.registered} alumni registered · {stats.people} people coming
+                  {tx('meet.registered', { registered: stats.registered, people: stats.people })}
                 </span>
               </li>
             )}
@@ -90,7 +92,7 @@ export function MeetPage() {
         {active && (
           <Card className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0">
-              <p className="text-sm text-muted">Your registration</p>
+              <p className="text-sm text-muted">{tx('meet.yourReg')}</p>
               <p className="font-mono text-lg font-semibold tracking-wide">{reg.code}</p>
             </div>
             <StatusBadge status={reg.status} />
@@ -98,19 +100,19 @@ export function MeetPage() {
         )}
 
         {!open && !active && (
-          <Notice tone="warning" title="Registration has closed">
-            Please contact the organisers if you still wish to attend.
+          <Notice tone="warning" title={tx('meet.closed')}>
+            {tx('meet.closedBody')}
           </Notice>
         )}
 
         {years.length > 0 && (
           <section>
-            <SectionTitle>Batches coming</SectionTitle>
+            <SectionTitle>{tx('meet.batches')}</SectionTitle>
             <div className="grid grid-cols-5 gap-2">
               {years.map((y) => (
                 <div key={y} className="rounded-xl border border-border bg-surface px-1 py-2 text-center">
                   <p className="text-[15px] font-bold tabular-nums">{y}</p>
-                  <p className="text-xs text-muted">{countByYear.get(y) ? `${countByYear.get(y)} in` : 'Be first'}</p>
+                  <p className="text-xs text-muted">{countByYear.get(y) ? tx('meet.batchIn', { n: countByYear.get(y)! }) : tx('meet.beFirst')}</p>
                 </div>
               ))}
             </div>
@@ -119,7 +121,7 @@ export function MeetPage() {
 
         {tickets && tickets.length > 0 && (
           <section>
-            <SectionTitle>Registration fees</SectionTitle>
+            <SectionTitle>{tx('meet.fees')}</SectionTitle>
             <Card className="divide-y divide-border">
               {tickets.map((t) => (
                 <div key={t.id} className="flex items-start justify-between gap-4 p-4">
@@ -131,25 +133,25 @@ export function MeetPage() {
                 </div>
               ))}
             </Card>
-            <p className="mt-2 text-sm text-muted">Pay by any UPI app after registering. Your seat is confirmed once the treasurer verifies the payment.</p>
+            <p className="mt-2 text-sm text-muted">{tx('meet.payNote')}</p>
           </section>
         )}
 
         {event.description && (
           <section>
-            <SectionTitle>About the meet</SectionTitle>
+            <SectionTitle>{tx('meet.about')}</SectionTitle>
             <Card className="whitespace-pre-line p-4 text-[15px] leading-relaxed">{event.description}</Card>
           </section>
         )}
 
         <section>
-          <SectionTitle>Good to know</SectionTitle>
+          <SectionTitle>{tx('meet.goodToKnow')}</SectionTitle>
           <Card className="divide-y divide-border">
             {event.registration_closes_at && (
               <div className="flex items-center gap-3 p-4">
                 <Clock className="size-5 text-primary" aria-hidden />
                 <p className="text-[15px]">
-                  Registration closes <strong>{formatDateTime(event.registration_closes_at)}</strong>
+                  {tx('meet.closes')} <strong>{formatDateTime(event.registration_closes_at)}</strong>
                 </p>
               </div>
             )}
@@ -157,16 +159,16 @@ export function MeetPage() {
               <div className="flex items-start gap-3 p-4">
                 <Phone className="mt-0.5 size-5 text-primary" aria-hidden />
                 <p className="text-[15px]">
-                  Questions? {event.contact_phone && <a className="font-semibold text-primary" href={`tel:${event.contact_phone.replace(/\s/g, '')}`}>{event.contact_phone}</a>}
+                  {tx('meet.questions')} {event.contact_phone && <a className="font-semibold text-primary" href={`tel:${event.contact_phone.replace(/\s/g, '')}`}>{event.contact_phone}</a>}
                   {event.contact_phone && event.contact_email && ' · '}
                   {event.contact_email && <a className="font-semibold text-primary" href={`mailto:${event.contact_email}`}>{event.contact_email}</a>}
                 </p>
               </div>
             )}
             <div className="flex items-center gap-3 p-4">
-              <Badge tone="primary">Tip</Badge>
+              <Badge tone="primary">{tx('meet.tip')}</Badge>
               <p className="text-[15px] text-muted">
-                Add this app to your home screen for quick access to your ticket. <Link to="/install" className="font-semibold text-primary">How?</Link>
+                {tx('meet.addHome')} <Link to="/install" className="font-semibold text-primary">{tx('meet.how')}</Link>
               </p>
             </div>
           </Card>

@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { Check, Minus, Plus } from 'lucide-react'
 import { useId, type ComponentProps, type ReactNode } from 'react'
+import { useT } from '../../i18n'
 
 const control =
   'w-full rounded-xl border border-border bg-surface px-3.5 min-h-12 text-[16px] text-text placeholder:text-muted/70 ' +
@@ -18,13 +19,14 @@ interface FieldProps {
 
 /** Label + control + hint/error, wired for screen readers. */
 export function Field({ label, hint, error, optional, children, className }: FieldProps) {
+  const tx = useT()
   const id = useId()
   const hintId = `${id}-hint`
   return (
     <div className={clsx('space-y-1.5', className)}>
       <label htmlFor={id} className="block text-sm font-semibold text-text">
         {label}
-        {optional && <span className="font-normal text-muted"> (optional)</span>}
+        {optional && <span className="font-normal text-muted"> ({tx('common.optional')})</span>}
       </label>
       {children({ id, 'aria-describedby': hint || error ? hintId : undefined, 'aria-invalid': error ? true : undefined })}
       {error ? (
@@ -185,6 +187,7 @@ export function Stepper({
   onChange: (v: number) => void
   label: string
 }) {
+  const tx = useT()
   return (
     <div className="inline-flex items-center rounded-full border border-border bg-surface" role="group" aria-label={label}>
       <button
@@ -192,7 +195,7 @@ export function Stepper({
         className="grid size-11 place-items-center rounded-full text-primary disabled:opacity-30"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
-        aria-label={`Fewer: ${label}`}
+        aria-label={tx('common.fewer', { label })}
       >
         <Minus className="size-4" />
       </button>
@@ -204,7 +207,7 @@ export function Stepper({
         className="grid size-11 place-items-center rounded-full text-primary disabled:opacity-30"
         onClick={() => onChange(Math.min(max, value + 1))}
         disabled={value >= max}
-        aria-label={`More: ${label}`}
+        aria-label={tx('common.more', { label })}
       >
         <Plus className="size-4" />
       </button>

@@ -9,6 +9,8 @@ import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { Avatar, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
+import { useT } from '../../i18n'
+import { dateLocale, tr } from '../../i18n/core'
 import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
@@ -45,7 +47,7 @@ import {
 
 // ------------------------------------------------------------------ helpers
 function timeOf(iso: string) {
-  return new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString(dateLocale(), { hour: 'numeric', minute: '2-digit' })
 }
 
 /** WhatsApp-style list stamp: time today, "Yesterday", weekday this week, else date. */
@@ -55,17 +57,17 @@ function listStamp(iso: string | null) {
   const now = new Date()
   const days = Math.floor((new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000)
   if (days <= 0) return timeOf(iso)
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return d.toLocaleDateString('en-IN', { weekday: 'short' })
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : '2-digit' })
+  if (days === 1) return tr('chat.yesterday')
+  if (days < 7) return d.toLocaleDateString(dateLocale(), { weekday: 'short' })
+  return d.toLocaleDateString(dateLocale(), { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : '2-digit' })
 }
 
 function dayLabel(iso: string) {
   const d = new Date(iso)
   const now = new Date()
   const days = Math.floor((new Date(now.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86_400_000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
+  if (days === 0) return tr('chat.today')
+  if (days === 1) return tr('chat.yesterday')
   return formatDate(iso, { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })
 }
 
@@ -87,11 +89,12 @@ function ChatAvatar({ c, size }: { c: Pick<ChatSummary, 'kind' | 'avatar_url' | 
 }
 
 function VerifiedOnly({ title }: { title: string }) {
+  const tx = useT()
   return (
     <div>
       <PageHeader title={title} />
-      <EmptyState icon={<ShieldAlert />} title="Chat is for verified members">
-        You’ll be verified once your Alumni Meet payment is confirmed, or when two verified JECians vouch for you.
+      <EmptyState icon={<ShieldAlert />} title={tx('chat.verifiedOnly')}>
+        {tx('chat.verifiedBody')}
       </EmptyState>
     </div>
   )
@@ -101,10 +104,11 @@ function VerifiedOnly({ title }: { title: string }) {
 type Filter = 'all' | 'unread' | 'groups' | 'direct'
 
 function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
+  const tx = useT()
   const unread = c.unread > 0
   const mine = c.last_sender === uid
   const seen = mine && c.kind === 'dm' && !!c.other_last_read_at && !!c.last_message_at && c.other_last_read_at >= c.last_message_at
-  const who = c.last_message && c.kind === 'group' && c.last_sender_name ? `${mine ? 'You' : c.last_sender_name}: ` : ''
+  const who = c.last_message && c.kind === 'group' && c.last_sender_name ? `${mine ? tx('chat.you') : c.last_sender_name}: ` : ''
   return (
     <li>
       <Link to={`/chat/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 active:bg-surface-2">
@@ -115,13 +119,13 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
             <p className={clsx('shrink-0 text-xs', unread && !c.muted ? 'font-semibold text-primary' : 'text-muted')}>{listStamp(c.last_message_at)}</p>
           </div>
           <div className="mt-0.5 flex items-center gap-1.5">
-            {mine && c.kind === 'dm' && (seen ? <CheckCheck className="size-4 shrink-0 text-primary" aria-label="Seen" /> : <Check className="size-4 shrink-0 text-muted" aria-label="Sent" />)}
+            {mine && c.kind === 'dm' && (seen ? <CheckCheck className="size-4 shrink-0 text-primary" aria-label={tx('chat.seen')} /> : <Check className="size-4 shrink-0 text-muted" aria-label={tx('chat.sent')} />)}
             <p className={clsx('min-w-0 flex-1 truncate text-sm', unread ? 'font-medium text-text' : 'text-muted')}>
-              {c.last_message ? `${who}${c.last_message}` : c.kind === 'group' ? 'Say hello to the group 👋' : 'No messages yet'}
+              {c.last_message ? `${who}${c.last_message}` : c.kind === 'group' ? tx('chat.sayHelloGroup') : tx('chat.noMessages')}
             </p>
-            {c.muted && <BellOff className="size-4 shrink-0 text-muted" aria-label="Muted" />}
+            {c.muted && <BellOff className="size-4 shrink-0 text-muted" aria-label={tx('chat.muted')} />}
             {unread && (
-              <span className={clsx('min-w-5.5 shrink-0 rounded-full px-1.5 text-center text-xs font-bold leading-5.5 text-white', c.muted ? 'bg-muted' : 'bg-primary')} aria-label={`${c.unread} unread`}>
+              <span className={clsx('min-w-5.5 shrink-0 rounded-full px-1.5 text-center text-xs font-bold leading-5.5 text-white', c.muted ? 'bg-muted' : 'bg-primary')} aria-label={tx('chat.unreadN', { n: c.unread })}>
                 {c.unread >= 100 ? '99+' : c.unread}
               </span>
             )}
@@ -133,6 +137,7 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
 }
 
 export function ChatListPage() {
+  const tx = useT()
   const uid = useUserId()
   const { data: me, isLoading: meLoading } = useMyProfile()
   const { data, isLoading, error, refetch } = useChats()
@@ -141,7 +146,7 @@ export function ChatListPage() {
   const [showRequests, setShowRequests] = useState(false)
 
   if (meLoading) return <PageSkeleton />
-  if (me?.verification !== 'verified' && !me?.is_admin) return <VerifiedOnly title="Chat" />
+  if (me?.verification !== 'verified' && !me?.is_admin) return <VerifiedOnly title={tx('chat.title')} />
 
   const all = data ?? []
   const requests = all.filter((c) => c.kind === 'dm' && c.is_request && c.started_by !== uid)
@@ -152,29 +157,29 @@ export function ChatListPage() {
     .filter((c) => !term || c.title.toLowerCase().includes(term) || (c.last_message ?? '').toLowerCase().includes(term))
   const counts = { unread: all.filter((c) => c.unread > 0).length }
   const chips: { key: Filter; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'unread', label: counts.unread ? `Unread · ${counts.unread}` : 'Unread' },
-    { key: 'groups', label: 'Groups' },
-    { key: 'direct', label: 'Direct' },
+    { key: 'all', label: tx('chat.fAll') },
+    { key: 'unread', label: counts.unread ? tx('chat.fUnreadN', { n: counts.unread }) : tx('chat.fUnread') },
+    { key: 'groups', label: tx('chat.fGroups') },
+    { key: 'direct', label: tx('chat.fDirect') },
   ]
 
   return (
     <div>
-      <PageHeader title="Chat" />
+      <PageHeader title={tx('chat.title')} />
       <div className="mx-auto w-full max-w-3xl">
         <div className="space-y-3 px-4 pt-3">
           <label className="relative block">
-            <span className="sr-only">Search chats</span>
+            <span className="sr-only">{tx('chat.search')}</span>
             <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />
             <input
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search chats"
+              placeholder={tx('chat.search')}
               className="min-h-12 w-full rounded-full border border-border bg-surface pl-12 pr-4 text-[16px] focus:border-primary focus:outline-none"
             />
           </label>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label="Filter chats">
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="tablist" aria-label={tx('chat.filter')}>
             {chips.map((c) => (
               <button
                 key={c.key}
@@ -195,9 +200,9 @@ export function ChatListPage() {
         </div>
         {error && (
           <div className="px-4 pt-3">
-            <Notice tone="danger" title="Couldn’t load your chats">
+            <Notice tone="danger" title={tx('chat.loadError')}>
               {friendlyError(error)}{' '}
-              <button type="button" className="font-semibold text-primary underline" onClick={() => void refetch()}>Try again</button>
+              <button type="button" className="font-semibold text-primary underline" onClick={() => void refetch()}>{tx('common.tryAgain')}</button>
             </Notice>
           </div>
         )}
@@ -206,7 +211,7 @@ export function ChatListPage() {
           <div className="px-4 pt-3">
             <button type="button" onClick={() => setShowRequests((s) => !s)} className="flex min-h-12 w-full items-center gap-3 rounded-2xl bg-primary-soft px-4 text-left font-semibold text-primary" aria-expanded={showRequests}>
               <MessagesSquare className="size-5" aria-hidden />
-              <span className="flex-1">Message requests</span>
+              <span className="flex-1">{tx('chat.requests')}</span>
               <span className="rounded-full bg-primary px-2 text-xs font-bold leading-5.5 text-on-primary">{requests.length}</span>
             </button>
             {showRequests && <ul className="mt-2 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">{requests.map((c) => <ChatRow key={c.id} c={c} uid={uid} />)}</ul>}
@@ -228,10 +233,10 @@ export function ChatListPage() {
         ) : main.length ? (
           <ul className="mt-2 divide-y divide-border">{main.map((c) => <ChatRow key={c.id} c={c} uid={uid} />)}</ul>
         ) : term || filter !== 'all' ? (
-          <p className="p-8 text-center text-muted">No chats match.</p>
+          <p className="p-8 text-center text-muted">{tx('chat.noMatch')}</p>
         ) : (
-          <EmptyState icon={<MessagesSquare />} title="No chats yet" action={<Link to="/people" className="font-semibold text-primary">Find a batchmate to message</Link>}>
-            Your batch and circle group chats appear here. Open anyone’s profile and tap Message to start a direct chat.
+          <EmptyState icon={<MessagesSquare />} title={tx('chat.empty')} action={<Link to="/people" className="font-semibold text-primary">{tx('chat.findBatchmate')}</Link>}>
+            {tx('chat.emptyBody')}
           </EmptyState>
         )}
       </div>
@@ -243,9 +248,10 @@ export function ChatListPage() {
 const EDIT_WINDOW_MS = 15 * 60_000
 
 function TickStatus({ m, seen }: { m: Message; seen: boolean }) {
-  if (m.pending) return <Clock className="size-3.5" aria-label="Sending" />
-  if (seen) return <CheckCheck className="size-4 text-accent" aria-label="Seen" />
-  return <Check className="size-4" aria-label="Sent" />
+  const tx = useT()
+  if (m.pending) return <Clock className="size-3.5" aria-label={tx('chat.sending')} />
+  if (seen) return <CheckCheck className="size-4 text-accent" aria-label={tx('chat.seen')} />
+  return <Check className="size-4" aria-label={tx('chat.sent')} />
 }
 
 interface BubbleProps {
@@ -269,6 +275,7 @@ interface BubbleProps {
 }
 
 function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMenu, onReply, onHeart, onPhotos, onVote, onReactions, onQuote, onRetry, onDiscard }: BubbleProps) {
+  const tx = useT()
   const gestures = useMessageGestures({ onReply, onMenu, onDoubleTap: onHeart, enabled: interactive })
   if (m.kind === 'system') {
     return <p className="mx-auto my-2 w-fit max-w-[85%] rounded-full bg-surface-2 px-3 py-1 text-center text-xs text-muted">{m.body}</p>
@@ -279,7 +286,7 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
       {isGroup && !mine && (
         <span className="w-8 shrink-0 self-start">
           {showName && (
-            <Link to={m.sender_id ? `/people/${m.sender_id}` : '#'} aria-label={m.sender?.full_name ?? 'Member'}>
+            <Link to={m.sender_id ? `/people/${m.sender_id}` : '#'} aria-label={m.sender?.full_name ?? tx('chat.member')}>
               <Avatar src={m.sender?.avatar_url} name={m.sender?.full_name ?? '?'} size={32} />
             </Link>
           )}
@@ -296,10 +303,10 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
               m.failed && 'ring-2 ring-danger',
             )}
           >
-            {isGroup && !mine && showName && <p className={clsx('mb-0.5 text-[13px] font-semibold', nameColour(m.sender_id))}>{m.sender?.full_name ?? 'Former member'}</p>}
+            {isGroup && !mine && showName && <p className={clsx('mb-0.5 text-[13px] font-semibold', nameColour(m.sender_id))}>{m.sender?.full_name ?? tx('chat.formerMember')}</p>}
             {quote && !deleted && <ReplyQuote r={quote} mine={mine} me={me} onClick={() => onQuote(quote.id)} />}
             {deleted ? (
-              <p className={clsx('italic', mine ? 'text-on-primary/80' : 'text-muted')}>🚫 This message was deleted</p>
+              <p className={clsx('italic', mine ? 'text-on-primary/80' : 'text-muted')}>🚫 {tx('chat.deleted')}</p>
             ) : (
               <>
                 {m.kind === 'image' && <PhotoGrid items={m.attachments} pending={m.pending} onOpen={(i) => onPhotos(m.attachments, i)} />}
@@ -310,7 +317,7 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
               </>
             )}
             <p className={clsx('-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-primary/75' : 'text-muted')}>
-              {m.edited_at && !deleted && <span>edited ·</span>}
+              {m.edited_at && !deleted && <span>{tx('chat.edited')} ·</span>}
               <span>{timeOf(m.created_at)}</span>
               {mine && !m.failed && <TickStatus m={m} seen={seen} />}
             </p>
@@ -320,9 +327,9 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
         {m.failed && (
           <div className="mt-1 flex items-center gap-1 text-sm">
             <AlertCircle className="size-4 text-danger" aria-hidden />
-            <span className="text-danger">Not sent.</span>
-            <button type="button" onClick={onRetry} className="min-h-11 rounded-full px-2 font-semibold text-primary">Retry</button>
-            <button type="button" onClick={onDiscard} className="min-h-11 rounded-full px-2 font-semibold text-muted">Delete</button>
+            <span className="text-danger">{tx('chat.notSent')}</span>
+            <button type="button" onClick={onRetry} className="min-h-11 rounded-full px-2 font-semibold text-primary">{tx('chat.retry')}</button>
+            <button type="button" onClick={onDiscard} className="min-h-11 rounded-full px-2 font-semibold text-muted">{tx('chat.delete')}</button>
           </div>
         )}
       </div>
@@ -333,12 +340,13 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
 
 /** Desktop hover button for message options (phones use long-press). */
 function MenuButton({ onClick }: { onClick: () => void }) {
+  const tx = useT()
   return (
     <button
       type="button"
       onClick={onClick}
       className="hidden size-9 shrink-0 place-items-center self-center rounded-full text-muted opacity-0 hover:bg-surface-2 focus:opacity-100 group-hover:opacity-100 [@media(pointer:fine)]:grid"
-      aria-label="Message options"
+      aria-label={tx('chat.msgOptions')}
     >
       <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
         <circle cx="5" cy="12" r="1.8" />
@@ -350,12 +358,14 @@ function MenuButton({ onClick }: { onClick: () => void }) {
 }
 
 function TypingLine({ names }: { names: string[] }) {
+  const tx = useT()
   if (!names.length) return null
-  const who = names.length === 1 ? `${names[0]} is` : names.length === 2 ? `${names[0]} and ${names[1]} are` : `${names.length} people are`
-  return <span className="text-primary">{who} typing…</span>
+  const text = names.length === 1 ? tx('chat.typing1', { a: names[0]! }) : names.length === 2 ? tx('chat.typing2', { a: names[0]!, b: names[1]! }) : tx('chat.typingN', { n: names.length })
+  return <span className="text-primary">{text}</span>
 }
 
 export function ChatThreadPage() {
+  const tx = useT()
   const { id = '' } = useParams()
   const uid = useUserId()
   const qc = useQueryClient()
@@ -492,9 +502,9 @@ export function ChatThreadPage() {
         await loadOlder()
         await new Promise((r) => requestAnimationFrame(r))
       }
-      toast('That message is no longer available.')
+      toast(tx('chat.msgGone'))
     },
-    [id, loadOlder, qc],
+    [id, loadOlder, qc, tx],
   )
 
   function doSend(input: SendInput, localId = newLocalId()) {
@@ -502,7 +512,7 @@ export function ChatThreadPage() {
       { ...input, localId },
       {
         // no connection: the message waits (and is sent automatically when we're back online); other errors are shown
-        onError: (err) => (isNetworkError(err) ? toast('No connection. Your message will send when you’re back online.') : toast.error(friendlyError(err))),
+        onError: (err) => (isNetworkError(err) ? toast(tx('chat.noConnection')) : toast.error(friendlyError(err))),
       },
     )
     signals.sentMessage()
@@ -534,10 +544,10 @@ export function ChatThreadPage() {
   }
 
   async function block() {
-    if (!chat?.other_id || !window.confirm(`Block ${chat.title}? They won’t be able to message you, and you won’t see each other’s posts.`)) return
+    if (!chat?.other_id || !window.confirm(tx('chat.blockConfirm', { name: chat.title }))) return
     const { error: err } = await supabase.from('blocks').insert({ blocker: uid, blocked: chat.other_id })
     if (err && err.code !== '23505') return toast.error(friendlyError(err))
-    toast.success('Blocked')
+    toast.success(tx('chat.blocked'))
     void qc.invalidateQueries({ queryKey: ['chats'] })
     navigate('/chat')
   }
@@ -546,7 +556,7 @@ export function ChatThreadPage() {
     if (!chat) return
     const { error: err } = await supabase.rpc('set_chat_muted', { p_chat: chat.id, p_muted: !chat.muted })
     if (err) return toast.error(friendlyError(err))
-    toast.success(chat.muted ? 'Notifications on' : 'Muted. You won’t get notifications from this chat.')
+    toast.success(chat.muted ? tx('chat.notifOn') : tx('chat.mutedToast'))
     await Promise.all([qc.invalidateQueries({ queryKey: chatKeys.one(id) }), qc.invalidateQueries({ queryKey: ['chats'] })])
   }
 
@@ -574,12 +584,12 @@ export function ChatThreadPage() {
   }
 
   if (meLoading) return <PageSkeleton />
-  if (me?.verification !== 'verified' && !me?.is_admin) return <VerifiedOnly title="Chat" />
+  if (me?.verification !== 'verified' && !me?.is_admin) return <VerifiedOnly title={tx('chat.title')} />
   if (!chatLoading && !chat) {
     return (
       <div>
-        <PageHeader title="Chat" back="/chat" />
-        <EmptyState icon={<MessagesSquare />} title="Chat not found">It may have been removed, or you’re not a member of this group.</EmptyState>
+        <PageHeader title={tx('chat.title')} back="/chat" />
+        <EmptyState icon={<MessagesSquare />} title={tx('chat.notFound')}>{tx('chat.notFoundBody')}</EmptyState>
       </div>
     )
   }
@@ -601,7 +611,7 @@ export function ChatThreadPage() {
     <div className="flex h-dvh flex-col bg-bg">
       <header className="sticky top-0 z-20 border-b border-border bg-bg/95 pt-safe backdrop-blur">
         <div className="mx-auto flex min-h-15 max-w-3xl items-center gap-2 px-2">
-          <Link to="/chat" className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label="Back to chats">
+          <Link to="/chat" className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={tx('chat.backToChats')}>
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
               <path d="m15 18-6-6 6-6" />
             </svg>
@@ -611,7 +621,7 @@ export function ChatThreadPage() {
               <ChatAvatar c={chat} size={40} />
               <span className="min-w-0">
                 <span className="block truncate font-bold leading-tight">{chat.title}</span>
-                <span className="block truncate text-sm text-muted">{signals.typingNames.length ? <TypingLine names={signals.typingNames} /> : chat.kind === 'dm' && chat.other_id && signals.online.includes(chat.other_id) ? <span className="text-success">● online</span> : chat.subtitle}</span>
+                <span className="block truncate text-sm text-muted">{signals.typingNames.length ? <TypingLine names={signals.typingNames} /> : chat.kind === 'dm' && chat.other_id && signals.online.includes(chat.other_id) ? <span className="text-success">● {tx('chat.online')}</span> : chat.subtitle}</span>
               </span>
             </Link>
           ) : (
@@ -621,17 +631,17 @@ export function ChatThreadPage() {
             </div>
           )}
           {chat?.kind === 'group' && chat.is_group_admin && chat.group_kind !== 'channel' && (
-            <button type="button" onClick={() => setSlowOpen(true)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Slow mode" title="Slow mode">
+            <button type="button" onClick={() => setSlowOpen(true)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={tx('chat.slow')} title={tx('chat.slow')}>
               <Gauge className={clsx('size-5', chat.slow_mode_seconds > 0 && 'text-primary')} />
             </button>
           )}
           {chat && (
-            <button type="button" onClick={() => setSearching((x) => !x)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Search in chat" aria-expanded={searching}>
+            <button type="button" onClick={() => setSearching((x) => !x)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={tx('chat.searchIn')} aria-expanded={searching}>
               <Search className="size-5" />
             </button>
           )}
           {chat && (chat.joined || chat.kind === 'dm') && (
-            <button type="button" onClick={toggleMute} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={chat.muted ? 'Unmute chat' : 'Mute chat'} title={chat.muted ? 'Unmute' : 'Mute'}>
+            <button type="button" onClick={toggleMute} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={chat.muted ? tx('chat.unmuteChat') : tx('chat.muteChat')} title={chat.muted ? tx('chat.unmute') : tx('chat.mute')}>
               {chat.muted ? <BellOff className="size-5" /> : <Bell className="size-5" />}
             </button>
           )}
@@ -640,10 +650,10 @@ export function ChatThreadPage() {
 
       {searching && <ChatSearch chatId={id} onClose={() => setSearching(false)} onPick={(mid) => { setSearching(false); void jumpTo(mid) }} />}
       {!searching && chat?.pinned_message && pinned.data && !pinned.data.deleted_at && (
-        <button type="button" onClick={() => void jumpTo(pinned.data!.id)} className="flex min-h-12 w-full items-center gap-3 border-b border-border bg-surface px-4 text-left" aria-label="Go to pinned message">
+        <button type="button" onClick={() => void jumpTo(pinned.data!.id)} className="flex min-h-12 w-full items-center gap-3 border-b border-border bg-surface px-4 text-left" aria-label={tx('chat.goPinned')}>
           <Pin className="size-4 shrink-0 text-primary" aria-hidden />
           <span className="min-w-0 flex-1">
-            <span className="block text-xs font-semibold text-primary">Pinned</span>
+            <span className="block text-xs font-semibold text-primary">{tx('chat.pinned')}</span>
             <span className="block truncate text-sm">{previewOf(pinned.data)}</span>
           </span>
         </button>
@@ -652,10 +662,10 @@ export function ChatThreadPage() {
         <div className="mx-auto w-full max-w-3xl px-3 py-3">
           {error && <Notice tone="danger" title={friendlyError(error)} />}
           <div ref={topSentinel} />
-          {loadingOlder && <p className="py-2 text-center text-sm text-muted">Loading earlier messages…</p>}
+          {loadingOlder && <p className="py-2 text-center text-sm text-muted">{tx('chat.loadingEarlier')}</p>}
           {win && !win.hasOlder && items.length > 0 && (
             <p className="mx-auto mb-3 w-fit max-w-[90%] rounded-xl bg-surface-2 px-3 py-1.5 text-center text-xs text-muted">
-              {isGroup ? 'This is the start of the group chat. Everyone who joins can read the full history.' : 'This is the start of your conversation.'}
+              {isGroup ? tx('chat.startGroup') : tx('chat.startDm')}
             </p>
           )}
           {isLoading ? (
@@ -667,10 +677,10 @@ export function ChatThreadPage() {
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-muted">
               <p className="text-4xl" aria-hidden>👋</p>
-              <p className="mt-2">{isGroup ? 'No messages yet. Start the conversation!' : 'Say hello!'}</p>
+              <p className="mt-2">{isGroup ? tx('chat.noMsgsGroup') : tx('chat.sayHello')}</p>
             </div>
           ) : (
-            <ul className="space-y-0.5" aria-label="Messages">
+            <ul className="space-y-0.5" aria-label={tx('chat.messages')}>
               {items.map((m, i) => {
                 const prev = items[i - 1]
                 const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
@@ -683,7 +693,7 @@ export function ChatThreadPage() {
                 return (
                   <li key={m.id} id={`msg-${m.id}`} ref={i === unreadIdx ? unreadRef : undefined} className={clsx('rounded-xl', !cont && 'pt-2', (m.reactions?.length ?? 0) > 0 && 'pb-1')}>
                     {newDay && <p className="sticky top-1 z-10 mx-auto my-2 w-fit rounded-full bg-surface-2/95 px-3 py-1 text-xs font-semibold text-muted shadow-sm">{dayLabel(m.created_at)}</p>}
-                    {i === unreadIdx && <p className="my-2 rounded-full bg-primary-soft py-1 text-center text-xs font-bold text-primary">Unread messages</p>}
+                    {i === unreadIdx && <p className="my-2 rounded-full bg-primary-soft py-1 text-center text-xs font-bold text-primary">{tx('chat.unreadDivider')}</p>}
                     <Bubble
                       m={m}
                       me={uid}
@@ -707,7 +717,7 @@ export function ChatThreadPage() {
                       }}
                       onDiscard={() => discardLocal(qc, id, m.id)}
                     />
-                    {mine && i === lastMineIdx && chat?.kind === 'dm' && seen && <p className="mt-0.5 pr-1 text-right text-[11px] text-muted">Seen</p>}
+                    {mine && i === lastMineIdx && chat?.kind === 'dm' && seen && <p className="mt-0.5 pr-1 text-right text-[11px] text-muted">{tx('chat.seen')}</p>}
                   </li>
                 )
               })}
@@ -719,7 +729,7 @@ export function ChatThreadPage() {
             type="button"
             onClick={() => scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })}
             className="sticky bottom-3 left-full z-10 mr-3 grid size-11 place-items-center rounded-full border border-border bg-surface text-primary shadow-md"
-            aria-label={newBelow ? `${newBelow} new messages, jump to latest` : 'Jump to latest'}
+            aria-label={newBelow ? tx('chat.newBelow', { n: newBelow }) : tx('chat.jumpLatest')}
           >
             <ArrowDown className="size-5" />
             {newBelow > 0 && <span className="absolute -top-2 right-0 min-w-5 rounded-full bg-primary px-1 text-center text-[11px] font-bold leading-5 text-on-primary">{newBelow}</span>}
@@ -732,11 +742,11 @@ export function ChatThreadPage() {
           {incomingRequest ? (
             <div className="space-y-2 py-1">
               <p className="text-center text-sm text-muted">
-                <strong className="text-text">{chat?.title}</strong> wants to message you. They won’t know you’ve seen this until you accept.
+                <strong className="text-text">{chat?.title}</strong> {tx('chat.wantsToMessage')}
               </p>
               <div className="flex gap-2">
-                <Button variant="danger-ghost" block onClick={block}>Block</Button>
-                <Button block loading={accept.isPending} onClick={() => accept.mutate(undefined, { onError: (e) => toast.error(friendlyError(e)) })}>Accept</Button>
+                <Button variant="danger-ghost" block onClick={block}>{tx('chat.block')}</Button>
+                <Button block loading={accept.isPending} onClick={() => accept.mutate(undefined, { onError: (e) => toast.error(friendlyError(e)) })}>{tx('chat.accept')}</Button>
               </div>
             </div>
           ) : chat && !chat.can_post ? (
@@ -748,16 +758,16 @@ export function ChatThreadPage() {
                   join.mutate({ id: chat.group_id!, join: true }, { onSuccess: () => void qc.invalidateQueries({ queryKey: chatKeys.one(id) }), onError: (e) => toast.error(friendlyError(e)) })
                 }
               >
-                {chat.group_kind === 'channel' ? 'Follow this channel' : 'Join to chat'}
+                {chat.group_kind === 'channel' ? tx('chat.follow') : tx('chat.joinToChat')}
               </Button>
             ) : (
               <p className="flex min-h-12 items-center justify-center gap-2 text-center text-sm text-muted">
                 {chat.group_kind === 'channel' ? (
                   <>
-                    <Megaphone className="size-4" aria-hidden /> Only admins can post in this channel
+                    <Megaphone className="size-4" aria-hidden /> {tx('chat.adminsOnly')}
                   </>
                 ) : (
-                  'You can’t send messages in this chat.'
+                  tx('chat.cantSend')
                 )}
               </p>
             )
@@ -812,8 +822,8 @@ export function ChatThreadPage() {
           setActionFor(null)
           if (!m) return
           const admin = m.sender_id !== uid
-          if (!window.confirm(admin ? 'Remove this message for everyone in the group?' : 'Delete this message for everyone?')) return
-          del.mutate(m, { onSuccess: () => toast.success('Message deleted'), onError: (e) => toast.error(friendlyError(e)) })
+          if (!window.confirm(admin ? tx('chat.removeConfirm') : tx('chat.deleteConfirm'))) return
+          del.mutate(m, { onSuccess: () => toast.success(tx('chat.msgDeleted')), onError: (e) => toast.error(friendlyError(e)) })
         }}
       />
       <ReactorsSheet
@@ -825,7 +835,7 @@ export function ChatThreadPage() {
           setReactorsFor(null)
         }}
       />
-      <SlowModeSheet open={slowOpen} current={chat?.slow_mode_seconds ?? 0} busy={setSlow.isPending} onClose={() => setSlowOpen(false)} onPick={(seconds) => chat?.group_id && setSlow.mutate({ groupId: chat.group_id, seconds }, { onSuccess: () => { setSlowOpen(false); toast.success(seconds ? 'Slow mode on' : 'Slow mode off') }, onError: (e) => toast.error(friendlyError(e)) })} />
+      <SlowModeSheet open={slowOpen} current={chat?.slow_mode_seconds ?? 0} busy={setSlow.isPending} onClose={() => setSlowOpen(false)} onPick={(seconds) => chat?.group_id && setSlow.mutate({ groupId: chat.group_id, seconds }, { onSuccess: () => { setSlowOpen(false); toast.success(seconds ? tx('chat.slowOn') : tx('chat.slowOff')) }, onError: (e) => toast.error(friendlyError(e)) })} />
       <ReportSheet messageId={reportFor} onClose={() => setReportFor(null)} />
       {viewer && <Lightbox items={viewer.items} start={viewer.start} onClose={() => setViewer(null)} />}
     </div>
@@ -834,6 +844,7 @@ export function ChatThreadPage() {
 
 /** Search bar + results for one chat. Debounced; tapping a result jumps to the message. */
 function ChatSearch({ chatId, onClose, onPick }: { chatId: string; onClose: () => void; onPick: (messageId: string) => void }) {
+  const tx = useT()
   const [text, setText] = useState('')
   const [term, setTerm] = useState('')
   useEffect(() => {
@@ -848,31 +859,31 @@ function ChatSearch({ chatId, onClose, onPick }: { chatId: string; onClose: () =
         <input
           autoFocus
           type="search"
-          aria-label="Search in this chat"
-          placeholder="Search in this chat"
+          aria-label={tx('chat.searchThis')}
+          placeholder={tx('chat.searchThis')}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === 'Escape' && onClose()}
           className="min-h-11 flex-1 rounded-full border border-border bg-surface px-4 text-[16px] focus:border-primary focus:outline-none"
         />
-        <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Close search">
+        <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={tx('chat.closeSearch')}>
           <X className="size-5" />
         </button>
       </div>
       {typed && (
-        <ul className="mx-auto max-h-[45dvh] max-w-3xl divide-y divide-border overflow-y-auto" aria-label="Search results">
+        <ul className="mx-auto max-h-[45dvh] max-w-3xl divide-y divide-border overflow-y-auto" aria-label={tx('chat.results')}>
           {data?.map((h) => (
             <li key={h.id}>
               <button type="button" onClick={() => onPick(h.id)} className="block min-h-14 w-full px-4 py-2 text-left hover:bg-surface-2">
                 <span className="flex justify-between gap-2 text-xs text-muted">
-                  <span className="truncate font-semibold">{h.sender_name ?? 'Member'}</span>
+                  <span className="truncate font-semibold">{h.sender_name ?? tx('chat.member')}</span>
                   <span className="shrink-0">{listStamp(h.created_at)}</span>
                 </span>
                 <span className="line-clamp-2 break-words text-[15px]">{h.body}</span>
               </button>
             </li>
           ))}
-          {!isFetching && term.trim().length >= 2 && !data?.length && <li className="p-4 text-center text-sm text-muted">No messages found.</li>}
+          {!isFetching && term.trim().length >= 2 && !data?.length && <li className="p-4 text-center text-sm text-muted">{tx('chat.noneFound')}</li>}
         </ul>
       )}
     </div>
@@ -880,40 +891,48 @@ function ChatSearch({ chatId, onClose, onPick }: { chatId: string; onClose: () =
 }
 
 const SLOW_OPTIONS = [
-  { seconds: 0, label: 'Off' },
-  { seconds: 10, label: '10 seconds' },
-  { seconds: 30, label: '30 seconds' },
-  { seconds: 60, label: '1 minute' },
-  { seconds: 300, label: '5 minutes' },
-  { seconds: 900, label: '15 minutes' },
-  { seconds: 3600, label: '1 hour' },
-]
+  { seconds: 0, label: 'chat.slow0' },
+  { seconds: 10, label: 'chat.slow10' },
+  { seconds: 30, label: 'chat.slow30' },
+  { seconds: 60, label: 'chat.slow60' },
+  { seconds: 300, label: 'chat.slow300' },
+  { seconds: 900, label: 'chat.slow900' },
+  { seconds: 3600, label: 'chat.slow3600' },
+] as const
 
 /** Group admins: limit how often each member can send (admins are exempt). */
 function SlowModeSheet({ open, current, busy, onClose, onPick }: { open: boolean; current: number; busy: boolean; onClose: () => void; onPick: (seconds: number) => void }) {
+  const tx = useT()
   return (
-    <Sheet open={open} onClose={onClose} label="Slow mode">
-      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">Slow mode</h2>
-      <p className="px-5 pb-2 text-sm text-muted">Members can send one message per interval. Admins aren’t limited.</p>
+    <Sheet open={open} onClose={onClose} label={tx('chat.slow')}>
+      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">{tx('chat.slow')}</h2>
+      <p className="px-5 pb-2 text-sm text-muted">{tx('chat.slowBody')}</p>
       {SLOW_OPTIONS.map((o) => (
         <SheetAction key={o.seconds} disabled={busy} icon={current === o.seconds ? <Check className="size-5 text-primary" /> : undefined} onClick={() => onPick(o.seconds)}>
-          <span className={current === o.seconds ? 'font-bold text-primary' : ''}>{o.label}</span>
+          <span className={current === o.seconds ? 'font-bold text-primary' : ''}>{tx(o.label)}</span>
         </SheetAction>
       ))}
     </Sheet>
   )
 }
 
-const REPORT_REASONS = ['Spam or scam', 'Harassment or hate', 'Inappropriate content', 'Something else']
+// the English text is what moderators see; only the label is translated
+const REPORT_REASONS = [
+  ['Spam or scam', 'chat.rSpam'],
+  ['Harassment or hate', 'chat.rHarass'],
+  ['Inappropriate content', 'chat.rInappropriate'],
+  ['Something else', 'chat.rOther'],
+] as const
 
 function ReportSheet({ messageId, onClose }: { messageId: string | null; onClose: () => void }) {
+  const tx = useT()
   const [busy, setBusy] = useState(false)
   async function send(reason: string) {
     if (!messageId) return
     setBusy(true)
     try {
       await reportMessage(messageId, reason)
-      toast.success('Thanks. Our moderators will review this message.')
+      toast.success(tx('chat.reported'))
       onClose()
     } catch (e) {
       toast.error(friendlyError(e))
@@ -922,11 +941,11 @@ function ReportSheet({ messageId, onClose }: { messageId: string | null; onClose
     }
   }
   return (
-    <Sheet open={!!messageId} onClose={onClose} label="Report message">
-      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">Report this message</h2>
-      <p className="px-5 pb-2 text-sm text-muted">Only moderators see your report. The sender isn’t told.</p>
-      {REPORT_REASONS.map((r) => (
-        <SheetAction key={r} disabled={busy} onClick={() => void send(r)}>{r}</SheetAction>
+    <Sheet open={!!messageId} onClose={onClose} label={tx('chat.reportMsg')}>
+      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">{tx('chat.reportThis')}</h2>
+      <p className="px-5 pb-2 text-sm text-muted">{tx('chat.reportBody')}</p>
+      {REPORT_REASONS.map(([r, label]) => (
+        <SheetAction key={r} disabled={busy} onClick={() => void send(r)}>{tx(label)}</SheetAction>
       ))}
     </Sheet>
   )

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter";
+/* Devanagari glyphs for Hindi: the files carry unicode-range, so the browser downloads them only when Hindi text is shown */
+@import "@fontsource/noto-sans-devanagari/400.css";
+@import "@fontsource/noto-sans-devanagari/500.css";
+@import "@fontsource/noto-sans-devanagari/600.css";
+@import "@fontsource/noto-sans-devanagari/700.css";
 
 /* Design tokens (see plan Section 05). Components use the semantic names only. */
 :root {
@@ -78,7 +83,7 @@
 }
 
 @theme inline {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter Variable", "Noto Sans Devanagari", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
