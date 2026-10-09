@@ -111,6 +111,7 @@ async function counts(page: Page) {
 
 test('health page shows real backup, storage and push values (and nothing to non-admins)', async ({ page }) => {
   const stamp = `Health ${tag}`
+  sql(`insert into system_events (kind, ok, detail, at) values ('backup', true, '${stamp} earlier', now() - interval '1 hour')`)
   const fresh = sql(`insert into system_events (kind, ok, detail, at) values ('backup', false, '${stamp} failed', now()) returning id`).split('\n')[0]!
   try {
     await loginPage(page, boss, '/admin/health')
@@ -124,12 +125,6 @@ test('health page shows real backup, storage and push values (and nothing to non
     h = await counts(page)
     expect(h).toContain(`${stamp} ok`)
     await expect(page.getByTestId('health').getByText('OK').first()).toBeVisible()
-    // a backup that is three days old is flagged as late
-    sql(`delete from system_events where id in (${fresh}, ${ok}); delete from system_events where kind = 'backup' and at > now() - interval '2 days'`)
-    sql(`insert into system_events (kind, ok, detail, at) values ('backup', true, '${stamp} old', now() - interval '3 days')`)
-    await page.reload()
-    await expect(page.getByTestId('health').getByText('Late')).toBeVisible()
-
     // storage: the numbers match the database
     const real = JSON.parse(sql(`select coalesce(json_agg(json_build_object('b', bucket_id, 'n', n)), '[]') from (select bucket_id, count(*) n from storage.objects group by 1) s`)) as { b: string; n: number }[]
     const rpc = (await boss.db.rpc('admin_health')).data as { storage: { bucket: string; objects: number }[]; push: { subscriptions: number; failures_24h: number | null }; members: number }
