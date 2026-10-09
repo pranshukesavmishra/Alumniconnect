@@ -73,6 +73,19 @@ create table public.poll_votes (
 create index poll_votes_chat_idx on public.poll_votes (chat_id);
 alter table public.poll_votes replica identity full;
 
+-- Slow mode: group admins can limit how often each member may send (0 = off).
+alter table public.groups add column if not exists slow_mode_seconds int not null default 0 check (slow_mode_seconds between 0 and 3600);
+
+create or replace function public.set_slow_mode(p_group uuid, p_seconds int)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_group_admin(p_group) then raise exception 'Only group admins can change slow mode' using errcode = '42501'; end if;
+  if p_seconds is null or p_seconds not between 0 and 3600 then raise exception 'Choose between off and 1 hour'; end if;
+  update public.groups set slow_mode_seconds = p_seconds where id = p_group;
+  perform public._audit('slow_mode', 'groups', p_group, jsonb_build_object('seconds', p_seconds));
+end;
+$$;
+
 -- ------------------------------------------------------------------ access
 create or replace function public.can_read_chat(p_chat uuid)
 returns boolean language sql stable security definer set search_path = '' as $$
@@ -223,6 +236,14 @@ begin
   -- flood control: 30 messages a minute
   select count(*) into n from public.messages where sender_id = me and created_at > now() - interval '1 minute';
   if n >= 30 then raise exception 'You’re sending messages too fast. Please slow down.'; end if;
+
+  -- slow mode (not for group admins)
+  if c.kind = 'group' and not public.is_group_admin(c.group_id) then
+    select g.slow_mode_seconds into n from public.groups g where g.id = c.group_id;
+    if n > 0 and exists (select 1 from public.messages where chat_id = c.id and sender_id = me and created_at > now() - make_interval(secs => n)) then
+      raise exception 'Slow mode is on: you can send one message every % seconds.', n;
+    end if;
+  end if;
 
   insert into public.messages (chat_id, sender_id, kind, body, attachments, reply_to, poll)
   values (c.id, me, p_kind, left(nullif(btrim(p_body), ''), 4000), coalesce(p_attachments, '[]'), p_reply_to, p_poll)
@@ -386,13 +407,34 @@ end;
 $$;
 create trigger messages_notify after insert on public.messages for each row execute function public._message_notify();
 
+-- What was reported, as it read at report time (so moderators can act even on private chats, and after edits).
+alter table public.reports add column if not exists snapshot text;
+
+-- Report a message to the moderators (one report per member per message). Admins see these in the moderation queue.
+create or replace function public.report_message(p_message uuid, p_reason text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  m public.messages;
+begin
+  select * into m from public.messages where id = p_message and deleted_at is null;
+  if not found or not public.can_read_chat(m.chat_id) or not public.is_verified() then
+    raise exception 'Message not found' using errcode = '42501';
+  end if;
+  if m.sender_id = auth.uid() then raise exception 'You can’t report your own message'; end if;
+  if char_length(btrim(coalesce(p_reason, ''))) < 3 then raise exception 'Please tell us briefly what is wrong'; end if;
+  insert into public.reports (reporter, target_type, target_id, reason, snapshot)
+  values (auth.uid(), 'message', p_message, left(btrim(p_reason), 500), left(coalesce(m.body, case m.kind when 'image' then '[photo]' when 'file' then '[file]' when 'voice' then '[voice message]' when 'poll' then '[poll]' else '' end), 500))
+  on conflict (reporter, target_type, target_id) do nothing;
+end;
+$$;
+
 -- ------------------------------------------------------------------ my chat list in ONE round trip (fast)
 -- p_chat = null: my inbox. p_chat = id: that one chat (also a channel I can read without following).
 create or replace function public.my_chats(p_chat uuid default null)
 returns table (id uuid, kind public.chat_kind, title text, avatar_url text, icon text, subtitle text, other_id uuid,
                group_id uuid, group_slug text, group_kind public.group_kind, joined boolean, is_group_admin boolean,
                is_request boolean, started_by uuid, last_message text, last_message_at timestamptz, last_sender uuid,
-               unread int, muted boolean, last_read_at timestamptz, other_last_read_at timestamptz, pinned_message uuid, can_post boolean, last_sender_name text)
+               unread int, muted boolean, last_read_at timestamptz, other_last_read_at timestamptz, pinned_message uuid, can_post boolean, last_sender_name text, slow_mode_seconds int)
 language sql stable security definer set search_path = '' as $$
   with me as (select auth.uid() as uid)
   select c.id, c.kind,
@@ -412,7 +454,8 @@ language sql stable security definer set search_path = '' as $$
          (select orr.last_read_at from public.chat_reads orr where orr.chat_id = c.id and orr.user_id = op.id),
          c.pinned_message,
          public.can_post_chat(c.id),
-         (select split_part(lp.full_name, ' ', 1) from public.profiles lp where lp.id = c.last_sender)
+         (select split_part(lp.full_name, ' ', 1) from public.profiles lp where lp.id = c.last_sender),
+         coalesce(g.slow_mode_seconds, 0)
     from public.chats c
     cross join me
     left join public.groups g on g.id = c.group_id
@@ -460,6 +503,83 @@ language sql stable security definer set search_path = '' as $$
    limit 8;
 $$;
 
+
+-- ------------------------------------------------------------------ moderation queue (admins)
+create or replace function public.admin_reports(p_status text default 'open')
+returns table (target_type text, target_id uuid, report_count bigint, last_reported timestamptz, reasons text,
+               preview text, author_id uuid, author_name text, removed boolean, place text)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Only admins can view reports' using errcode = '42501'; end if;
+  return query
+  with g as (
+    select r.target_type, r.target_id, count(*) as n, max(r.created_at) as last_at,
+           string_agg(distinct r.reason, ' · ') as reasons, (array_agg(r.snapshot) filter (where r.snapshot is not null))[1] as snap
+      from public.reports r where r.status = p_status group by r.target_type, r.target_id)
+  select g.target_type, g.target_id, g.n, g.last_at, g.reasons,
+         case g.target_type
+           when 'post' then (select left(po.body, 300) from public.posts po where po.id = g.target_id)
+           when 'comment' then (select left(co.body, 300) from public.comments co where co.id = g.target_id)
+           when 'message' then coalesce((select left(me.body, 300) from public.messages me where me.id = g.target_id and me.deleted_at is null), g.snap)
+           when 'profile' then (select pr.full_name from public.profiles pr where pr.id = g.target_id)
+         end,
+         case g.target_type
+           when 'post' then (select po.author_id from public.posts po where po.id = g.target_id)
+           when 'comment' then (select co.author_id from public.comments co where co.id = g.target_id)
+           when 'message' then (select me.sender_id from public.messages me where me.id = g.target_id)
+           when 'profile' then g.target_id
+         end,
+         (select p2.full_name from public.profiles p2 where p2.id = case g.target_type
+           when 'post' then (select po.author_id from public.posts po where po.id = g.target_id)
+           when 'comment' then (select co.author_id from public.comments co where co.id = g.target_id)
+           when 'message' then (select me.sender_id from public.messages me where me.id = g.target_id)
+           when 'profile' then g.target_id end),
+         case g.target_type
+           when 'post' then (select po.is_hidden from public.posts po where po.id = g.target_id)
+           when 'comment' then (select co.is_hidden from public.comments co where co.id = g.target_id)
+           when 'message' then coalesce((select me.deleted_at is not null from public.messages me where me.id = g.target_id), true)
+           else false
+         end,
+         case g.target_type
+           when 'message' then (select coalesce(gr.name, 'Direct message') from public.messages me join public.chats ch on ch.id = me.chat_id left join public.groups gr on gr.id = ch.group_id where me.id = g.target_id)
+           when 'post' then (select coalesce(gr.name, 'Public feed') from public.posts po left join public.groups gr on gr.id = po.group_id where po.id = g.target_id)
+           else null
+         end
+    from g order by g.last_at desc limit 100;
+end;
+$$;
+
+-- Admin action on a reported message: remove it for everyone (any chat, including private ones) and close its reports.
+create or replace function public.admin_remove_message(p_message uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  m public.messages;
+begin
+  if not public.is_admin() then raise exception 'Only admins can moderate' using errcode = '42501'; end if;
+  select * into m from public.messages where id = p_message;
+  if not found then raise exception 'Message not found'; end if;
+  update public.messages set body = null, attachments = '[]', poll = null, deleted_at = coalesce(deleted_at, now()) where id = p_message;
+  delete from public.message_reactions where message_id = p_message;
+  delete from public.poll_votes where message_id = p_message;
+  if (select last_message_at from public.chats where id = m.chat_id) = m.created_at then
+    update public.chats set last_message = 'This message was deleted' where id = m.chat_id;
+  end if;
+  update public.chats set pinned_message = null where id = m.chat_id and pinned_message = p_message;
+  update public.reports set status = 'actioned', handled_by = auth.uid() where target_type = 'message' and target_id = p_message and status = 'open';
+  perform public._audit('remove_message', 'messages', p_message, jsonb_build_object('chat', m.chat_id));
+end;
+$$;
+
+-- Dismiss reports on any target without taking action.
+create or replace function public.admin_dismiss_reports(p_type text, p_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_admin() then raise exception 'Only admins can moderate' using errcode = '42501'; end if;
+  update public.reports set status = 'dismissed', handled_by = auth.uid() where target_type = p_type and target_id = p_id and status = 'open';
+  perform public._audit('dismiss_reports', p_type || 's', p_id, '{}'::jsonb);
+end;
+$$;
+
 -- ------------------------------------------------------------------ RLS + grants
 alter table public.chats enable row level security;
 alter table public.chat_reads enable row level security;
@@ -483,7 +603,7 @@ begin
   foreach f in array array['start_dm(uuid)', 'accept_message_request(uuid)',
     'send_message(uuid, text, public.message_kind, jsonb, uuid, jsonb)', 'edit_message(uuid, text)', 'delete_message(uuid)',
     'react_to_message(uuid, text)', 'vote_poll(uuid, int[])', 'mark_chat_read(uuid)', 'set_chat_muted(uuid, boolean)',
-    'pin_message(uuid, uuid)', 'my_chats(uuid)', 'search_messages(text, uuid)', 'mention_candidates(uuid, text)']
+    'pin_message(uuid, uuid)', 'set_slow_mode(uuid, int)', 'report_message(uuid, text)', 'admin_reports(text)', 'admin_remove_message(uuid)', 'admin_dismiss_reports(text, uuid)', 'my_chats(uuid)', 'search_messages(text, uuid)', 'mention_candidates(uuid, text)']
   loop
     execute format('revoke execute on function public.%s from anon, public', f);
     execute format('grant execute on function public.%s to authenticated', f);

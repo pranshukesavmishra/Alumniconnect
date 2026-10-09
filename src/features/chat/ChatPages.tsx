@@ -1,10 +1,11 @@
 import clsx from 'clsx'
-import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Megaphone, MessagesSquare, Pin, Search, ShieldAlert, Users, X } from 'lucide-react'
+import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Gauge, Megaphone, MessagesSquare, Pin, Search, ShieldAlert, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { PageHeader } from '../../components/layout/AppShell'
+import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { Avatar, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
@@ -26,6 +27,9 @@ import {
   useEditMessage,
   usePinMessage,
   usePinnedMessage,
+  useSetSlowMode,
+  isNetworkError,
+  reportMessage,
   useReact,
   useVote,
   useChat,
@@ -374,6 +378,9 @@ export function ChatThreadPage() {
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null)
   const [editing, setEditing] = useState<Message | null>(null)
   const [searching, setSearching] = useState(false)
+  const [slowOpen, setSlowOpen] = useState(false)
+  const [reportFor, setReportFor] = useState<string | null>(null)
+  const setSlow = useSetSlowMode(id)
   const [viewer, setViewer] = useState<{ items: Attachment[]; start: number } | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const topSentinel = useRef<HTMLDivElement>(null)
@@ -487,9 +494,30 @@ export function ChatThreadPage() {
   )
 
   function doSend(input: SendInput, localId = newLocalId()) {
-    send.mutate({ ...input, localId }, { onError: (err) => toast.error(friendlyError(err)) })
+    send.mutate(
+      { ...input, localId },
+      {
+        // no connection: the message waits (and is sent automatically when we're back online); other errors are shown
+        onError: (err) => (isNetworkError(err) ? toast('No connection. Your message will send when you’re back online.') : toast.error(friendlyError(err))),
+      },
+    )
     signals.sentMessage()
   }
+
+  // back online: send whatever was waiting
+  const waiting = useRef<Message[]>([])
+  useEffect(() => {
+    waiting.current = items.filter((m) => m.failed && pendingInput(m.id))
+  }, [items])
+  useEffect(() => {
+    const retry = () => waiting.current.forEach((m) => {
+      const input = pendingInput(m.id)
+      if (input) doSend(input, m.id)
+    })
+    window.addEventListener('online', retry)
+    return () => window.removeEventListener('online', retry)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- doSend only uses stable mutation refs
+  }, [])
 
   async function saveEdit(messageId: string, body: string) {
     try {
@@ -519,7 +547,7 @@ export function ChatThreadPage() {
   }
 
   function permsFor(m: Message | undefined): ActionPermissions {
-    const none = { canReact: false, canReply: false, canEdit: false, canDelete: false, adminDelete: false, canPin: false }
+    const none = { canReact: false, canReply: false, canEdit: false, canDelete: false, adminDelete: false, canPin: false, canReport: false }
     if (!m || !chat || m.pending || m.failed || m.kind === 'system') return none
     const deleted = !!m.deleted_at
     const mine = m.sender_id === uid
@@ -531,6 +559,7 @@ export function ChatThreadPage() {
       canDelete: !deleted && (mine || (chat.kind === 'group' && chat.is_group_admin)),
       adminDelete: !mine,
       canPin: !deleted && (chat.kind === 'dm' || chat.is_group_admin) && !blockedRequest,
+      canReport: !deleted && !mine,
     }
   }
 
@@ -558,6 +587,9 @@ export function ChatThreadPage() {
     return -1
   })()
   const titleLink = chat ? (chat.kind === 'dm' ? `/people/${chat.other_id}` : `/groups/${chat.group_slug}`) : '#'
+  const slow = chat?.kind === 'group' && !chat.is_group_admin ? chat.slow_mode_seconds : 0
+  const lastOwn = [...items].reverse().find((m) => m.sender_id === uid && !m.failed)
+  const cooldownUntil = slow > 0 && lastOwn ? new Date(lastOwn.created_at).getTime() + slow * 1000 : 0
   const actionMsg = actionFor ? (byId.get(actionFor) ?? null) : null
   const reactorsMsg = reactorsFor ? (byId.get(reactorsFor) ?? null) : null
 
@@ -583,6 +615,11 @@ export function ChatThreadPage() {
               <Skeleton className="size-10 rounded-full" />
               <Skeleton className="h-4 w-40" />
             </div>
+          )}
+          {chat?.kind === 'group' && chat.is_group_admin && chat.group_kind !== 'channel' && (
+            <button type="button" onClick={() => setSlowOpen(true)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Slow mode" title="Slow mode">
+              <Gauge className={clsx('size-5', chat.slow_mode_seconds > 0 && 'text-primary')} />
+            </button>
           )}
           {chat && (
             <button type="button" onClick={() => setSearching((x) => !x)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Search in chat" aria-expanded={searching}>
@@ -732,6 +769,8 @@ export function ChatThreadPage() {
               onSend={(input) => doSend(input)}
               onEdit={saveEdit}
               onTyping={signals.sendTyping}
+              slowSeconds={slow}
+              cooldownUntil={cooldownUntil}
             />
           )}
         </div>
@@ -741,6 +780,10 @@ export function ChatThreadPage() {
         m={actionMsg}
         perms={permsFor(actionMsg ?? undefined)}
         me={uid}
+        onReport={() => {
+          setReportFor(actionMsg?.id ?? null)
+          setActionFor(null)
+        }}
         pinned={!!actionMsg && chat?.pinned_message === actionMsg.id}
         onPin={() => {
           if (actionMsg) pin.mutate(chat?.pinned_message === actionMsg.id ? null : actionMsg.id, { onError: (e) => toast.error(friendlyError(e)) })
@@ -778,6 +821,8 @@ export function ChatThreadPage() {
           setReactorsFor(null)
         }}
       />
+      <SlowModeSheet open={slowOpen} current={chat?.slow_mode_seconds ?? 0} busy={setSlow.isPending} onClose={() => setSlowOpen(false)} onPick={(seconds) => chat?.group_id && setSlow.mutate({ groupId: chat.group_id, seconds }, { onSuccess: () => { setSlowOpen(false); toast.success(seconds ? 'Slow mode on' : 'Slow mode off') }, onError: (e) => toast.error(friendlyError(e)) })} />
+      <ReportSheet messageId={reportFor} onClose={() => setReportFor(null)} />
       {viewer && <Lightbox items={viewer.items} start={viewer.start} onClose={() => setViewer(null)} />}
     </div>
   )
@@ -827,5 +872,58 @@ function ChatSearch({ chatId, onClose, onPick }: { chatId: string; onClose: () =
         </ul>
       )}
     </div>
+  )
+}
+
+const SLOW_OPTIONS = [
+  { seconds: 0, label: 'Off' },
+  { seconds: 10, label: '10 seconds' },
+  { seconds: 30, label: '30 seconds' },
+  { seconds: 60, label: '1 minute' },
+  { seconds: 300, label: '5 minutes' },
+  { seconds: 900, label: '15 minutes' },
+  { seconds: 3600, label: '1 hour' },
+]
+
+/** Group admins: limit how often each member can send (admins are exempt). */
+function SlowModeSheet({ open, current, busy, onClose, onPick }: { open: boolean; current: number; busy: boolean; onClose: () => void; onPick: (seconds: number) => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} label="Slow mode">
+      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">Slow mode</h2>
+      <p className="px-5 pb-2 text-sm text-muted">Members can send one message per interval. Admins aren’t limited.</p>
+      {SLOW_OPTIONS.map((o) => (
+        <SheetAction key={o.seconds} disabled={busy} icon={current === o.seconds ? <Check className="size-5 text-primary" /> : undefined} onClick={() => onPick(o.seconds)}>
+          <span className={current === o.seconds ? 'font-bold text-primary' : ''}>{o.label}</span>
+        </SheetAction>
+      ))}
+    </Sheet>
+  )
+}
+
+const REPORT_REASONS = ['Spam or scam', 'Harassment or hate', 'Inappropriate content', 'Something else']
+
+function ReportSheet({ messageId, onClose }: { messageId: string | null; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  async function send(reason: string) {
+    if (!messageId) return
+    setBusy(true)
+    try {
+      await reportMessage(messageId, reason)
+      toast.success('Thanks. Our moderators will review this message.')
+      onClose()
+    } catch (e) {
+      toast.error(friendlyError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Sheet open={!!messageId} onClose={onClose} label="Report message">
+      <h2 className="px-5 pb-1 pt-1 text-lg font-bold">Report this message</h2>
+      <p className="px-5 pb-2 text-sm text-muted">Only moderators see your report. The sender isn’t told.</p>
+      {REPORT_REASONS.map((r) => (
+        <SheetAction key={r} disabled={busy} onClick={() => void send(r)}>{r}</SheetAction>
+      ))}
+    </Sheet>
   )
 }

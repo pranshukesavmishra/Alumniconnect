@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pause, Pencil, Pin, PinOff, Play, Plus, Reply, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pause, Pencil, Flag, Pin, PinOff, Play, Plus, Reply, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -252,6 +252,7 @@ export interface ActionPermissions {
   canDelete: boolean
   adminDelete: boolean
   canPin: boolean
+  canReport: boolean
 }
 
 export function MessageActionsSheet({
@@ -265,6 +266,7 @@ export function MessageActionsSheet({
   onDelete,
   pinned,
   onPin,
+  onReport,
 }: {
   m: Message | null
   perms: ActionPermissions
@@ -276,6 +278,7 @@ export function MessageActionsSheet({
   onDelete: () => void
   pinned: boolean
   onPin: () => void
+  onReport: () => void
 }) {
   const [more, setMore] = useState(false)
   useEffect(() => {
@@ -333,6 +336,7 @@ export function MessageActionsSheet({
             )}
             {perms.canPin && <SheetAction icon={pinned ? <PinOff className="size-5" /> : <Pin className="size-5" />} onClick={onPin}>{pinned ? 'Unpin' : 'Pin to top'}</SheetAction>}
             {perms.canEdit && <SheetAction icon={<Pencil className="size-5" />} onClick={onEdit}>Edit</SheetAction>}
+            {perms.canReport && <SheetAction icon={<Flag className="size-5" />} onClick={onReport}>Report</SheetAction>}
             {perms.canDelete && (
               <SheetAction icon={<Trash2 className="size-5" />} danger onClick={onDelete}>
                 {perms.adminDelete ? 'Remove as group admin' : 'Delete for everyone'}

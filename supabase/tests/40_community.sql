@@ -215,6 +215,80 @@ begin
 end $$;
 reset role;
 
+-- slow mode (admin only; members limited, admins exempt) and reporting a chat message
+select pg_temp.login('40000000-0000-0000-0000-00000000000b');
+set local role authenticated;
+do $$ begin
+  begin perform public.set_slow_mode((select id from public.groups where slug = 'trekking'), 60); assert false, 'member cannot set slow mode';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+select pg_temp.login('40000000-0000-0000-0000-0000000000ff');
+set local role authenticated;
+do $$ begin
+  perform public.set_slow_mode((select id from public.groups where slug = 'trekking'), 60);
+  begin perform public.set_slow_mode((select id from public.groups where slug = 'trekking'), 99999); assert false, 'range checked';
+  exception when raise_exception then null; end;
+  assert (select slow_mode_seconds from public.my_chats((select v from t where k = 'trek'))) = 60, 'slow mode visible in chat info';
+  perform public.join_group((select id from public.groups where slug = 'trekking'), true);
+  perform public.send_message((select v from t where k = 'trek'), 'admin 1');
+  perform public.send_message((select v from t where k = 'trek'), 'admin 2'); -- admins are exempt
+end $$;
+reset role;
+update public.messages set created_at = now() - interval '2 hours' where sender_id = '40000000-0000-0000-0000-00000000000a'; -- earlier chatter is long ago
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$
+declare ch uuid := (select v from t where k = 'trek');
+begin
+  perform public.send_message(ch, 'first after slow mode');
+  begin perform public.send_message(ch, 'too soon'); assert false, 'slow mode blocks second message';
+  exception when raise_exception then assert sqlerrm like 'Slow mode is on%', 'friendly message: ' || sqlerrm; end;
+  begin perform public.report_message((select id from public.messages where chat_id = ch and sender_id = auth.uid() limit 1), 'spam'); assert false, 'cannot report own';
+  exception when raise_exception then null; end;
+  perform public.report_message((select id from public.messages where chat_id = ch and body = 'admin 1'), 'Not appropriate');
+  perform public.report_message((select id from public.messages where chat_id = ch and body = 'admin 1'), 'Not appropriate'); -- idempotent
+  begin perform public.report_message((select id from public.messages where chat_id = ch limit 1), 'x'); assert false, 'reason required';
+  exception when raise_exception then null; end;
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from public.reports where target_type = 'message') = 1, 'one report stored';
+end $$;
+-- moderation queue: only admins; remove a reported message; dismiss
+select pg_temp.login('40000000-0000-0000-0000-00000000000a');
+set local role authenticated;
+do $$ begin
+  begin perform * from public.admin_reports(); assert false, 'members cannot read the queue';
+  exception when insufficient_privilege then null; end;
+  begin perform public.admin_remove_message((select id from public.messages where body = 'admin 1')); assert false, 'members cannot remove';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+select pg_temp.login('40000000-0000-0000-0000-0000000000ff');
+set local role authenticated;
+do $$
+declare mid uuid := (select id from public.messages where body = 'admin 1');
+begin
+  assert (select report_count from public.admin_reports() where target_id = mid) = 1, 'queue lists reported message';
+  assert (select preview from public.admin_reports() where target_id = mid) = 'admin 1', 'preview';
+  perform public.admin_remove_message(mid);
+  assert (select deleted_at is not null and body is null from public.messages where id = mid), 'removed';
+  assert not exists (select 1 from public.admin_reports() where target_id = mid), 'closed reports leave the open queue';
+  assert (select preview from public.admin_reports('actioned') where target_id = mid) = 'admin 1', 'snapshot survives removal';
+  assert exists (select 1 from public.admin_audit where action = 'remove_message'), 'audited';
+end $$;
+reset role;
+
+-- DM outsiders cannot report messages they cannot read
+select pg_temp.login('40000000-0000-0000-0000-0000000000aa');
+set local role authenticated;
+do $$ begin
+  begin perform public.report_message((select id from public.messages where chat_id = (select v from t where k = 'conv') limit 1), 'nosy'); assert false, 'cannot report unreadable message';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
 -- reports: three reports hide a post
 insert into auth.users (id, email) values ('40000000-0000-0000-0000-0000000000d1', 'd1@x.com'), ('40000000-0000-0000-0000-0000000000d2', 'd2@x.com');
 update public.profiles set verification = 'verified' where id in ('40000000-0000-0000-0000-0000000000d1', '40000000-0000-0000-0000-0000000000d2');

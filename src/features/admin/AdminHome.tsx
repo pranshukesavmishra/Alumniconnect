@@ -1,4 +1,4 @@
-import { CalendarPlus, ChevronRight, History, ShieldCheck, Users } from 'lucide-react'
+import { CalendarPlus, ChevronRight, Flag, History, ShieldCheck, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -6,11 +6,13 @@ import { Badge, EmptyState, Notice, PageSkeleton } from '../../components/ui/Dis
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange } from '../../lib/format'
 import { useMyProfile } from '../auth/AuthProvider'
+import { useOpenReportCount } from './AdminModeration'
 import { useManagedEvents } from './queries'
 
 export function AdminHome() {
   const { data: me } = useMyProfile()
   const { data, isLoading, error } = useManagedEvents()
+  const reports = useOpenReportCount(!!me?.is_admin)
   if (isLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
   if (!me.is_admin && !data?.length) return <Navigate to="/" replace />
@@ -29,6 +31,12 @@ export function AdminHome() {
             <Link to="/admin/members" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Users className="size-5" aria-hidden /></span>
               <span className="flex-1"><span className="block font-semibold">Members</span><span className="block text-sm text-muted">Edit profiles, verify, admins</span></span>
+              <ChevronRight className="size-5 text-muted" aria-hidden />
+            </Link>
+            <Link to="/admin/reports" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Flag className="size-5" aria-hidden /></span>
+              <span className="flex-1"><span className="block font-semibold">Reports</span><span className="block text-sm text-muted">Posts and messages members flagged</span></span>
+              {reports > 0 && <Badge tone="danger">{reports}</Badge>}
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
             <Link to="/admin/activity" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">

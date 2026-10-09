@@ -21,6 +21,7 @@ const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage').th
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
 const AdminEventPage = lazy(() => import('./features/admin/AdminEventPage').then((m) => ({ default: m.AdminEventPage })))
 const AdminMembers = lazy(() => import('./features/admin/AdminMembers').then((m) => ({ default: m.AdminMembers })))
+const AdminModeration = lazy(() => import('./features/admin/AdminModeration').then((m) => ({ default: m.AdminModeration })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
 const GroupsPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupsPage })))
 const GroupPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupPage })))
@@ -144,6 +145,7 @@ export function App() {
             <Route path="admin" element={m(<AdminHome />)} />
             <Route path="admin/members" element={m(<AdminMembers />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
+            <Route path="admin/reports" element={m(<AdminModeration />)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
             <Route path="privacy" element={<PrivacyPage />} />

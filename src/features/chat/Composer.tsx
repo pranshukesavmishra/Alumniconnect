@@ -28,6 +28,8 @@ export function ChatComposer({
   onSend,
   onEdit,
   onTyping,
+  slowSeconds,
+  cooldownUntil,
 }: {
   chatId: string
   isGroup: boolean
@@ -39,7 +41,19 @@ export function ChatComposer({
   onSend: (input: SendInput) => void
   onEdit: (id: string, body: string) => Promise<boolean>
   onTyping: () => void
+  /** group slow mode (0 = off) */
+  slowSeconds: number
+  /** when this member may send again (ms since epoch; 0 = now) */
+  cooldownUntil: number
 }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 500)
+    return () => clearInterval(t)
+  }, [cooldownUntil])
+  const waitSeconds = Math.max(0, Math.ceil((cooldownUntil - now) / 1000))
   const [text, setText] = useState('')
   const [picked, setPicked] = useState<Picked[]>([])
   const [attachOpen, setAttachOpen] = useState(false)
@@ -157,6 +171,7 @@ export function ChatComposer({
 
   async function submit(e?: FormEvent) {
     e?.preventDefault()
+    if (!editing && waitSeconds > 0) return
     const body = text.trim()
     if (editing) {
       if (!body && editing.kind === 'text') return
@@ -192,7 +207,7 @@ export function ChatComposer({
   }
 
   const showMic = !editing && !text.trim() && picked.length === 0 && voiceSupported()
-  const canSend = editing ? !!text.trim() || editing.kind !== 'text' : !!text.trim() || picked.length > 0
+  const canSend = editing ? !!text.trim() || editing.kind !== 'text' : (!!text.trim() || picked.length > 0) && waitSeconds === 0
   const banner = editing ? (
     <Bar icon={<Pencil className="size-4" />} title="Edit message" text={editing.body ?? previewOf(editing)} onClose={() => {
       setText(savedDraft.current)
@@ -321,6 +336,11 @@ export function ChatComposer({
         </button>
         )}
       </form>
+      )}
+      {slowSeconds > 0 && !editing && (
+        <p className="mt-1 text-center text-xs text-muted" role="status">
+          {waitSeconds > 0 ? `Slow mode: you can send again in ${waitSeconds}s` : `Slow mode is on: one message every ${slowSeconds >= 60 ? `${Math.round(slowSeconds / 60)} min` : `${slowSeconds}s`}`}
+        </p>
       )}
       {text.length > 3500 && <p className="mt-1 text-right text-xs text-muted">{4000 - text.length} characters left</p>}
 

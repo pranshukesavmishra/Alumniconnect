@@ -33,6 +33,7 @@ export interface ChatSummary {
   other_last_read_at: string | null
   pinned_message: string | null
   can_post: boolean
+  slow_mode_seconds: number
 }
 
 const SELECT =
@@ -572,4 +573,28 @@ export function useVote(chatId: string) {
     },
     onError: (_e, { id }, ctx) => patchMessage(qc, chatId, id, (m) => ({ ...m, votes: ctx?.before ?? m.votes })),
   })
+}
+
+/** True for "no connection / server unreachable" failures (as opposed to the server refusing the request). */
+export function isNetworkError(e: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  const err = e as { code?: string; status?: number; message?: string } | null
+  if (!err || err.code || err.status) return false
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(err.message ?? '')
+}
+
+export function useSetSlowMode(chatId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ groupId, seconds }: { groupId: string; seconds: number }) => {
+      const { error } = await supabase.rpc('set_slow_mode', { p_group: groupId, p_seconds: seconds })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: chatKeys.one(chatId) }),
+  })
+}
+
+export async function reportMessage(messageId: string, reason: string) {
+  const { error } = await supabase.rpc('report_message', { p_message: messageId, p_reason: reason })
+  if (error) throw error
 }
