@@ -7,6 +7,7 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Avatar, Card, EmptyState, PageSkeleton } from '../../components/ui/Display'
 import { relativeTime } from '../../lib/format'
 import { useUserId } from '../auth/AuthProvider'
+import { PushToggle } from './PushToggle'
 import { markNotificationsRead, useNotifications, type Notification } from './queries'
 
 function describe(n: Notification): { text: string; to: string } {
@@ -46,6 +47,7 @@ export function NotificationsPage() {
     <div>
       <PageHeader title="Notifications" back="/" />
       <Page>
+        <PushToggle />
         {!data?.length ? (
           <EmptyState icon={<Bell />} title="No notifications yet">Likes, comments, messages and connection requests will show up here.</EmptyState>
         ) : (

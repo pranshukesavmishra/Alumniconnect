@@ -21,10 +21,17 @@ step "lint" npx oxlint src
 step "unit tests" npx vitest run
 step "production build" npm run build
 step "database suites" scripts/db-test.sh
+DENO=${DENO:-$(command -v deno || echo /tmp/denobin/node_modules/.bin/deno)}
+if [ -x "$DENO" ]; then
+  step "edge functions: unit" "$DENO" test --allow-env --no-check supabase/functions/_shared/webpush.test.ts supabase/functions/import-avatar/index.test.ts
+  step "edge functions: push through the real stack" "$DENO" test --allow-all --no-check supabase/functions/push-send/integration.test.ts
+else
+  echo "SKIP  edge function tests (install Deno: npm i -g deno)"
+fi
 
 serve 5190 npx vite preview --port 5190 --strictPort
 for p in 5181 5182 5183 5185; do serve $p npx vite --port $p --strictPort; done
-step "e2e: main flows" npx playwright test e2e/meet.spec.ts e2e/community.spec.ts e2e/chat.spec.ts e2e/chat-rich.spec.ts e2e/chat-moderation.spec.ts e2e/profile-photo.spec.ts e2e/admin-community.spec.ts e2e/offline-ticket.spec.ts
+step "e2e: main flows" npx playwright test e2e/meet.spec.ts e2e/community.spec.ts e2e/chat.spec.ts e2e/chat-rich.spec.ts e2e/chat-moderation.spec.ts e2e/profile-photo.spec.ts e2e/admin-community.spec.ts e2e/offline-ticket.spec.ts e2e/push.spec.ts
 for c in meet admin community linkedin; do step "e2e: verify $c" npx playwright test --config "e2e/verify/playwright.$c.config.ts"; done
 
 exit $fail

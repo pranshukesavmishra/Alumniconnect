@@ -1,5 +1,5 @@
 import { expect, test, type Browser } from '@playwright/test'
-import { onboard, signInWithEmail, sql } from './helpers'
+import { makeCircle, onboard, signInWithEmail, sql } from './helpers'
 
 // A fake microphone, so voice notes can be recorded without hardware or a permission prompt.
 test.use({
@@ -23,7 +23,7 @@ async function member(browser: Browser, email: string, name: string) {
 test('polls and voice notes work between two members', async ({ browser }) => {
   const a = await member(browser, `pia.${run}@example.com`, `Pia ${run}`)
   const b = await member(browser, `rohan.${run}@example.com`, `Rohan ${run}`)
-  const chatId = sql(`select c.id from chats c join groups g on g.id = c.group_id where g.slug = 'computer-science-engineering-${year}'`)
+  const chatId = makeCircle('rich', [`pia.${run}@example.com`, `rohan.${run}@example.com`])
 
   await a.page.goto(`/chat/${chatId}`)
   // poll: needs a question and two different options

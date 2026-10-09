@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
   }
   if (!hostAllowed(url)) return json(req, { error: 'no_photo' }, 404)
 
-  let bytes: Uint8Array
+  let bytes: Uint8Array<ArrayBuffer>
   try {
     const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(10_000), headers: { Accept: 'image/*' } })
     // a redirect must not lead somewhere else

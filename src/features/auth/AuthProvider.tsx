@@ -63,6 +63,8 @@ export function useMyProfile() {
 
 export async function signOut() {
   clearAllDrafts()
+  // a shared phone must stop receiving this member's notifications
+  await import('../../lib/push').then((m) => m.disablePush()).catch(() => undefined)
   const { error } = await supabase.auth.signOut()
   // offline or expired token: still remove the session from this device
   if (error) await supabase.auth.signOut({ scope: 'local' })

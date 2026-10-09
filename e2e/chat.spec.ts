@@ -1,5 +1,5 @@
 import { expect, test, type Browser } from '@playwright/test'
-import { onboard, signInWithEmail, sql } from './helpers'
+import { makeCircle, onboard, signInWithEmail, sql } from './helpers'
 
 const run = Date.now().toString(36).slice(-5)
 // each run gets its own batch (and so its own empty batch chat)
@@ -19,7 +19,7 @@ async function member(browser: Browser, email: string, name: string) {
 test('group chat: react, reply, edit, photo, delete — seen by the other member', async ({ browser }) => {
   const a = await member(browser, `asha.${run}@example.com`, `Asha ${run}`)
   const b = await member(browser, `vikram.${run}@example.com`, `Vikram ${run}`)
-  const chatId = sql(`select c.id from chats c join groups g on g.id = c.group_id where g.slug = 'computer-science-engineering-${year}'`)
+  const chatId = makeCircle('chat', [`asha.${run}@example.com`, `vikram.${run}@example.com`])
 
   // Asha writes in the batch chat
   await a.page.goto(`/chat/${chatId}`)

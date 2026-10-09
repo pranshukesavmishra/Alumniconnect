@@ -43,3 +43,11 @@ export async function onboard(page: Page, name: string, year: string) {
   await page.getByLabel('Mobile number').fill('+91 98765 43210')
   await page.getByRole('button', { name: 'Continue' }).click()
 }
+
+/** A fresh, approved circle (with its group chat) holding exactly these members: keeps chat tests isolated from each other. */
+export function makeCircle(tag: string, emails: string[]): string {
+  const slug = `e2e-${tag}-${Date.now().toString(36)}`.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 70)
+  const gid = sql(`insert into groups (kind, slug, name, is_approved) values ('circle', '${slug}', 'Circle ${tag}', true) returning id`).split('\n')[0]!
+  sql(`insert into group_members (group_id, user_id) select '${gid}', id from auth.users where email in (${emails.map((e) => `'${e}'`).join(',')})`)
+  return sql(`select id from chats where group_id = '${gid}'`)
+}

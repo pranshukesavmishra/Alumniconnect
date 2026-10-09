@@ -154,3 +154,23 @@ the photo, so sign-in is the only automatic source; members can always upload a 
    This lets someone who signed up by email press "Use my LinkedIn photo" in *Edit profile*, connect LinkedIn once
    and have the photo imported, without creating a second account. (Local config already has it on.)
 3. Make sure the LinkedIn provider uses the "Sign In with LinkedIn using OpenID Connect" product (scopes `openid profile email`).
+
+## Push notifications (messages, @mentions, connection requests)
+
+Uses standard Web Push: no Firebase or other account is needed. Works on Android, desktop browsers, and on iPhone
+(iOS 16.4+) once the app is added to the Home Screen.
+
+1. Create the keys once: `node scripts/generate-push-keys.mjs`
+2. Supabase → Edge Functions → Secrets: add `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `PUSH_SECRET` and
+   `VAPID_SUBJECT` (`mailto:` + the committee's contact address). Deploy: `npx supabase functions deploy push-send --no-verify-jwt`
+3. Supabase → SQL editor, so the database knows where to send (use your project ref and the PUSH_SECRET from step 1):
+   ```sql
+   insert into private.settings (key, value) values
+     ('push_function_url', 'https://<project-ref>.supabase.co/functions/v1/push-send'),
+     ('push_secret', '<PUSH_SECRET>')
+   on conflict (key) do update set value = excluded.value;
+   ```
+4. Hosting (Cloudflare Pages) → environment variables: `VITE_VAPID_PUBLIC_KEY` = the public key, then redeploy.
+
+Members turn notifications on from **Notifications** (or the prompt on the Chat tab). Signing out removes the
+device. Without these settings the app works exactly the same, with notifications only inside the app.

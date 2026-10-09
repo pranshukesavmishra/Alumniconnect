@@ -7,6 +7,7 @@ export interface Db {
   select<T>(table: string, query: string): Promise<T[]>
   update(table: string, query: string, patch: Record<string, unknown>): Promise<void>
   upsert(table: string, row: Record<string, unknown>): Promise<void>
+  remove(table: string, query: string): Promise<void>
 }
 
 function client(key: string, bearer: string): Db {
@@ -27,6 +28,10 @@ function client(key: string, bearer: string): Db {
         headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify(row),
       })
+      if (!res.ok) throw new Error(`DB ${table}: ${res.status} ${await res.text()}`)
+    },
+    async remove(table: string, query: string) {
+      const res = await fetch(`${URL_}/rest/v1/${table}?${query}`, { method: 'DELETE', headers: { ...headers, Prefer: 'return=minimal' } })
       if (!res.ok) throw new Error(`DB ${table}: ${res.status} ${await res.text()}`)
     },
   }

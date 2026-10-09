@@ -12,6 +12,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
+import { PushToggle } from '../community/PushToggle'
 import { useJoinGroup } from '../community/queries'
 import { ChatComposer } from './Composer'
 import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, PollCard, VoicePlayer, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
@@ -189,6 +190,9 @@ export function ChatListPage() {
           </div>
         </div>
 
+        <div className="px-4 pt-3 empty:hidden">
+          <PushToggle onlyWhenOff />
+        </div>
         {error && (
           <div className="px-4 pt-3">
             <Notice tone="danger" title="Couldn’t load your chats">

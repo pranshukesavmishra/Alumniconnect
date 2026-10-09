@@ -1,5 +1,5 @@
 import { expect, test, type Browser } from '@playwright/test'
-import { onboard, signInWithEmail, sql } from './helpers'
+import { makeCircle, onboard, signInWithEmail, sql } from './helpers'
 
 const run = Date.now().toString(36).slice(-5)
 const year = String(1995 + ((Date.now() + 13) % 26))
@@ -21,14 +21,14 @@ test('slow mode limits members; reported messages reach admins who can remove th
   const reporter = await member(browser, `reporter.${run}@example.com`, `Reporter ${run}`)
   sql(`update profiles set is_admin = true where id = (select id from auth.users where email = 'boss.${run}@example.com')`)
   await boss.page.reload()
-  const chatId = sql(`select c.id from chats c join groups g on g.id = c.group_id where g.slug = 'computer-science-engineering-${year}'`)
+  const chatId = makeCircle('mod', [`boss.${run}@example.com`, `talker.${run}@example.com`, `reporter.${run}@example.com`])
 
   // admin turns on slow mode (1 minute)
   await boss.page.goto(`/chat/${chatId}`)
   await boss.page.getByRole('button', { name: 'Slow mode' }).click()
   await boss.page.getByRole('dialog', { name: 'Slow mode' }).getByRole('button', { name: '1 minute' }).click()
   await expect(boss.page.getByText('Slow mode on')).toBeVisible()
-  expect(sql(`select slow_mode_seconds from groups where slug = 'computer-science-engineering-${year}'`)).toBe('60')
+  expect(sql(`select g.slow_mode_seconds from groups g join chats c on c.group_id = g.id where c.id = '${chatId}'`)).toBe('60')
 
   // a member can send one message, then has to wait; the box says so and Send is disabled
   await talker.page.goto(`/chat/${chatId}`)

@@ -28,4 +28,9 @@ if [ "$(probe)" != "401" ]; then
   (nohup $CLI functions serve > /tmp/functions-serve.log 2>&1 &)
   for _ in $(seq 1 60); do [ "$(probe)" = "401" ] && break; sleep 2; done
 fi
+# local push notifications: point the database at the local push function (settings are wiped by db reset)
+SECRET=$(grep '^PUSH_SECRET=' supabase/functions/.env 2>/dev/null | cut -d= -f2-)
+if [ -n "$SECRET" ]; then
+  PGPASSWORD=postgres psql -h 127.0.0.1 -p 54322 -U postgres -qc "insert into private.settings values ('push_function_url', 'http://supabase_kong_Alumniconnect:8000/functions/v1/push-send'), ('push_secret', '$SECRET') on conflict (key) do update set value = excluded.value" >/dev/null 2>&1
+fi
 echo "stack ready: db=54322 api=54321 mail=54324 functions=$( [ "$(probe)" = "401" ] && echo up || echo DOWN )"
