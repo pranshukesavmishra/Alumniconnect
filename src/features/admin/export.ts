@@ -17,9 +17,22 @@ export const spreadsheetSafe = safe
 /** Long digit strings (phones, UTRs) as text so Excel keeps every digit ("+91…" not "9.19E+11"). */
 export const asText = (v: string | null | undefined) => (v ? `="${v.replace(/"/g, '')}"` : '')
 
+/**
+ * Last line of defence for every spreadsheet we hand out: any text cell that starts with = + - @ tab or CR gets a leading quote so
+ * Excel / Sheets show it instead of running it. Plain numbers (including negatives such as refunds) and the deliberate
+ * ="digits" text cells made by asText are left alone. Cells already neutralised by safe() start with a quote and pass through.
+ */
+export function neutralise(v: unknown): unknown {
+  if (typeof v !== 'string') return v
+  if (!/^[=+\-@\t\r]/.test(v)) return v
+  if (/^-?\d+(\.\d+)?$/.test(v)) return v
+  if (/^="[A-Za-z0-9+\-() ]*"$/.test(v)) return v
+  return `'${v}`
+}
+
 export function saveCsv(name: string, rows: Record<string, unknown>[]) {
   // BOM so Excel opens UTF-8 (names, ₹) correctly
-  downloadFile(name, '﻿' + Papa.unparse(rows), 'text/csv;charset=utf-8')
+  downloadFile(name, '\ufeff' + Papa.unparse(rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, neutralise(v)])))), 'text/csv;charset=utf-8')
 }
 
 export const stamp = () => new Date().toISOString().slice(0, 10)
