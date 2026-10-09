@@ -53,6 +53,12 @@ export function describe(n: Row): { title: string; body: string; url: string; ta
       return { title: 'JEC Alumni Connect', body: `${who} accepted your connection request`, url: `/people/${n.actor_id}`, tag: `conn:${n.actor_id}`, urgency: 'normal' }
     case 'invite_joined':
       return { title: 'JEC Alumni Connect', body: `${who} joined through your invite 🎉`, url: `/people/${n.actor_id}`, tag: `invite:${n.actor_id}`, urgency: 'normal' }
+    case 'mentor_request':
+      return { title: `${who} wants you as a mentor`, body: clip(n.body), url: '/mentors/mine', tag: `mentor:${n.target_id}`, urgency: 'normal' }
+    case 'mentor_accepted':
+      return { title: 'JEC Alumni Connect', body: `${who} accepted your mentor request`, url: '/mentors/mine', tag: `mentor:${n.target_id}`, urgency: 'normal' }
+    case 'mentor_declined':
+      return { title: 'JEC Alumni Connect', body: `${who} can’t take on a new mentee right now`, url: '/mentors/mine', tag: `mentor:${n.target_id}`, urgency: 'normal' }
     case 'help_request':
       return { title: `${who} needs help`, body: clip(n.body), url: '/help', tag: `help:${n.target_id}`, urgency: 'normal' }
     default:
