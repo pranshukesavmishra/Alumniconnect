@@ -1,22 +1,24 @@
-import { BarChart3, CalendarPlus, ChevronRight, Flag, History, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, History, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
-import { Badge, EmptyState, Notice, PageSkeleton } from '../../components/ui/Display'
+import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { buildQueue, describeAccess, type QueueItem } from '../../lib/adminAttention'
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange } from '../../lib/format'
 import { useMyProfile } from '../auth/AuthProvider'
-import { useOpenReportCount } from './AdminModeration'
-import { useManagedEvents } from './queries'
+import { AdminSearch } from './AdminSearch'
+import { useAttention, useManagedEvents } from './queries'
 
 export function AdminHome() {
   const { data: me } = useMyProfile()
   const { data, isLoading, error } = useManagedEvents()
-  const reports = useOpenReportCount(!!me?.is_admin)
+  const canManage = !!me?.is_admin || !!data?.some((d) => d.role === 'manager')
+  const attention = useAttention(canManage)
   if (isLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
   if (!me.is_admin && !data?.length) return <Navigate to="/" replace />
-  if (data?.length === 1 && !me.is_admin) return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
+  if (data?.length === 1 && !me.is_admin && data[0]!.role === 'checkin') return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
 
   return (
     <div>
@@ -26,6 +28,24 @@ export function AdminHome() {
         action={me.is_admin && <ButtonLink to="/admin/events/new" size="sm" icon={<CalendarPlus className="size-4" />}>New event</ButtonLink>}
       />
       <Page className="space-y-3">
+        <p className="text-sm text-muted" data-testid="my-access">
+          Signed in as{' '}
+          {describeAccess(me.is_admin, (data ?? []).map((d) => ({ role: d.role, title: d.event.title }))).map((a) => a.label).filter((l, i, all) => all.indexOf(l) === i).join(' + ') || 'member'}.
+          {me.is_admin && <> <Link to="/admin/roles" className="font-semibold text-primary">Who can do what</Link></>}
+        </p>
+        {canManage && <AdminSearch members={me.is_admin} />}
+        {canManage && (
+          <section aria-label="Needs your attention" className="space-y-2 pt-1">
+            <SectionTitle>Needs your attention</SectionTitle>
+            {attention.error ? (
+              <Notice tone="danger" title={friendlyError(attention.error)} />
+            ) : !attention.data ? (
+              <PageSkeleton />
+            ) : (
+              <Queue items={buildQueue(attention.data)} />
+            )}
+          </section>
+        )}
         {me.is_admin && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Link to="/admin/members" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
@@ -46,7 +66,12 @@ export function AdminHome() {
             <Link to="/admin/reports" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Flag className="size-5" aria-hidden /></span>
               <span className="flex-1"><span className="block font-semibold">Reports</span><span className="block text-sm text-muted">Posts and messages members flagged</span></span>
-              {reports > 0 && <Badge tone="danger">{reports}</Badge>}
+              {!!attention.data?.global?.reports_open && <Badge tone="danger">{attention.data.global.reports_open}</Badge>}
+              <ChevronRight className="size-5 text-muted" aria-hidden />
+            </Link>
+            <Link to="/admin/roles" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><KeyRound className="size-5" aria-hidden /></span>
+              <span className="flex-1"><span className="block font-semibold">Roles</span><span className="block text-sm text-muted">Who is an admin, treasurer or volunteer</span></span>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
             <Link to="/admin/activity" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
@@ -76,5 +101,37 @@ export function AdminHome() {
         )}
       </Page>
     </div>
+  )
+}
+
+const TONE = { danger: 'danger', warning: 'warning', primary: 'primary', neutral: 'neutral' } as const
+
+function Queue({ items }: { items: QueueItem[] }) {
+  if (!items.length) {
+    return (
+      <Card className="flex items-center gap-3 p-4" data-testid="queue-empty">
+        <CheckCircle2 className="size-6 shrink-0 text-success" aria-hidden />
+        <div>
+          <p className="font-semibold">All caught up</p>
+          <p className="text-sm text-muted">No payments, members, reports or circles are waiting.</p>
+        </div>
+      </Card>
+    )
+  }
+  return (
+    <ul className="space-y-2" data-testid="queue">
+      {items.map((i) => (
+        <li key={i.id}>
+          <Link to={i.href} data-queue={i.id} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
+            <Badge tone={TONE[i.tone]} className="min-w-8 justify-center">{i.count > 0 ? i.count : '!'}</Badge>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{i.title}</span>
+              <span className="block text-sm text-muted [overflow-wrap:anywhere]">{i.detail}</span>
+            </span>
+            <ChevronRight className="size-5 shrink-0 text-muted" aria-hidden />
+          </Link>
+        </li>
+      ))}
+    </ul>
   )
 }

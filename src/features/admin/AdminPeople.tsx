@@ -23,16 +23,16 @@ const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
   { id: 'cancelled', label: 'Cancelled' },
 ]
 
-export function AdminPeople({ event, data, manager }: { event: EventRow; data: AdminData; manager: boolean }) {
-  const [q, setQ] = useState('')
+export function AdminPeople({ event, data, manager, initialQuery = '' }: { event: EventRow; data: AdminData; manager: boolean; initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery)
   const [filter, setFilter] = useState<RegistrationStatus | 'all'>('all')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(() => data.registrations.find((r) => initialQuery && r.code.toLowerCase() === initialQuery.toLowerCase())?.id ?? null)
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return data.registrations.filter(
       (r) =>
-        (filter === 'all' ? r.status !== 'cancelled' : r.status === filter) &&
+        (filter === 'all' ? needle !== '' || r.status !== 'cancelled' : r.status === filter) &&
         (!needle || [r.full_name, r.code, r.phone, r.email, r.city, String(r.grad_year ?? '')].some((v) => v?.toLowerCase().includes(needle))),
     )
   }, [data.registrations, q, filter])

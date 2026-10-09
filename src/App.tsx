@@ -35,6 +35,7 @@ const BusinessDetailPage = lazy(() => import('./features/businesses/BusinessDeta
 const AddBusinessPage = lazy(() => import('./features/businesses/AddBusinessPage').then((m) => ({ default: m.AddBusinessPage })))
 const AdminCommunity = lazy(() => import('./features/admin/AdminCommunity').then((m) => ({ default: m.AdminCommunity })))
 const AdminModeration = lazy(() => import('./features/admin/AdminModeration').then((m) => ({ default: m.AdminModeration })))
+const AdminRoles = lazy(() => import('./features/admin/AdminRoles').then((m) => ({ default: m.AdminRoles })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
 const GroupsPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupsPage })))
 const GroupPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupPage })))
@@ -171,6 +172,7 @@ export function App() {
             <Route path="admin" element={m(<AdminHome />)} />
             <Route path="admin/members" element={m(<AdminMembers />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
+            <Route path="admin/roles" element={m(<AdminRoles />)} />
             <Route path="admin/reports" element={m(<AdminModeration />)} />
             <Route path="admin/analytics" element={m(<AdminAnalytics />)} />
             <Route path="admin/community" element={m(<AdminCommunity />)} />

@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMyProfile } from '../auth/AuthProvider'
 import { useMyStaffEvents } from '../events/queries'
 import { supabase } from '../../lib/supabase'
-import type { EventRow, Payment, Profile, Registration, RegistrationItem, StaffRole, TicketType } from '../../lib/types'
+import type { Attention } from '../../lib/adminAttention'
+import type { EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, StaffRole, TicketType, VerificationStatus } from '../../lib/types'
 
 /** PostgREST returns at most 1000 rows per request; page through everything. */
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
@@ -196,4 +197,60 @@ export async function searchProfiles(q: string): Promise<Profile[]> {
   const { data, error } = await supabase.from('profiles').select('*').ilike('full_name', `%${q.replace(/[%_]/g, '')}%`).limit(10)
   if (error) throw error
   return data as Profile[]
+}
+
+// ------------------------------------------------------------------ command centre
+export const attentionKey = ['admin-attention'] as const
+
+/** The "needs your attention" summary: admins get site-wide counts, treasurers only their own events. Refreshes every minute. */
+export function useAttention(enabled: boolean) {
+  return useQuery({
+    queryKey: attentionKey,
+    enabled,
+    refetchInterval: 60_000,
+    staleTime: 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_attention')
+      if (error) throw error
+      return data as unknown as Attention
+    },
+  })
+}
+
+export interface SearchResults {
+  members: { id: string; full_name: string; grad_year: number | null; branch: string | null; city: string | null; verification: VerificationStatus; is_admin: boolean; onboarded: boolean; matched_on: string }[]
+  registrations: { id: string; code: string; full_name: string; status: RegistrationStatus; amount_paise: number; headcount: number; event_slug: string; event_title: string; user_id: string; matched_on: string }[]
+  payments: { id: string; utr: string | null; amount_paise: number; status: PaymentStatus; method: string; payer_name: string | null; created_at: string; registration_id: string; code: string; full_name: string; event_slug: string; event_title: string }[]
+  by_contact: boolean
+}
+
+export function useAdminSearch(q: string) {
+  return useQuery({
+    queryKey: ['admin-search', q],
+    enabled: q.length >= 2,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_search', { p_q: q })
+      if (error) throw error
+      return data as unknown as SearchResults
+    },
+  })
+}
+
+export interface RolesOverview {
+  admins: { id: string; full_name: string; avatar_url: string | null; grad_year: number | null; branch: string | null }[]
+  staff: { user_id: string; full_name: string; avatar_url: string | null; role: StaffRole; event_id: string; event_slug: string; event_title: string; is_admin: boolean }[]
+  circle_admins: number
+}
+
+export function useRolesOverview(enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-roles'],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_roles_overview')
+      if (error) throw error
+      return data as unknown as RolesOverview
+    },
+  })
 }

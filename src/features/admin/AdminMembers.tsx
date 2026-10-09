@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, Copy, Eye, Plus, Search, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Navigate } from 'react-router'
+import { Navigate, useSearchParams } from 'react-router'
 import { Sheet } from '../../components/ui/Sheet'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -21,8 +21,15 @@ export function AdminMembers() {
   const { data: me, isLoading } = useMyProfile()
   const [q, setQ] = useState('')
   const [dq, setDq] = useState('')
-  const [filter, setFilter] = useState<'all' | VerificationStatus | 'admins'>('all')
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [params, setParams] = useSearchParams()
+  const initial = params.get('filter')
+  const [filter, setFilter] = useState<'all' | VerificationStatus | 'admins'>(initial === 'pending' || initial === 'verified' || initial === 'rejected' || initial === 'admins' ? initial : 'all')
+  // deep links from the admin home (?open=<member id>, ?filter=pending); the editor's own state decides afterwards
+  const [openId, setOpenIdState] = useState<string | null>(params.get('open'))
+  const setOpenId = (id: string | null) => {
+    setOpenIdState(id)
+    if (params.has('open') || params.has('filter')) setParams({}, { replace: true })
+  }
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
