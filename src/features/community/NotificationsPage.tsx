@@ -27,6 +27,12 @@ function describe(n: Notification): { text: string; to: string } {
       return { text: `${who} mentioned you: “${n.body ?? ''}”`, to: `/chat/${n.target_id}` }
     case 'announcement':
       return { text: `Alumni Meet announcement: ${n.body ?? ''}`, to: '/meet' }
+    case 'mentor_request':
+      return { text: `${who} asked you to be their mentor: “${n.body ?? ''}”`, to: '/mentors/mine' }
+    case 'mentor_accepted':
+      return { text: `${who} accepted your mentor request`, to: '/mentors/mine' }
+    case 'mentor_declined':
+      return { text: `${who} can’t take on a new mentee right now`, to: '/mentors/mine' }
     case 'help_request':
       return { text: `${who} asked for help: “${n.body ?? ''}”`, to: '/help' }
     case 'invite_joined':
