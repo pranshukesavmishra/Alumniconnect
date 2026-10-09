@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-NAME=jec-db-test
+NAME=${DB_TEST_NAME:-jec-db-test}
 PORT=${DB_TEST_PORT:-54329}
 IMAGE=${DB_TEST_IMAGE:-supabase/postgres:17.6.1.011}
 export PGPASSWORD=postgres
