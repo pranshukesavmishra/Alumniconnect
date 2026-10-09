@@ -3,9 +3,10 @@ import { Camera, Check, FileText, Image as ImageIcon, Paperclip, Pencil, Reply, 
 import { useEffect, useLayoutEffect, useRef, useState, type ClipboardEvent, type FormEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Sheet, SheetAction } from '../../components/ui/Sheet'
+import { Avatar } from '../../components/ui/Display'
 import { fileProblem, formatBytes, isPhoto, MAX_PHOTOS } from './media'
 import { previewOf, type Message, type ReplyPreview } from './merge'
-import type { SendInput } from './queries'
+import { useMentionCandidates, type SendInput } from './queries'
 
 const MAX_PICK = 30
 
@@ -15,6 +16,7 @@ interface Picked {
 }
 
 export function ChatComposer({
+  chatId,
   isGroup,
   me,
   replyTo,
@@ -25,6 +27,7 @@ export function ChatComposer({
   onEdit,
   onTyping,
 }: {
+  chatId: string
   isGroup: boolean
   me: string | null
   replyTo: ReplyPreview | null
@@ -44,6 +47,30 @@ export function ChatComposer({
   const cameraInput = useRef<HTMLInputElement>(null)
   const docInput = useRef<HTMLInputElement>(null)
   const savedDraft = useRef('')
+  const [caret, setCaret] = useState(0)
+  const [mentionIdx, setMentionIdx] = useState(0)
+  const [mentionDismissed, setMentionDismissed] = useState(false)
+
+  // "@" + letters right before the caret opens member suggestions (groups only, not while editing)
+  const mention = isGroup && !editing ? /(?:^|\s)@([\p{L}\p{N}_.-]{0,30})$/u.exec(text.slice(0, caret)) : null
+  const prefix = mention && !mentionDismissed ? (mention[1] ?? '') : null
+  const { data: candidates = [] } = useMentionCandidates(chatId, prefix, prefix !== null)
+  const suggestions = prefix !== null ? candidates : []
+  useEffect(() => setMentionIdx(0), [prefix])
+
+  function pickMention(name: string) {
+    if (prefix === null) return
+    const first = name.split(' ')[0] ?? name
+    const start = caret - prefix.length - 1
+    const next = `${text.slice(0, start)}@${first} ${text.slice(caret)}`
+    setText(next)
+    const pos = start + first.length + 2
+    requestAnimationFrame(() => {
+      input.current?.focus()
+      input.current?.setSelectionRange(pos, pos)
+      setCaret(pos)
+    })
+  }
 
   // Editing: put the message text in the box; cancelling restores what was being typed.
   useEffect(() => {
@@ -159,6 +186,18 @@ export function ChatComposer({
   return (
     <div>
       {banner}
+      {suggestions.length > 0 && (
+        <ul role="listbox" aria-label="Mention a member" className="mb-2 max-h-56 overflow-y-auto rounded-2xl border border-border bg-surface shadow-md">
+          {suggestions.map((c, i) => (
+            <li key={c.id} role="option" aria-selected={i === mentionIdx}>
+              <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pickMention(c.full_name)} className={clsx('flex min-h-12 w-full items-center gap-3 px-3 text-left', i === mentionIdx && 'bg-primary-soft')}>
+                <Avatar src={c.avatar_url} name={c.full_name} size={32} />
+                <span className="truncate font-medium">{c.full_name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {picked.length > 0 && (
         <ul className="mb-2 flex gap-2 overflow-x-auto pb-1" aria-label="Attachments to send">
           {picked.map((p, i) => (
@@ -197,9 +236,29 @@ export function ChatComposer({
           onPaste={onPaste}
           onChange={(e) => {
             setText(e.target.value)
+            setCaret(e.target.selectionStart)
+            setMentionDismissed(false)
             if (e.target.value && !editing) onTyping()
           }}
+          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
           onKeyDown={(e) => {
+            if (suggestions.length) {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                setMentionIdx((i) => (i + (e.key === 'ArrowDown' ? 1 : suggestions.length - 1)) % suggestions.length)
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault()
+                pickMention(suggestions[mentionIdx]!.full_name)
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setMentionDismissed(true)
+                return
+              }
+            }
             if (e.key === 'Escape' && (editing || replyTo)) {
               e.preventDefault()
               if (editing) {

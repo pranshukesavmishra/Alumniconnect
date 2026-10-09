@@ -425,8 +425,8 @@ language sql stable security definer set search_path = '' as $$
    limit 300;
 $$;
 
--- Search my chats (messages I can read).
-create or replace function public.search_messages(p_query text)
+-- Search messages I can read: all my chats, or just one (p_chat).
+create or replace function public.search_messages(p_query text, p_chat uuid default null)
 returns table (id uuid, chat_id uuid, body text, created_at timestamptz, sender_name text, chat_title text)
 language sql stable security definer set search_path = '' as $$
   select m.id, m.chat_id, m.body, m.created_at, p.full_name, coalesce(g.name, op.full_name)
@@ -435,10 +435,26 @@ language sql stable security definer set search_path = '' as $$
     left join public.groups g on g.id = c.group_id
     left join public.profiles op on c.kind = 'dm' and op.id = case when c.dm_a = auth.uid() then c.dm_b else c.dm_a end
     left join public.profiles p on p.id = m.sender_id
-   where char_length(btrim(p_query)) >= 2 and m.deleted_at is null and public.can_read_chat(m.chat_id)
-     and m.body ilike '%' || replace(replace(btrim(p_query), '%', '\%'), '_', '\_') || '%'
+   where char_length(btrim(p_query)) >= 2 and m.deleted_at is null and public.is_verified()
+     and (p_chat is null or m.chat_id = p_chat) and public.can_read_chat(m.chat_id)
+     and m.body ilike '%' || replace(replace(replace(btrim(p_query), '\', '\\'), '%', '\%'), '_', '\_') || '%'
    order by m.created_at desc
    limit 50;
+$$;
+
+-- Members of a chat's group whose names start with a prefix, for @mention suggestions.
+create or replace function public.mention_candidates(p_chat uuid, p_prefix text default '')
+returns table (id uuid, full_name text, avatar_url text)
+language sql stable security definer set search_path = '' as $$
+  select p.id, p.full_name, p.avatar_url
+    from public.chats c
+    join public.group_members gm on gm.group_id = c.group_id
+    join public.profiles p on p.id = gm.user_id
+   where c.id = p_chat and c.kind = 'group' and public.is_group_member(c.group_id) and p.id <> auth.uid()
+     and (btrim(p_prefix) = '' or lower(p.full_name) like lower(replace(replace(replace(btrim(p_prefix), '\', '\\'), '%', '\%'), '_', '\_')) || '%'
+          or lower(split_part(p.full_name, ' ', 1)) like lower(replace(replace(replace(btrim(p_prefix), '\', '\\'), '%', '\%'), '_', '\_')) || '%')
+   order by p.full_name
+   limit 8;
 $$;
 
 -- ------------------------------------------------------------------ RLS + grants
@@ -465,7 +481,7 @@ begin
   foreach f in array array['start_dm(uuid)', 'accept_message_request(uuid)',
     'send_message(uuid, text, public.message_kind, jsonb, uuid, jsonb)', 'edit_message(uuid, text)', 'delete_message(uuid)',
     'react_to_message(uuid, text)', 'vote_poll(uuid, int[])', 'mark_chat_read(uuid)', 'set_chat_muted(uuid, boolean)',
-    'pin_message(uuid, uuid)', 'my_chats(uuid)', 'search_messages(text)']
+    'pin_message(uuid, uuid)', 'my_chats(uuid)', 'search_messages(text, uuid)', 'mention_candidates(uuid, text)']
   loop
     execute format('revoke execute on function public.%s from anon, public', f);
     execute format('grant execute on function public.%s to authenticated', f);

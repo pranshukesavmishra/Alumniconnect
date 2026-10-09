@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Megaphone, MessagesSquare, Search, ShieldAlert, Users } from 'lucide-react'
+import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Megaphone, MessagesSquare, Pin, Search, ShieldAlert, Users, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -12,9 +12,8 @@ import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useJoinGroup } from '../community/queries'
-import { Linkified } from '../community/PostCard'
 import { ChatComposer } from './Composer'
-import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, useMessageGestures, type ActionPermissions } from './MessageBits'
+import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
 import { firstUnreadIndex, isContinuation, previewOf, type Attachment, type Message, type ReplyPreview } from './merge'
 import {
   chatKeys,
@@ -22,8 +21,11 @@ import {
   newLocalId,
   pendingInput,
   useAcceptRequest,
+  useChatSearch,
   useDeleteMessage,
   useEditMessage,
+  usePinMessage,
+  usePinnedMessage,
   useReact,
   useChat,
   useChats,
@@ -292,7 +294,7 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
               <>
                 {m.kind === 'image' && <PhotoGrid items={m.attachments} pending={m.pending} onOpen={(i) => onPhotos(m.attachments, i)} />}
                 {m.kind === 'file' && m.attachments[0] && <FileCard a={m.attachments[0]} mine={mine} pending={m.pending} />}
-                {m.kind === 'text' || m.kind === 'image' || m.kind === 'file' ? m.body && <Linkified text={m.body} /> : <p>{previewOf(m)}</p>}
+                {m.kind === 'text' || m.kind === 'image' || m.kind === 'file' ? m.body && <RichText text={m.body} mentions={isGroup} mine={mine} /> : <p>{previewOf(m)}</p>}
               </>
             )}
             <p className={clsx('-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-primary/75' : 'text-muted')}>
@@ -354,6 +356,8 @@ export function ChatThreadPage() {
   const edit = useEditMessage(id)
   const del = useDeleteMessage(id)
   const accept = useAcceptRequest(id)
+  const pin = usePinMessage(id)
+  const pinned = usePinnedMessage(id, chat?.pinned_message ?? null)
   const join = useJoinGroup()
   const signals = useChatSignals(id)
   const markRead = useMarkRead(id, signals.sentRead)
@@ -364,6 +368,7 @@ export function ChatThreadPage() {
   const [reactorsFor, setReactorsFor] = useState<string | null>(null)
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null)
   const [editing, setEditing] = useState<Message | null>(null)
+  const [searching, setSearching] = useState(false)
   const [viewer, setViewer] = useState<{ items: Attachment[]; start: number } | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const topSentinel = useRef<HTMLDivElement>(null)
@@ -509,7 +514,7 @@ export function ChatThreadPage() {
   }
 
   function permsFor(m: Message | undefined): ActionPermissions {
-    const none = { canReact: false, canReply: false, canEdit: false, canDelete: false, adminDelete: false }
+    const none = { canReact: false, canReply: false, canEdit: false, canDelete: false, adminDelete: false, canPin: false }
     if (!m || !chat || m.pending || m.failed || m.kind === 'system') return none
     const deleted = !!m.deleted_at
     const mine = m.sender_id === uid
@@ -520,6 +525,7 @@ export function ChatThreadPage() {
       canEdit: mine && !deleted && ['text', 'image', 'file'].includes(m.kind) && Date.now() - new Date(m.created_at).getTime() < EDIT_WINDOW_MS - 30_000,
       canDelete: !deleted && (mine || (chat.kind === 'group' && chat.is_group_admin)),
       adminDelete: !mine,
+      canPin: !deleted && (chat.kind === 'dm' || chat.is_group_admin) && !blockedRequest,
     }
   }
 
@@ -573,6 +579,11 @@ export function ChatThreadPage() {
               <Skeleton className="h-4 w-40" />
             </div>
           )}
+          {chat && (
+            <button type="button" onClick={() => setSearching((x) => !x)} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Search in chat" aria-expanded={searching}>
+              <Search className="size-5" />
+            </button>
+          )}
           {chat && (chat.joined || chat.kind === 'dm') && (
             <button type="button" onClick={toggleMute} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label={chat.muted ? 'Unmute chat' : 'Mute chat'} title={chat.muted ? 'Unmute' : 'Mute'}>
               {chat.muted ? <BellOff className="size-5" /> : <Bell className="size-5" />}
@@ -581,6 +592,16 @@ export function ChatThreadPage() {
         </div>
       </header>
 
+      {searching && <ChatSearch chatId={id} onClose={() => setSearching(false)} onPick={(mid) => { setSearching(false); void jumpTo(mid) }} />}
+      {!searching && chat?.pinned_message && pinned.data && !pinned.data.deleted_at && (
+        <button type="button" onClick={() => void jumpTo(pinned.data!.id)} className="flex min-h-12 w-full items-center gap-3 border-b border-border bg-surface px-4 text-left" aria-label="Go to pinned message">
+          <Pin className="size-4 shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block text-xs font-semibold text-primary">Pinned</span>
+            <span className="block truncate text-sm">{previewOf(pinned.data)}</span>
+          </span>
+        </button>
+      )}
       <div ref={scroller} onScroll={onScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
         <div className="mx-auto w-full max-w-3xl px-3 py-3">
           {error && <Notice tone="danger" title={friendlyError(error)} />}
@@ -695,6 +716,7 @@ export function ChatThreadPage() {
             )
           ) : (
             <ChatComposer
+              chatId={id}
               isGroup={!!isGroup}
               me={uid}
               replyTo={replyTo}
@@ -713,6 +735,11 @@ export function ChatThreadPage() {
         m={actionMsg}
         perms={permsFor(actionMsg ?? undefined)}
         me={uid}
+        pinned={!!actionMsg && chat?.pinned_message === actionMsg.id}
+        onPin={() => {
+          if (actionMsg) pin.mutate(chat?.pinned_message === actionMsg.id ? null : actionMsg.id, { onError: (e) => toast.error(friendlyError(e)) })
+          setActionFor(null)
+        }}
         onClose={() => setActionFor(null)}
         onReact={(emoji) => {
           if (actionMsg) react.mutate({ id: actionMsg.id, emoji }, { onError: (e) => toast.error(friendlyError(e)) })
@@ -746,6 +773,53 @@ export function ChatThreadPage() {
         }}
       />
       {viewer && <Lightbox items={viewer.items} start={viewer.start} onClose={() => setViewer(null)} />}
+    </div>
+  )
+}
+
+/** Search bar + results for one chat. Debounced; tapping a result jumps to the message. */
+function ChatSearch({ chatId, onClose, onPick }: { chatId: string; onClose: () => void; onPick: (messageId: string) => void }) {
+  const [text, setText] = useState('')
+  const [term, setTerm] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setTerm(text), 300)
+    return () => clearTimeout(t)
+  }, [text])
+  const { data, isFetching } = useChatSearch(chatId, term)
+  const typed = text.trim().length >= 2
+  return (
+    <div className="border-b border-border bg-bg">
+      <div className="mx-auto flex max-w-3xl items-center gap-2 px-3 py-2">
+        <input
+          autoFocus
+          type="search"
+          aria-label="Search in this chat"
+          placeholder="Search in this chat"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && onClose()}
+          className="min-h-11 flex-1 rounded-full border border-border bg-surface px-4 text-[16px] focus:border-primary focus:outline-none"
+        />
+        <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2" aria-label="Close search">
+          <X className="size-5" />
+        </button>
+      </div>
+      {typed && (
+        <ul className="mx-auto max-h-[45dvh] max-w-3xl divide-y divide-border overflow-y-auto" aria-label="Search results">
+          {data?.map((h) => (
+            <li key={h.id}>
+              <button type="button" onClick={() => onPick(h.id)} className="block min-h-14 w-full px-4 py-2 text-left hover:bg-surface-2">
+                <span className="flex justify-between gap-2 text-xs text-muted">
+                  <span className="truncate font-semibold">{h.sender_name ?? 'Member'}</span>
+                  <span className="shrink-0">{listStamp(h.created_at)}</span>
+                </span>
+                <span className="line-clamp-2 break-words text-[15px]">{h.body}</span>
+              </button>
+            </li>
+          ))}
+          {!isFetching && term.trim().length >= 2 && !data?.length && <li className="p-4 text-center text-sm text-muted">No messages found.</li>}
+        </ul>
+      )}
     </div>
   )
 }

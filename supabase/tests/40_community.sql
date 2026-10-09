@@ -187,6 +187,34 @@ do $$ begin
 end $$;
 reset role;
 
+-- search (one chat / all chats), mention suggestions, pin rules
+select pg_temp.login('40000000-0000-0000-0000-00000000000b');
+set local role authenticated;
+do $$
+declare ch uuid := (select v from t where k = 'trek');
+begin
+  assert (select count(*) from public.search_messages('trek plan', ch)) = 1, 'search finds message in chat';
+  assert (select count(*) from public.search_messages('trek plan')) = 1, 'search across my chats';
+  assert (select count(*) from public.search_messages('%', ch)) = 0, 'wildcards are literal';
+  assert exists (select 1 from public.mention_candidates(ch, 'an') where full_name = 'Anil'), 'mention prefix';
+  assert not exists (select 1 from public.mention_candidates(ch, '') where full_name = 'Bela'), 'not myself';
+  assert (select count(*) from public.mention_candidates((select v from t where k = 'conv'), '')) = 0, 'no mentions in DMs';
+  begin perform public.pin_message(ch, (select id from public.messages where chat_id = ch limit 1)); assert false, 'member cannot pin';
+  exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+select pg_temp.login('40000000-0000-0000-0000-0000000000ff');
+set local role authenticated;
+do $$
+declare ch uuid := (select v from t where k = 'trek'); m uuid := (select id from public.messages where chat_id = ch order by created_at limit 1);
+begin
+  perform public.pin_message(ch, m);
+  assert (select pinned_message from public.chats where id = ch) = m, 'admin pins';
+  perform public.delete_message(m);
+  assert (select pinned_message from public.chats where id = ch) is null, 'deleting a pinned message unpins it';
+end $$;
+reset role;
+
 -- reports: three reports hide a post
 insert into auth.users (id, email) values ('40000000-0000-0000-0000-0000000000d1', 'd1@x.com'), ('40000000-0000-0000-0000-0000000000d2', 'd2@x.com');
 update public.profiles set verification = 'verified' where id in ('40000000-0000-0000-0000-0000000000d1', '40000000-0000-0000-0000-0000000000d2');

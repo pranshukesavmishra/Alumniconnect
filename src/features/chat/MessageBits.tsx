@@ -1,11 +1,12 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pencil, Plus, Reply, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pencil, Pin, PinOff, Plus, Reply, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Avatar } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
+import { Linkified } from '../community/PostCard'
 import { downloadUrl, formatBytes, useMediaUrl } from './media'
 import { groupReactions, previewOf, type Attachment, type Message, type Reaction, type ReplyPreview } from './merge'
 
@@ -250,6 +251,7 @@ export interface ActionPermissions {
   canEdit: boolean
   canDelete: boolean
   adminDelete: boolean
+  canPin: boolean
 }
 
 export function MessageActionsSheet({
@@ -261,6 +263,8 @@ export function MessageActionsSheet({
   onReply,
   onEdit,
   onDelete,
+  pinned,
+  onPin,
 }: {
   m: Message | null
   perms: ActionPermissions
@@ -270,6 +274,8 @@ export function MessageActionsSheet({
   onReply: () => void
   onEdit: () => void
   onDelete: () => void
+  pinned: boolean
+  onPin: () => void
 }) {
   const [more, setMore] = useState(false)
   useEffect(() => {
@@ -325,6 +331,7 @@ export function MessageActionsSheet({
                 Copy text
               </SheetAction>
             )}
+            {perms.canPin && <SheetAction icon={pinned ? <PinOff className="size-5" /> : <Pin className="size-5" />} onClick={onPin}>{pinned ? 'Unpin' : 'Pin to top'}</SheetAction>}
             {perms.canEdit && <SheetAction icon={<Pencil className="size-5" />} onClick={onEdit}>Edit</SheetAction>}
             {perms.canDelete && (
               <SheetAction icon={<Trash2 className="size-5" />} danger onClick={onDelete}>
@@ -438,4 +445,20 @@ export function useMessageGestures({ onReply, onMenu, onDoubleTap, enabled }: { 
     }
   }, [enabled])
   return ref
+}
+
+/** Message text: links become clickable and (in groups) @mentions are highlighted. */
+export function RichText({ text, mentions, mine }: { text: string; mentions: boolean; mine: boolean }) {
+  if (!mentions || !text.includes('@')) return <Linkified text={text} />
+  return (
+    <>
+      {text.split(/((?:^|(?<=\s))@[\p{L}\p{N}_.-]+)/u).map((part, i) =>
+        part.startsWith('@') ? (
+          <span key={i} className={clsx('font-semibold', mine ? 'underline decoration-white/40' : 'text-primary')}>{part}</span>
+        ) : (
+          <Linkified key={i} text={part} />
+        ),
+      )}
+    </>
+  )
 }

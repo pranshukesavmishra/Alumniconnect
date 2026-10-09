@@ -475,3 +475,73 @@ export function useGroupChatId(groupId: string | undefined) {
     },
   })
 }
+
+export interface SearchHit {
+  id: string
+  chat_id: string
+  body: string
+  created_at: string
+  sender_name: string | null
+  chat_title: string | null
+}
+
+/** Search inside one chat (or all my chats when chatId is null). `term` should already be debounced. */
+export function useChatSearch(chatId: string | null, term: string) {
+  const q = term.trim()
+  return useQuery({
+    queryKey: ['chat-search', chatId, q],
+    enabled: q.length >= 2,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('search_messages', { p_query: q, p_chat: chatId })
+      if (error) throw error
+      return data as SearchHit[]
+    },
+  })
+}
+
+export function usePinMessage(chatId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (messageId: string | null) => {
+      const { error } = await supabase.rpc('pin_message', { p_chat: chatId, p_message: messageId })
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: chatKeys.one(chatId) }),
+  })
+}
+
+/** The pinned message (from the loaded window when possible, else fetched once). */
+export function usePinnedMessage(chatId: string, pinnedId: string | null) {
+  return useQuery({
+    queryKey: ['pinned', chatId, pinnedId],
+    enabled: !!pinnedId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('messages').select(SELECT).eq('id', pinnedId!).maybeSingle()
+      if (error) throw error
+      return (data as unknown as Message | null) ?? null
+    },
+  })
+}
+
+export interface MentionCandidate {
+  id: string
+  full_name: string
+  avatar_url: string | null
+}
+
+/** Group members matching what was typed after "@". */
+export function useMentionCandidates(chatId: string, prefix: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['mentions', chatId, prefix],
+    enabled: enabled && prefix !== null,
+    staleTime: 60_000,
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('mention_candidates', { p_chat: chatId, p_prefix: prefix ?? '' })
+      if (error) throw error
+      return data as MentionCandidate[]
+    },
+  })
+}

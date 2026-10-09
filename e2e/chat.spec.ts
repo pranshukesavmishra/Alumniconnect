@@ -72,6 +72,28 @@ test('group chat: react, reply, edit, photo, delete — seen by the other member
   await expect(b.page.getByText('This message was deleted')).toBeVisible({ timeout: 15_000 })
   expect(Number(sql(`select count(*) from storage.objects where bucket_id = 'chat-media' and name like '%/${chatId}/%'`))).toBe(0)
 
+  // @mention: suggestions appear, picking inserts the name, and the member gets a notification
+  await a.page.getByLabel('Message', { exact: true }).fill('Welcome @Vik')
+  await a.page.getByRole('option', { name: new RegExp(`Vikram ${run}`) }).click()
+  await expect(a.page.getByLabel('Message', { exact: true })).toHaveValue('Welcome @Vikram ')
+  await a.page.getByLabel('Message', { exact: true }).press('End')
+  await a.page.getByLabel('Message', { exact: true }).type('see you there')
+  await a.page.getByRole('button', { name: 'Send' }).click()
+  await expect(a.page.getByText('@Vikram', { exact: true })).toBeVisible()
+  await expect.poll(() => sql(`select count(*) from notifications where kind = 'mention' and target_id = '${chatId}'`)).toBe('1')
+
+  // Pin a message (group admin or platform admin only), then find messages by search
+  sql(`update profiles set is_admin = true where id = (select id from auth.users where email = 'asha.${run}@example.com')`)
+  await a.page.reload()
+  await a.page.getByText('Welcome').first().click({ button: 'right' })
+  await a.page.getByRole('dialog', { name: 'Message options' }).getByRole('button', { name: 'Pin to top' }).click()
+  await expect(a.page.getByRole('button', { name: 'Go to pinned message' })).toContainText('Welcome @Vikram')
+  await a.page.getByRole('button', { name: 'Search in chat' }).click()
+  await a.page.getByLabel('Search in this chat').fill('Count me')
+  await expect(a.page.getByRole('list', { name: 'Search results' }).getByText('Count me in')).toBeVisible()
+  await a.page.getByRole('list', { name: 'Search results' }).getByText('Count me in').click()
+  await expect(a.page.getByRole('list', { name: 'Search results' })).toBeHidden()
+
   await a.ctx.close()
   await b.ctx.close()
 })
