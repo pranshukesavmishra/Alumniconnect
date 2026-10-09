@@ -53,6 +53,8 @@ export function describe(n: Row): { title: string; body: string; url: string; ta
       return { title: 'JEC Alumni Connect', body: `${who} accepted your connection request`, url: `/people/${n.actor_id}`, tag: `conn:${n.actor_id}`, urgency: 'normal' }
     case 'invite_joined':
       return { title: 'JEC Alumni Connect', body: `${who} joined through your invite 🎉`, url: `/people/${n.actor_id}`, tag: `invite:${n.actor_id}`, urgency: 'normal' }
+    case 'announcement':
+      return { title: 'Alumni Meet 2026', body: clip(n.body), url: '/meet', tag: `ann:${n.target_id}`, urgency: 'high' }
     case 'help_request':
       return { title: `${who} needs help`, body: clip(n.body), url: '/help', tag: `help:${n.target_id}`, urgency: 'normal' }
     default:

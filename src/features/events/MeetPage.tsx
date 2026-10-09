@@ -1,13 +1,14 @@
-import { CalendarDays, Clock, MapPin, Phone, Ticket, Users } from 'lucide-react'
+import { CalendarDays, Clock, MapPin, Phone, Pin, Ticket, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
 import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { MEET_SLUG, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
-import { daysUntil, formatDateRange, formatDateTime } from '../../lib/format'
+import { daysUntil, formatDateRange, formatDateTime, relativeTime } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
 import { useAuth } from '../auth/AuthProvider'
+import { clock, groupByDay, useAnnouncements, useProgramme } from './programme'
 import { registrationOpen, useEvent, useEventStats, useMyRegistration, useTicketTypes } from './queries'
 import { StatusBadge } from './StatusBadge'
 
@@ -17,6 +18,8 @@ export function MeetPage() {
   const { data: tickets } = useTicketTypes(event?.id)
   const { data: stats } = useEventStats(event?.id)
   const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
+  const programme = useProgramme(event?.id)
+  const announcements = useAnnouncements(event?.id, !!session)
 
   if (isLoading) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title="Couldn’t load the event">{friendlyError(error)}</Notice></Page>
@@ -95,6 +98,44 @@ export function MeetPage() {
             </div>
             <StatusBadge status={reg.status} />
           </Card>
+        )}
+
+        {!!announcements.data?.length && (
+          <section aria-label="Announcements" className="space-y-2">
+            <SectionTitle>Announcements</SectionTitle>
+            {announcements.data.slice(0, 3).map((a) => (
+              <Card key={a.id} className={a.pinned ? 'border-accent/50 bg-accent-soft p-4' : 'p-4'}>
+                <p className="font-semibold">{a.pinned && <Pin className="mr-1 inline size-4 text-warning" aria-label="Pinned" />}{a.title}</p>
+                <p className="mt-1 whitespace-pre-line text-[15px] text-muted">{a.body}</p>
+                <p className="mt-2 text-xs text-muted">{relativeTime(a.created_at)}</p>
+              </Card>
+            ))}
+          </section>
+        )}
+
+        {!!programme.data?.length && (
+          <section aria-label="Programme" className="space-y-4">
+            <SectionTitle>Programme</SectionTitle>
+            {groupByDay(programme.data).map((d) => (
+              <div key={d.day}>
+                <h3 className="mb-1.5 text-sm font-bold">{d.heading}</h3>
+                <Card className="divide-y divide-border">
+                  {d.items.map((it) => (
+                    <div key={it.id} className="flex gap-3 p-3.5">
+                      <p className="w-20 shrink-0 text-sm font-semibold tabular-nums">{clock(it.starts_at)}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold">{it.title}</p>
+                        {(it.venue || it.ends_at) && (
+                          <p className="text-sm text-muted">{[it.venue, it.ends_at ? `until ${clock(it.ends_at)}` : null].filter(Boolean).join(' · ')}</p>
+                        )}
+                        {it.details && <p className="mt-1 whitespace-pre-line text-sm text-muted">{it.details}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+              </div>
+            ))}
+          </section>
         )}
 
         {!open && !active && (

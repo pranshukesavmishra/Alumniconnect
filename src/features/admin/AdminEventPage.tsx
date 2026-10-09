@@ -13,10 +13,11 @@ import { useMyProfile } from '../auth/AuthProvider'
 import { AdminPayments } from './AdminPayments'
 import { AdminPeople } from './AdminPeople'
 import { AdminSettings } from './AdminSettings'
+import { AdminProgramme } from './AdminProgramme'
 import { AdminTeam } from './AdminTeam'
 import { useAdminData, useAdminEvent, useEventRole, type AdminData } from './queries'
 
-type Tab = 'overview' | 'payments' | 'people' | 'settings' | 'team'
+type Tab = 'overview' | 'payments' | 'people' | 'programme' | 'settings' | 'team'
 
 export function AdminEventPage() {
   const { slug = '' } = useParams()
@@ -48,6 +49,7 @@ export function AdminEventPage() {
         { id: 'overview', label: 'Overview' },
         { id: 'payments', label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
         { id: 'people', label: 'People' },
+        { id: 'programme', label: 'Programme' },
         ...(me.is_admin ? ([{ id: 'settings', label: 'Settings' }, { id: 'team', label: 'Team' }] as const) : []),
       ]
     : [{ id: 'people', label: 'People' }]
@@ -94,6 +96,7 @@ export function AdminEventPage() {
         {tab === 'overview' && (admin.data ? <Overview data={admin.data} /> : <PageSkeleton />)}
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} /> : <PageSkeleton />)}
+        {tab === 'programme' && <AdminProgramme eventId={data.event.id} />}
         {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} />}
       </Page>
