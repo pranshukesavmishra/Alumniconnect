@@ -94,3 +94,35 @@ describe('helpers', () => {
     expect(hasUnknownSender([msg('z', '2026-10-08T09:00:00Z', { sender: { id: OTHER, full_name: 'B', avatar_url: null } })], msg('a', '2026-10-08T10:00:00Z'))).toBe(false)
   })
 })
+
+describe('reactions', () => {
+  it('groups by emoji, most popular first, and flags mine', async () => {
+    const { groupReactions } = await import('./merge')
+    const g = groupReactions(
+      [
+        { user_id: 'a', emoji: '👍' },
+        { user_id: ME, emoji: '❤️' },
+        { user_id: 'b', emoji: '❤️' },
+      ],
+      ME,
+    )
+    expect(g).toEqual([
+      { emoji: '❤️', count: 2, mine: true },
+      { emoji: '👍', count: 1, mine: false },
+    ])
+  })
+  it('toggles and replaces my reaction', async () => {
+    const { applyMyReaction } = await import('./merge')
+    const base = [{ user_id: 'a', emoji: '👍' }]
+    expect(applyMyReaction(base, ME, '❤️')).toEqual([...base, { user_id: ME, emoji: '❤️' }])
+    expect(applyMyReaction([...base, { user_id: ME, emoji: '❤️' }], ME, '😂')).toEqual([...base, { user_id: ME, emoji: '😂' }])
+    expect(applyMyReaction([...base, { user_id: ME, emoji: '❤️' }], ME, null)).toEqual(base)
+  })
+  it('keeps reactions and reply previews when a live row (without joins) updates a message', () => {
+    const withExtras = msg('a', '2026-10-08T10:00:00Z', { reactions: [{ user_id: 'x', emoji: '👍' }], reply: null })
+    const [out] = mergeMessages([withExtras], [msg('a', '2026-10-08T10:00:00Z', { body: 'edited' })])
+    expect(out?.reactions).toHaveLength(1)
+    const [gone] = mergeMessages([withExtras], [msg('a', '2026-10-08T10:00:00Z', { deleted_at: '2026-10-08T10:01:00Z' })])
+    expect(gone?.reactions).toHaveLength(0)
+  })
+})

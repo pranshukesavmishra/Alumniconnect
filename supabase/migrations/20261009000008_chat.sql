@@ -54,11 +54,14 @@ create index messages_search_idx on public.messages using gin (to_tsvector('simp
 
 create table public.message_reactions (
   message_id uuid not null references public.messages (id) on delete cascade,
+  chat_id uuid not null references public.chats (id) on delete cascade,   -- lets live updates filter by chat
   user_id uuid not null references public.profiles (id) on delete cascade,
   emoji text not null check (char_length(emoji) between 1 and 16),
   created_at timestamptz not null default now(),
   primary key (message_id, user_id)
 );
+create index message_reactions_chat_idx on public.message_reactions (chat_id);
+alter table public.message_reactions replica identity full;  -- deletions carry chat_id for live filters
 
 create table public.poll_votes (
   message_id uuid not null references public.messages (id) on delete cascade,
@@ -194,7 +197,10 @@ begin
   if p_kind in ('image', 'file', 'voice') then
     if jsonb_array_length(coalesce(p_attachments, '[]')) = 0 then raise exception 'Attachment missing'; end if;
     for a in select * from jsonb_array_elements(p_attachments) loop
-      if coalesce(a ->> 'path', '') not like me::text || '/' || c.id::text || '/%' then raise exception 'Invalid attachment'; end if;
+      if coalesce(a ->> 'path', '') not like me::text || '/' || c.id::text || '/%'
+         or (a ? 'thumb' and coalesce(a ->> 'thumb', '') not like me::text || '/' || c.id::text || '/%') then
+        raise exception 'Invalid attachment';
+      end if;
     end loop;
   end if;
   if p_kind = 'poll' then
@@ -232,12 +238,24 @@ $$;
 
 -- Edit within 15 minutes; delete for everyone (own messages; group admins can remove any in their group).
 create or replace function public.edit_message(p_message uuid, p_body text)
-returns void language plpgsql security definer set search_path = '' as $$
+returns public.messages language plpgsql security definer set search_path = '' as $$
+declare
+  m public.messages;
 begin
-  if coalesce(btrim(p_body), '') = '' then raise exception 'Message is empty'; end if;
-  update public.messages set body = left(btrim(p_body), 4000), edited_at = now()
-   where id = p_message and sender_id = auth.uid() and kind = 'text' and deleted_at is null and created_at > now() - interval '15 minutes';
-  if not found then raise exception 'Messages can be edited for 15 minutes after sending'; end if;
+  -- text needs a body; photo/file captions may be cleared
+  update public.messages set body = left(nullif(btrim(p_body), ''), 4000), edited_at = now()
+   where id = p_message and sender_id = auth.uid() and kind in ('text', 'image', 'file') and deleted_at is null
+     and created_at > now() - interval '15 minutes'
+     and (kind <> 'text' or coalesce(btrim(p_body), '') <> '')
+  returning * into m;
+  if not found then
+    if coalesce(btrim(p_body), '') = '' then raise exception 'Message is empty'; end if;
+    raise exception 'Messages can be edited for 15 minutes after sending';
+  end if;
+  if (select last_message_at from public.chats where id = m.chat_id) = m.created_at and m.kind = 'text' then
+    update public.chats set last_message = left(m.body, 140) where id = m.chat_id;
+  end if;
+  return m;
 end;
 $$;
 
@@ -254,6 +272,11 @@ begin
   end if;
   update public.messages set body = null, attachments = '[]', poll = null, deleted_at = now() where id = p_message;
   delete from public.message_reactions where message_id = p_message;
+  delete from public.poll_votes where message_id = p_message;
+  if (select last_message_at from public.chats where id = m.chat_id) = m.created_at then
+    update public.chats set last_message = 'This message was deleted' where id = m.chat_id;
+  end if;
+  if c.pinned_message = p_message then update public.chats set pinned_message = null where id = c.id; end if;
 end;
 $$;
 
@@ -269,7 +292,7 @@ begin
   if p_emoji is null or btrim(p_emoji) = '' then
     delete from public.message_reactions where message_id = p_message and user_id = auth.uid();
   else
-    insert into public.message_reactions (message_id, user_id, emoji) values (p_message, auth.uid(), left(btrim(p_emoji), 16))
+    insert into public.message_reactions (message_id, chat_id, user_id, emoji) values (p_message, ch, auth.uid(), left(btrim(p_emoji), 16))
     on conflict (message_id, user_id) do update set emoji = excluded.emoji, created_at = now();
   end if;
 end;
@@ -430,8 +453,7 @@ create policy "own read state" on public.chat_reads for select to authenticated 
   user_id = auth.uid() or exists (select 1 from public.chats c where c.id = chat_id and c.kind = 'dm' and auth.uid() in (c.dm_a, c.dm_b)));
 create policy "readable messages" on public.messages for select to authenticated using (
   public.can_read_chat(chat_id) and (sender_id is null or not public.is_blocked_between(auth.uid(), sender_id)));
-create policy "readable reactions" on public.message_reactions for select to authenticated using (
-  exists (select 1 from public.messages m where m.id = message_id and public.can_read_chat(m.chat_id)));
+create policy "readable reactions" on public.message_reactions for select to authenticated using (public.can_read_chat(chat_id));
 create policy "readable votes" on public.poll_votes for select to authenticated using (
   exists (select 1 from public.messages m where m.id = message_id and public.can_read_chat(m.chat_id)));
 
@@ -470,6 +492,8 @@ on conflict (id) do nothing;
 create policy "upload own chat media" on storage.objects for insert to authenticated
   with check (bucket_id = 'chat-media' and (storage.foldername(name))[1] = auth.uid()::text
               and public.can_post_chat(public._chat_of_path(name)));
+create policy "delete own chat media" on storage.objects for delete to authenticated
+  using (bucket_id = 'chat-media' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "read chat media of my chats" on storage.objects for select to authenticated
   using (bucket_id = 'chat-media' and public.can_read_chat(public._chat_of_path(name)));
 

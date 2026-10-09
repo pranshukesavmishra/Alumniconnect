@@ -104,3 +104,8 @@
   animation: shimmer 1.4s infinite;
 }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
+@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes flash { 0%, 100% { background: transparent; } 30% { background: var(--primary-soft); } }
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-"] { animation: none !important; }
+}

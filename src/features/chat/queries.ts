@@ -3,7 +3,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
-import { hasUnknownSender, mergeMessages, PAGE_SIZE, removeLocal, type Attachment, type Message, type MessageKind, type MessageWindow, type Poll } from './merge'
+import { applyMyReaction, hasUnknownSender, mergeMessages, PAGE_SIZE, removeLocal, type Attachment, type Message, type MessageKind, type MessageWindow, type Poll, type ReplyPreview } from './merge'
+import { removeMyFiles, uploadFile, uploadPhoto } from './media'
 
 export type { Message } from './merge'
 
@@ -34,7 +35,10 @@ export interface ChatSummary {
   can_post: boolean
 }
 
-const SELECT = '*, sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)'
+const SELECT =
+  '*, sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url),' +
+  ' reactions:message_reactions(user_id, emoji, user:profiles(full_name, avatar_url)),' +
+  ' reply:reply_to(id, sender_id, kind, body, attachments, poll, deleted_at, sender:profiles!messages_sender_id_fkey(full_name))'
 
 export const chatKeys = {
   list: (uid: string | null) => ['chats', uid] as const,
@@ -105,7 +109,14 @@ async function fetchPage(chatId: string, before?: string): Promise<Message[]> {
   if (before) q = q.lt('created_at', before)
   const { data, error } = await q
   if (error) throw error
-  return (data as Message[]).reverse()
+  return (data as unknown as Message[]).reverse()
+}
+
+async function refetchMessages(chatId: string, ids: string[]): Promise<Message[]> {
+  if (!ids.length) return []
+  const { data, error } = await supabase.from('messages').select(SELECT).eq('chat_id', chatId).in('id', ids)
+  if (error) return []
+  return data as unknown as Message[]
 }
 
 function setWindow(qc: QueryClient, chatId: string, fn: (w: MessageWindow) => MessageWindow) {
@@ -143,12 +154,28 @@ export function useMessages(chatId: string | undefined) {
       setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(w.items, [m], uid) }))
       if (hasUnknownSender(items, m)) void qc.invalidateQueries({ queryKey: chatKeys.messages(chatId) })
     }
+    // reactions changed: re-read just those messages (batched), with their joins
+    const touched = new Set<string>()
+    let t: ReturnType<typeof setTimeout> | undefined
+    const onReaction = (payload: { new: Record<string, unknown>; old: Record<string, unknown> }) => {
+      const id = (payload.new?.message_id ?? payload.old?.message_id) as string | undefined
+      if (!id) return
+      touched.add(id)
+      clearTimeout(t)
+      t = setTimeout(() => {
+        const ids = [...touched]
+        touched.clear()
+        void refetchMessages(chatId, ids).then((rows) => setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(w.items, rows, uid) })))
+      }, 250)
+    }
     const ch = supabase
       .channel(`messages:${chatId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `chat_id=eq.${chatId}` }, onRow)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions', filter: `chat_id=eq.${chatId}` }, onReaction)
       .subscribe((status) => setLive(status === 'SUBSCRIBED'))
     return () => {
+      clearTimeout(t)
       setLive(false)
       void supabase.removeChannel(ch)
     }
@@ -174,12 +201,14 @@ export function useMessages(chatId: string | undefined) {
 export interface SendInput {
   body: string
   kind?: MessageKind
-  attachments?: Attachment[]
-  replyTo?: string | null
+  /** photos (sent together as one album) or a single document */
+  files?: File[]
+  replyTo?: ReplyPreview | null
   poll?: Poll | null
-  /** set when retrying a failed message */
-  localId?: string
 }
+
+// Files of unsent messages, kept so "Retry" can upload them again.
+const pendingFiles = new Map<string, SendInput>()
 
 /** Send with an instant optimistic bubble; on failure the bubble stays with "Retry". */
 export function useSendMessage(chatId: string) {
@@ -188,39 +217,56 @@ export function useSendMessage(chatId: string) {
   const { data: me } = useMyProfile()
   return useMutation({
     mutationFn: async (input: SendInput & { localId: string }) => {
+      const kind = input.kind ?? 'text'
+      let attachments: Attachment[] = []
+      if (input.files?.length) {
+        attachments = await Promise.all(input.files.map((f) => (kind === 'image' ? uploadPhoto(uid!, chatId, f) : uploadFile(uid!, chatId, f))))
+      }
       const { data, error } = await supabase.rpc('send_message', {
         p_chat: chatId,
         p_body: input.body,
-        p_kind: input.kind ?? 'text',
-        p_attachments: input.attachments ?? [],
-        p_reply_to: input.replyTo ?? null,
+        p_kind: kind,
+        p_attachments: attachments,
+        p_reply_to: input.replyTo?.id ?? null,
         p_poll: input.poll ?? null,
       })
-      if (error) throw error
+      if (error) {
+        void removeMyFiles(attachments) // don't leave orphaned uploads behind
+        throw error
+      }
       return data as Message
     },
     onMutate: (input) => {
+      pendingFiles.set(input.localId, input)
+      const kind = input.kind ?? 'text'
       const local: Message = {
         id: input.localId,
         chat_id: chatId,
         sender_id: uid,
-        kind: input.kind ?? 'text',
+        kind,
         body: input.body.trim() || null,
-        attachments: input.attachments ?? [],
-        reply_to: input.replyTo ?? null,
+        attachments: (input.files ?? []).map((f) => ({ path: `local:${f.name}`, name: f.name, size: f.size, mime: f.type, localUrl: kind === 'image' ? URL.createObjectURL(f) : undefined })),
+        reply_to: input.replyTo?.id ?? null,
+        reply: input.replyTo ?? null,
         poll: input.poll ?? null,
         edited_at: null,
         deleted_at: null,
         created_at: new Date().toISOString(),
         sender: me ? { id: me.id, full_name: me.full_name, avatar_url: me.avatar_url } : null,
+        reactions: [],
         pending: true,
       }
-      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(removeLocal(w.items, input.localId), [], uid).concat(local) }))
+      setWindow(qc, chatId, (w) => ({ ...w, items: [...removeLocal(w.items, input.localId), local] }))
     },
     onSuccess: (m, input) => {
-      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(removeLocal(w.items, input.localId), [m], uid) }))
+      pendingFiles.delete(input.localId)
+      setWindow(qc, chatId, (w) => {
+        const local = w.items.find((x) => x.id === input.localId)
+        local?.attachments.forEach((a) => a.localUrl && URL.revokeObjectURL(a.localUrl))
+        return { ...w, items: mergeMessages(removeLocal(w.items, input.localId), [{ ...m, reply: input.replyTo ?? null, reactions: [] }], uid) }
+      })
       qc.setQueryData<ChatSummary[]>(chatKeys.list(uid), (list) =>
-        list?.map((c) => (c.id === chatId ? { ...c, last_message: m.body, last_message_at: m.created_at, last_sender: uid, unread: 0, is_request: c.started_by === uid ? c.is_request : false } : c)),
+        list?.map((c) => (c.id === chatId ? { ...c, last_message_at: m.created_at, last_sender: uid, unread: 0, is_request: c.started_by === uid ? c.is_request : false } : c)),
       )
       void qc.invalidateQueries({ queryKey: chatKeys.list(uid) })
     },
@@ -230,13 +276,81 @@ export function useSendMessage(chatId: string) {
   })
 }
 
+/** What was sent for a failed message, to retry it as-is. */
+export function pendingInput(localId: string): SendInput | undefined {
+  return pendingFiles.get(localId)
+}
+
 export function newLocalId(): string {
   return `local-${crypto.randomUUID()}`
 }
 
 /** Discard a failed message. */
 export function discardLocal(qc: QueryClient, chatId: string, localId: string) {
-  setWindow(qc, chatId, (w) => ({ ...w, items: removeLocal(w.items, localId) }))
+  pendingFiles.delete(localId)
+  setWindow(qc, chatId, (w) => {
+    w.items.find((x) => x.id === localId)?.attachments.forEach((a) => a.localUrl && URL.revokeObjectURL(a.localUrl))
+    return { ...w, items: removeLocal(w.items, localId) }
+  })
+}
+
+function patchMessage(qc: QueryClient, chatId: string, id: string, fn: (m: Message) => Message) {
+  setWindow(qc, chatId, (w) => ({ ...w, items: w.items.map((m) => (m.id === id ? fn(m) : m)) }))
+}
+
+/** React (or remove my reaction with null). Optimistic; rolls back on error. */
+export function useReact(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  const { data: me } = useMyProfile()
+  return useMutation({
+    mutationFn: async ({ id, emoji }: { id: string; emoji: string | null }) => {
+      const { error } = await supabase.rpc('react_to_message', { p_message: id, p_emoji: emoji ?? '' })
+      if (error) throw error
+    },
+    onMutate: ({ id, emoji }) => {
+      const before = qc.getQueryData<MessageWindow>(chatKeys.messages(chatId))?.items.find((m) => m.id === id)?.reactions
+      patchMessage(qc, chatId, id, (m) => ({
+        ...m,
+        reactions: applyMyReaction(m.reactions, uid!, emoji).map((r) => (r.user_id === uid && me ? { ...r, user: { full_name: me.full_name, avatar_url: me.avatar_url } } : r)),
+      }))
+      return { before }
+    },
+    onError: (_e, { id }, ctx) => patchMessage(qc, chatId, id, (m) => ({ ...m, reactions: ctx?.before ?? m.reactions })),
+  })
+}
+
+export function useEditMessage(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  return useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) => {
+      const { data, error } = await supabase.rpc('edit_message', { p_message: id, p_body: body })
+      if (error) throw error
+      return data as Message
+    },
+    onSuccess: (m) => {
+      setWindow(qc, chatId, (w) => ({ ...w, items: mergeMessages(w.items, [m], uid) }))
+      void qc.invalidateQueries({ queryKey: chatKeys.list(uid) })
+    },
+  })
+}
+
+export function useDeleteMessage(chatId: string) {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  return useMutation({
+    mutationFn: async (m: Message) => {
+      const { error } = await supabase.rpc('delete_message', { p_message: m.id })
+      if (error) throw error
+      if (m.sender_id === uid) await removeMyFiles(m.attachments)
+    },
+    onSuccess: (_d, m) => {
+      patchMessage(qc, chatId, m.id, (x) => ({ ...x, body: null, attachments: [], poll: null, reactions: [], deleted_at: new Date().toISOString() }))
+      void qc.invalidateQueries({ queryKey: chatKeys.list(uid) })
+      void qc.invalidateQueries({ queryKey: chatKeys.one(chatId) })
+    },
+  })
 }
 
 /** Mark read (server + local cache), and tell the other side via the live channel. */

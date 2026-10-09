@@ -5,6 +5,10 @@ export type MessageKind = 'text' | 'image' | 'file' | 'voice' | 'poll' | 'system
 
 export interface Attachment {
   path: string
+  /** small version of a photo */
+  thumb?: string
+  /** client-only: preview of a file that is still uploading */
+  localUrl?: string
   name?: string
   mime?: string
   size?: number
@@ -25,6 +29,24 @@ export interface Sender {
   avatar_url: string | null
 }
 
+export interface Reaction {
+  user_id: string
+  emoji: string
+  user?: { full_name: string; avatar_url: string | null } | null
+}
+
+/** The message a reply points to (embedded by the server; may be missing for live rows). */
+export interface ReplyPreview {
+  id: string
+  sender_id: string | null
+  kind: MessageKind
+  body: string | null
+  attachments: Attachment[]
+  poll: Poll | null
+  deleted_at: string | null
+  sender?: { full_name: string } | null
+}
+
 export interface Message {
   id: string
   chat_id: string
@@ -38,6 +60,8 @@ export interface Message {
   deleted_at: string | null
   created_at: string
   sender?: Sender | null
+  reactions?: Reaction[]
+  reply?: ReplyPreview | null
   /** client-only: optimistic message waiting for the server */
   pending?: boolean
   /** client-only: the send failed; the user can retry or discard */
@@ -79,7 +103,10 @@ export function mergeMessages(current: Message[], incoming: Message[], me?: stri
       if (local) map.delete(local.id)
     }
     const sender = m.sender ?? prev?.sender ?? (m.sender_id ? senders.get(m.sender_id) : undefined) ?? null
-    map.set(m.id, { ...m, sender, pending: false, failed: false })
+    // live rows carry no joins: keep what we already know
+    const reactions = m.reactions ?? prev?.reactions ?? []
+    const reply = m.reply !== undefined ? m.reply : (prev?.reply ?? null)
+    map.set(m.id, { ...m, sender, reactions: m.deleted_at ? [] : reactions, reply, pending: false, failed: false })
   }
   return [...map.values()].sort(byTime)
 }
@@ -122,4 +149,22 @@ export function isContinuation(prev: Message | undefined, m: Message): boolean {
   if (!prev || prev.kind === 'system' || m.kind === 'system' || prev.sender_id !== m.sender_id) return false
   const gap = new Date(m.created_at).getTime() - new Date(prev.created_at).getTime()
   return gap >= 0 && gap < 5 * 60_000 && new Date(m.created_at).toDateString() === new Date(prev.created_at).toDateString()
+}
+
+/** Reactions grouped for display: most popular first, with whether I reacted. */
+export function groupReactions(list: Reaction[] | undefined, me: string | null): { emoji: string; count: number; mine: boolean }[] {
+  const by = new Map<string, { emoji: string; count: number; mine: boolean; first: number }>()
+  ;(list ?? []).forEach((r, i) => {
+    const g = by.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false, first: i }
+    g.count++
+    if (r.user_id === me) g.mine = true
+    by.set(r.emoji, g)
+  })
+  return [...by.values()].sort((a, b) => b.count - a.count || a.first - b.first).map(({ emoji, count, mine }) => ({ emoji, count, mine }))
+}
+
+/** Apply my reaction locally (optimistic): same emoji again removes it, a new one replaces it. */
+export function applyMyReaction(list: Reaction[] | undefined, me: string, emoji: string | null): Reaction[] {
+  const others = (list ?? []).filter((r) => r.user_id !== me)
+  return emoji ? [...others, { user_id: me, emoji }] : others
 }

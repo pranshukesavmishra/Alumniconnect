@@ -1,6 +1,6 @@
 import clsx from 'clsx'
-import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Megaphone, MessagesSquare, Search, Send, ShieldAlert, Users, X } from 'lucide-react'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Megaphone, MessagesSquare, Search, ShieldAlert, Users } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
@@ -13,12 +13,18 @@ import { supabase } from '../../lib/supabase'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useJoinGroup } from '../community/queries'
 import { Linkified } from '../community/PostCard'
-import { firstUnreadIndex, isContinuation, previewOf, type Message } from './merge'
+import { ChatComposer } from './Composer'
+import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, useMessageGestures, type ActionPermissions } from './MessageBits'
+import { firstUnreadIndex, isContinuation, previewOf, type Attachment, type Message, type ReplyPreview } from './merge'
 import {
   chatKeys,
   discardLocal,
   newLocalId,
+  pendingInput,
   useAcceptRequest,
+  useDeleteMessage,
+  useEditMessage,
+  useReact,
   useChat,
   useChats,
   useChatSignals,
@@ -26,6 +32,7 @@ import {
   useMessages,
   useSendMessage,
   type ChatSummary,
+  type SendInput,
 } from './queries'
 
 // ------------------------------------------------------------------ helpers
@@ -222,37 +229,43 @@ export function ChatListPage() {
 }
 
 // ------------------------------------------------------------------ thread
+const EDIT_WINDOW_MS = 15 * 60_000
+
 function TickStatus({ m, seen }: { m: Message; seen: boolean }) {
   if (m.pending) return <Clock className="size-3.5" aria-label="Sending" />
   if (seen) return <CheckCheck className="size-4 text-[#53bdeb]" aria-label="Seen" />
   return <Check className="size-4" aria-label="Sent" />
 }
 
-function Bubble({
-  m,
-  mine,
-  showName,
-  isGroup,
-  seen,
-  onRetry,
-  onDiscard,
-}: {
+interface BubbleProps {
   m: Message
+  me: string | null
   mine: boolean
   showName: boolean
   isGroup: boolean
   seen: boolean
+  interactive: boolean
+  quote: ReplyPreview | null
+  onMenu: () => void
+  onReply: () => void
+  onHeart: () => void
+  onPhotos: (items: Attachment[], start: number) => void
+  onReactions: () => void
+  onQuote: (id: string) => void
   onRetry: () => void
   onDiscard: () => void
-}) {
+}
+
+function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMenu, onReply, onHeart, onPhotos, onReactions, onQuote, onRetry, onDiscard }: BubbleProps) {
+  const gestures = useMessageGestures({ onReply, onMenu, onDoubleTap: onHeart, enabled: interactive })
   if (m.kind === 'system') {
     return <p className="mx-auto my-2 w-fit max-w-[85%] rounded-full bg-surface-2 px-3 py-1 text-center text-xs text-muted">{m.body}</p>
   }
   const deleted = !!m.deleted_at
   return (
-    <div className={clsx('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
+    <div className={clsx('group flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
       {isGroup && !mine && (
-        <span className="w-8 shrink-0">
+        <span className="w-8 shrink-0 self-start">
           {showName && (
             <Link to={m.sender_id ? `/people/${m.sender_id}` : '#'} aria-label={m.sender?.full_name ?? 'Member'}>
               <Avatar src={m.sender?.avatar_url} name={m.sender?.full_name ?? '?'} size={32} />
@@ -260,39 +273,65 @@ function Bubble({
           )}
         </span>
       )}
+      {mine && interactive && <MenuButton onClick={onMenu} />}
       <div className={clsx('flex max-w-[80%] flex-col', mine ? 'items-end' : 'items-start')}>
-        <div
-          className={clsx(
-            'min-w-16 whitespace-pre-line break-words rounded-2xl px-3 py-1.5 text-[16px] leading-snug shadow-sm [overflow-wrap:anywhere]',
-            mine ? 'bg-primary text-on-primary [&_a]:text-on-primary' : 'bg-surface text-text',
-            mine ? (showName ? 'rounded-tr-md' : '') : showName ? 'rounded-tl-md' : '',
-            m.failed && 'ring-2 ring-danger',
-          )}
-        >
-          {isGroup && !mine && showName && <p className={clsx('mb-0.5 text-[13px] font-semibold', nameColour(m.sender_id))}>{m.sender?.full_name ?? 'Former member'}</p>}
-          {deleted ? (
-            <p className={clsx('italic', mine ? 'text-on-primary/80' : 'text-muted')}>🚫 This message was deleted</p>
-          ) : m.kind === 'text' ? (
-            <Linkified text={m.body ?? ''} />
-          ) : (
-            <p>{previewOf(m)}</p>
-          )}
-          <p className={clsx('-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-primary/75' : 'text-muted')}>
-            {m.edited_at && !deleted && <span>edited ·</span>}
-            <span>{timeOf(m.created_at)}</span>
-            {mine && !m.failed && <TickStatus m={m} seen={seen} />}
-          </p>
+        <div ref={gestures} style={{ touchAction: 'pan-y' }} className="[-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none">
+          <div
+            className={clsx(
+              'min-w-16 whitespace-pre-line break-words rounded-2xl px-3 py-1.5 text-[16px] leading-snug shadow-sm [overflow-wrap:anywhere]',
+              mine ? 'bg-primary text-on-primary [&_a]:text-on-primary' : 'bg-surface text-text',
+              mine ? (showName ? 'rounded-tr-md' : '') : showName ? 'rounded-tl-md' : '',
+              m.failed && 'ring-2 ring-danger',
+            )}
+          >
+            {isGroup && !mine && showName && <p className={clsx('mb-0.5 text-[13px] font-semibold', nameColour(m.sender_id))}>{m.sender?.full_name ?? 'Former member'}</p>}
+            {quote && !deleted && <ReplyQuote r={quote} mine={mine} me={me} onClick={() => onQuote(quote.id)} />}
+            {deleted ? (
+              <p className={clsx('italic', mine ? 'text-on-primary/80' : 'text-muted')}>🚫 This message was deleted</p>
+            ) : (
+              <>
+                {m.kind === 'image' && <PhotoGrid items={m.attachments} pending={m.pending} onOpen={(i) => onPhotos(m.attachments, i)} />}
+                {m.kind === 'file' && m.attachments[0] && <FileCard a={m.attachments[0]} mine={mine} pending={m.pending} />}
+                {m.kind === 'text' || m.kind === 'image' || m.kind === 'file' ? m.body && <Linkified text={m.body} /> : <p>{previewOf(m)}</p>}
+              </>
+            )}
+            <p className={clsx('-mb-0.5 mt-0.5 flex items-center justify-end gap-1 text-[11px]', mine ? 'text-on-primary/75' : 'text-muted')}>
+              {m.edited_at && !deleted && <span>edited ·</span>}
+              <span>{timeOf(m.created_at)}</span>
+              {mine && !m.failed && <TickStatus m={m} seen={seen} />}
+            </p>
+          </div>
         </div>
+        {!deleted && <ReactionChips list={m.reactions} me={me} mine={mine} onOpen={onReactions} />}
         {m.failed && (
           <div className="mt-1 flex items-center gap-1 text-sm">
             <AlertCircle className="size-4 text-danger" aria-hidden />
             <span className="text-danger">Not sent.</span>
-            <button type="button" onClick={onRetry} className="min-h-9 rounded-full px-2 font-semibold text-primary">Retry</button>
-            <button type="button" onClick={onDiscard} className="min-h-9 rounded-full px-2 font-semibold text-muted">Delete</button>
+            <button type="button" onClick={onRetry} className="min-h-11 rounded-full px-2 font-semibold text-primary">Retry</button>
+            <button type="button" onClick={onDiscard} className="min-h-11 rounded-full px-2 font-semibold text-muted">Delete</button>
           </div>
         )}
       </div>
+      {!mine && interactive && <MenuButton onClick={onMenu} />}
     </div>
+  )
+}
+
+/** Desktop hover button for message options (phones use long-press). */
+function MenuButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hidden size-9 shrink-0 place-items-center self-center rounded-full text-muted opacity-0 hover:bg-surface-2 focus:opacity-100 group-hover:opacity-100 [@media(pointer:fine)]:grid"
+      aria-label="Message options"
+    >
+      <svg viewBox="0 0 24 24" className="size-5" fill="currentColor" aria-hidden>
+        <circle cx="5" cy="12" r="1.8" />
+        <circle cx="12" cy="12" r="1.8" />
+        <circle cx="19" cy="12" r="1.8" />
+      </svg>
+    </button>
   )
 }
 
@@ -311,20 +350,27 @@ export function ChatThreadPage() {
   const { data: chat, isLoading: chatLoading } = useChat(id)
   const { data: win, isLoading, error, loadOlder, loadingOlder } = useMessages(id)
   const send = useSendMessage(id)
+  const react = useReact(id)
+  const edit = useEditMessage(id)
+  const del = useDeleteMessage(id)
   const accept = useAcceptRequest(id)
   const join = useJoinGroup()
   const signals = useChatSignals(id)
   const markRead = useMarkRead(id, signals.sentRead)
 
-  const [text, setText] = useState('')
   const [atBottom, setAtBottom] = useState(true)
   const [newBelow, setNewBelow] = useState(0)
+  const [actionFor, setActionFor] = useState<string | null>(null)
+  const [reactorsFor, setReactorsFor] = useState<string | null>(null)
+  const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null)
+  const [editing, setEditing] = useState<Message | null>(null)
+  const [viewer, setViewer] = useState<{ items: Attachment[]; start: number } | null>(null)
   const scroller = useRef<HTMLDivElement>(null)
   const topSentinel = useRef<HTMLDivElement>(null)
-  const input = useRef<HTMLTextAreaElement>(null)
   const items = useMemo(() => win?.items ?? [], [win])
+  const byId = useMemo(() => new Map(items.map((m) => [m.id, m])), [items])
 
-  // "New messages" divider: frozen at the read position when the chat was opened.
+  // "Unread messages" divider: frozen at the read position when the chat was opened.
   const [openedReadAt, setOpenedReadAt] = useState<string | null | undefined>(undefined)
   useEffect(() => {
     if (chat && openedReadAt === undefined) setOpenedReadAt(chat.last_read_at)
@@ -374,12 +420,15 @@ export function ChatThreadPage() {
   useEffect(() => {
     const el = topSentinel.current
     if (!el || !win?.hasOlder) return
-    const io = new IntersectionObserver((entries) => {
-      if (entries[0]?.isIntersecting && positioned.current && scroller.current) {
-        heightBefore.current = scroller.current.scrollHeight
-        void loadOlder()
-      }
-    }, { root: scroller.current, rootMargin: '200px 0px 0px 0px' })
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && positioned.current && scroller.current) {
+          heightBefore.current = scroller.current.scrollHeight
+          void loadOlder()
+        }
+      },
+      { root: scroller.current, rootMargin: '200px 0px 0px 0px' },
+    )
     io.observe(el)
     return () => io.disconnect()
   }, [win?.hasOlder, loadOlder])
@@ -408,31 +457,38 @@ export function ChatThreadPage() {
     if (bottom) setNewBelow(0)
   }, [])
 
-  // Auto-grow the composer up to ~6 lines.
-  useLayoutEffect(() => {
-    const el = input.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
-  }, [text])
+  // Jump to a quoted message, loading earlier pages if needed, and flash it.
+  const jumpTo = useCallback(
+    async (target: string) => {
+      for (let i = 0; i < 20; i++) {
+        const el = document.getElementById(`msg-${target}`)
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          el.animate([{ background: 'var(--primary-soft)' }, { background: 'transparent' }], { duration: 1600, easing: 'ease-out' })
+          return
+        }
+        if (!qc.getQueryData<{ hasOlder: boolean }>(chatKeys.messages(id))?.hasOlder) break
+        await loadOlder()
+        await new Promise((r) => requestAnimationFrame(r))
+      }
+      toast('That message is no longer available.')
+    },
+    [id, loadOlder, qc],
+  )
 
-  function doSend(body: string, localId = newLocalId()) {
-    send.mutate(
-      { body, localId },
-      {
-        onError: (err) => toast.error(friendlyError(err)),
-      },
-    )
+  function doSend(input: SendInput, localId = newLocalId()) {
+    send.mutate({ ...input, localId }, { onError: (err) => toast.error(friendlyError(err)) })
     signals.sentMessage()
   }
 
-  function submit(e?: FormEvent) {
-    e?.preventDefault()
-    const body = text.trim()
-    if (!body || !chat?.can_post) return
-    setText('')
-    doSend(body)
-    input.current?.focus()
+  async function saveEdit(messageId: string, body: string) {
+    try {
+      await edit.mutateAsync({ id: messageId, body })
+      return true
+    } catch (e) {
+      toast.error(friendlyError(e))
+      return false
+    }
   }
 
   async function block() {
@@ -450,6 +506,27 @@ export function ChatThreadPage() {
     if (err) return toast.error(friendlyError(err))
     toast.success(chat.muted ? 'Notifications on' : 'Muted. You won’t get notifications from this chat.')
     await Promise.all([qc.invalidateQueries({ queryKey: chatKeys.one(id) }), qc.invalidateQueries({ queryKey: ['chats'] })])
+  }
+
+  function permsFor(m: Message | undefined): ActionPermissions {
+    const none = { canReact: false, canReply: false, canEdit: false, canDelete: false, adminDelete: false }
+    if (!m || !chat || m.pending || m.failed || m.kind === 'system') return none
+    const deleted = !!m.deleted_at
+    const mine = m.sender_id === uid
+    const blockedRequest = chat.kind === 'dm' && chat.is_request && chat.started_by !== uid
+    return {
+      canReact: !deleted && !blockedRequest,
+      canReply: !deleted && chat.can_post && !blockedRequest,
+      canEdit: mine && !deleted && ['text', 'image', 'file'].includes(m.kind) && Date.now() - new Date(m.created_at).getTime() < EDIT_WINDOW_MS - 30_000,
+      canDelete: !deleted && (mine || (chat.kind === 'group' && chat.is_group_admin)),
+      adminDelete: !mine,
+    }
+  }
+
+  function heart(m: Message) {
+    if (!permsFor(m).canReact) return
+    const mineNow = m.reactions?.find((r) => r.user_id === uid)?.emoji
+    react.mutate({ id: m.id, emoji: mineNow === '❤️' ? null : '❤️' }, { onError: (e) => toast.error(friendlyError(e)) })
   }
 
   if (meLoading) return <PageSkeleton />
@@ -470,6 +547,8 @@ export function ChatThreadPage() {
     return -1
   })()
   const titleLink = chat ? (chat.kind === 'dm' ? `/people/${chat.other_id}` : `/groups/${chat.group_slug}`) : '#'
+  const actionMsg = actionFor ? (byId.get(actionFor) ?? null) : null
+  const reactorsMsg = reactorsFor ? (byId.get(reactorsFor) ?? null) : null
 
   return (
     <div className="flex h-dvh flex-col bg-bg">
@@ -502,7 +581,7 @@ export function ChatThreadPage() {
         </div>
       </header>
 
-      <div ref={scroller} onScroll={onScroll} className="relative flex-1 overflow-y-auto overscroll-contain" aria-live="polite" aria-relevant="additions">
+      <div ref={scroller} onScroll={onScroll} className="relative flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
         <div className="mx-auto w-full max-w-3xl px-3 py-3">
           {error && <Notice tone="danger" title={friendlyError(error)} />}
           <div ref={topSentinel} />
@@ -524,28 +603,40 @@ export function ChatThreadPage() {
               <p className="mt-2">{isGroup ? 'No messages yet. Start the conversation!' : 'Say hello!'}</p>
             </div>
           ) : (
-            <ul className="space-y-0.5">
+            <ul className="space-y-0.5" aria-label="Messages">
               {items.map((m, i) => {
                 const prev = items[i - 1]
                 const newDay = !prev || new Date(prev.created_at).toDateString() !== new Date(m.created_at).toDateString()
-                const cont = !newDay && i !== unreadIdx && isContinuation(prev, m)
+                const cont = !newDay && i !== unreadIdx && isContinuation(prev, m) && !m.reply_to
                 const mine = m.sender_id === uid
                 const seen = chat?.kind === 'dm' && !!chat.other_last_read_at && chat.other_last_read_at >= m.created_at
+                const target = m.reply_to ? byId.get(m.reply_to) : undefined
+                const quote = m.reply_to ? (target ? replyPreviewOf(target) : (m.reply ?? null)) : null
+                const interactive = !m.pending && !m.failed && !m.deleted_at && m.kind !== 'system'
                 return (
-                  <li key={m.id} ref={i === unreadIdx ? unreadRef : undefined} className={clsx(!cont && 'pt-2')}>
-                    {newDay && (
-                      <p className="sticky top-1 z-10 mx-auto my-2 w-fit rounded-full bg-surface-2/95 px-3 py-1 text-xs font-semibold text-muted shadow-sm">{dayLabel(m.created_at)}</p>
-                    )}
-                    {i === unreadIdx && (
-                      <p className="my-2 rounded-full bg-primary-soft py-1 text-center text-xs font-bold text-primary">Unread messages</p>
-                    )}
+                  <li key={m.id} id={`msg-${m.id}`} ref={i === unreadIdx ? unreadRef : undefined} className={clsx('rounded-xl', !cont && 'pt-2', (m.reactions?.length ?? 0) > 0 && 'pb-1')}>
+                    {newDay && <p className="sticky top-1 z-10 mx-auto my-2 w-fit rounded-full bg-surface-2/95 px-3 py-1 text-xs font-semibold text-muted shadow-sm">{dayLabel(m.created_at)}</p>}
+                    {i === unreadIdx && <p className="my-2 rounded-full bg-primary-soft py-1 text-center text-xs font-bold text-primary">Unread messages</p>}
                     <Bubble
                       m={m}
+                      me={uid}
                       mine={mine}
                       showName={!cont}
                       isGroup={!!isGroup}
                       seen={seen}
-                      onRetry={() => doSend(m.body ?? '', m.id)}
+                      interactive={interactive}
+                      quote={quote}
+                      onMenu={() => setActionFor(m.id)}
+                      onReply={() => permsFor(m).canReply && setReplyTo(replyPreviewOf(m))}
+                      onHeart={() => heart(m)}
+                      onPhotos={(list, start) => setViewer({ items: list, start })}
+                      onReactions={() => setReactorsFor(m.id)}
+                      onQuote={(qid) => void jumpTo(qid)}
+                      onRetry={() => {
+                        const input = pendingInput(m.id)
+                        if (input) doSend(input, m.id)
+                        else doSend({ body: m.body ?? '' }, m.id)
+                      }}
                       onDiscard={() => discardLocal(qc, id, m.id)}
                     />
                     {mine && i === lastMineIdx && chat?.kind === 'dm' && seen && <p className="mt-0.5 pr-1 text-right text-[11px] text-muted">Seen</p>}
@@ -586,10 +677,7 @@ export function ChatThreadPage() {
                 block
                 loading={join.isPending}
                 onClick={() =>
-                  join.mutate(
-                    { id: chat.group_id!, join: true },
-                    { onSuccess: () => void qc.invalidateQueries({ queryKey: chatKeys.one(id) }), onError: (e) => toast.error(friendlyError(e)) },
-                  )
+                  join.mutate({ id: chat.group_id!, join: true }, { onSuccess: () => void qc.invalidateQueries({ queryKey: chatKeys.one(id) }), onError: (e) => toast.error(friendlyError(e)) })
                 }
               >
                 {chat.group_kind === 'channel' ? 'Follow this channel' : 'Join to chat'}
@@ -606,45 +694,58 @@ export function ChatThreadPage() {
               </p>
             )
           ) : (
-            <form onSubmit={submit} className="flex items-end gap-2">
-              <textarea
-                ref={input}
-                aria-label="Message"
-                rows={1}
-                className="max-h-40 min-h-12 flex-1 resize-none rounded-3xl border border-border bg-surface px-4 py-3 text-[16px] leading-snug focus:border-primary focus:outline-none"
-                placeholder={isGroup ? 'Message the group' : 'Message'}
-                value={text}
-                maxLength={4000}
-                enterKeyHint="send"
-                onChange={(e) => {
-                  setText(e.target.value)
-                  if (e.target.value) signals.sendTyping()
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(pointer: fine)').matches) {
-                    e.preventDefault()
-                    submit()
-                  }
-                }}
-              />
-              {text && (
-                <button type="button" onClick={() => setText('')} className="sr-only focus:not-sr-only" aria-label="Clear message">
-                  <X className="size-4" />
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={!text.trim() || !chat}
-                className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-on-primary transition-opacity disabled:opacity-40"
-                aria-label="Send"
-              >
-                <Send className="size-5" />
-              </button>
-            </form>
+            <ChatComposer
+              isGroup={!!isGroup}
+              me={uid}
+              replyTo={replyTo}
+              onCancelReply={() => setReplyTo(null)}
+              editing={editing}
+              onCancelEdit={() => setEditing(null)}
+              onSend={(input) => doSend(input)}
+              onEdit={saveEdit}
+              onTyping={signals.sendTyping}
+            />
           )}
-          {text.length > 3500 && <p className="mt-1 text-right text-xs text-muted">{4000 - text.length} characters left</p>}
         </div>
       </div>
+
+      <MessageActionsSheet
+        m={actionMsg}
+        perms={permsFor(actionMsg ?? undefined)}
+        me={uid}
+        onClose={() => setActionFor(null)}
+        onReact={(emoji) => {
+          if (actionMsg) react.mutate({ id: actionMsg.id, emoji }, { onError: (e) => toast.error(friendlyError(e)) })
+          setActionFor(null)
+        }}
+        onReply={() => {
+          if (actionMsg) setReplyTo(replyPreviewOf(actionMsg))
+          setActionFor(null)
+        }}
+        onEdit={() => {
+          setEditing(actionMsg)
+          setReplyTo(null)
+          setActionFor(null)
+        }}
+        onDelete={() => {
+          const m = actionMsg
+          setActionFor(null)
+          if (!m) return
+          const admin = m.sender_id !== uid
+          if (!window.confirm(admin ? 'Remove this message for everyone in the group?' : 'Delete this message for everyone?')) return
+          del.mutate(m, { onSuccess: () => toast.success('Message deleted'), onError: (e) => toast.error(friendlyError(e)) })
+        }}
+      />
+      <ReactorsSheet
+        m={reactorsMsg}
+        me={uid}
+        onClose={() => setReactorsFor(null)}
+        onRemoveMine={() => {
+          if (reactorsMsg) react.mutate({ id: reactorsMsg.id, emoji: null }, { onError: (e) => toast.error(friendlyError(e)) })
+          setReactorsFor(null)
+        }}
+      />
+      {viewer && <Lightbox items={viewer.items} start={viewer.start} onClose={() => setViewer(null)} />}
     </div>
   )
 }
