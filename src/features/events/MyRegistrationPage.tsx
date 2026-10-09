@@ -1,5 +1,7 @@
 import clsx from 'clsx'
 import { CalendarPlus, Check, Copy, Pencil, Smartphone, Upload, X } from 'lucide-react'
+import { readCachedTicket, ticketKey, type CachedTicket } from './ticketCache'
+import { useOnline } from '../../hooks/useOnline'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router'
 import { toast } from 'sonner'
@@ -32,19 +34,13 @@ const IOS_APPS = [
   { name: 'Paytm', scheme: 'paytmmp://pay' },
 ]
 
-interface CachedTicket {
-  code: string
-  name: string
-  headcount: number
-  title: string
-  when: string
-}
-const ticketKey = (uid: string | null) => `ticket:${uid ?? ''}`
+
 
 export function MyRegistrationPage() {
   const { data: event, isLoading } = useEvent(MEET_SLUG)
   const { data: mine, isLoading: lm, isFetching, error } = useMyRegistration(event?.id)
   const uid = useUserId()
+  const online = useOnline()
 
   // Keep the entry pass on the phone so it can be shown at the gate without network.
   useEffect(() => {
@@ -60,14 +56,14 @@ export function MyRegistrationPage() {
     }
   }, [mine, event, uid])
 
+  // no signal at the gate: show the pass saved on this phone straight away, never a loading screen
+  if (!online) {
+    const saved = readCachedTicket(uid)
+    if (saved) return <Page><OfflineTicket t={saved} /></Page>
+  }
   if ((isLoading || lm) && !error) return <PageSkeleton />
   if (error || (!event && !navigator.onLine)) {
-    let cached: CachedTicket | null = null
-    try {
-      cached = JSON.parse(localStorage.getItem(ticketKey(uid)) ?? 'null') as CachedTicket | null
-    } catch {
-      /* ignore */
-    }
+    const cached = readCachedTicket(uid)
     return <Page>{cached ? <OfflineTicket t={cached} /> : <Notice tone="danger" title={friendlyError(error)} />}</Page>
   }
   if (!event) return <Navigate to="/meet" replace />

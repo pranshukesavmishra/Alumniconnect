@@ -325,7 +325,7 @@ test.describe('check-in', () => {
     expect(ci(vol, ru.code).out.split('\n').pop()).toBe('cancelled|false|-')
   })
 
-  test('volunteers cannot see tickets bought or payments (but do see registrations)', () => {
+  test('volunteers cannot see tickets bought, payments or contact details (they get the safe attendee list)', () => {
     const ev = createEvent()
     const vol = makeVolunteer(ev, 'privvol')
     const u = createMember({ email: mail('priv'), name: 'Private Person' })
@@ -333,7 +333,10 @@ test.describe('check-in', () => {
     submitUtr(u, r.id, newUtr())
     expect(as(vol, `select count(*) from event_registration_items where registration_id = '${r.id}'`).split('\n').pop()).toBe('0')
     expect(as(vol, `select count(*) from event_payments where registration_id = '${r.id}'`).split('\n').pop()).toBe('0')
-    expect(as(vol, `select count(*) from event_registrations where id = '${r.id}'`).split('\n').pop()).toBe('1')
+    // the registrations table itself is closed to them; the attendee list leaves out phone/email/notes/amount
+    expect(as(vol, `select count(*) from event_registrations where id = '${r.id}'`).split('\n').pop()).toBe('0')
+    expect(as(vol, `select count(*) from event_attendees('${ev.id}') where id = '${r.id}'`).split('\n').pop()).toBe('1')
+    expect(as(vol, `select count(*) from event_attendees('${ev.id}') where id = '${r.id}' and phone = '' and email is null and amount_paise = 0`).split('\n').pop()).toBe('1')
     // a volunteer cannot verify payments or record cash
     expect(review(vol, payment(r.id)[0]!, true).err).toContain('Only event managers')
   })

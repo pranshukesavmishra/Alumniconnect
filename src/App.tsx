@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
+import { readCachedTicket } from './features/events/ticketCache'
+import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
 import { MeetPage } from './features/events/MeetPage'
 import { HomePage } from './features/home/HomePage'
@@ -87,6 +89,9 @@ function RequireMember({ children }: { children: ReactNode }) {
   const { data: profile, isLoading } = useMyProfile()
   const location = useLocation()
   const here = location.pathname + location.search
+  const online = useOnline()
+  // at the gate with no signal: the saved entry pass must open without waiting for (or needing) a sign-in check
+  if (!online && location.pathname === '/meet/my' && readCachedTicket(session?.user.id ?? null)) return <>{children}</>
   if (loading || (session && isLoading)) return <PageSkeleton />
   if (!session) return <Navigate to={`/signin?next=${encodeURIComponent(here)}`} replace />
   if (profile && !profile.onboarded) return <Navigate to={`/welcome?next=${encodeURIComponent(here)}`} replace />

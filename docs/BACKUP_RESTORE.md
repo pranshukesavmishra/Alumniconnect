@@ -14,7 +14,7 @@ The encrypted backups contain all app data, sign-in accounts and photo records. 
 
 ## Restore into a new Supabase project
 
-This procedure was rehearsed on 8 Oct 2026, and every table came back with identical row counts.
+This procedure was rehearsed on 9 Oct 2026 against a real Supabase stack (backup, wipe, restore): all 34 tables, including chat history, sign-in accounts and file records, came back with identical row counts.
 
 1. **Download a backup:** GitHub → Actions → *Nightly backup and keep-alive* → a recent run → Artifacts. Or take it from the R2/B2 bucket.
 2. **Decrypt it:**

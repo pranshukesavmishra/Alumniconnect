@@ -40,8 +40,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   const e = existing?.event
   const [f, setF] = useState({
     slug: e?.slug ?? MEET_SLUG,
-    title: e?.title ?? 'JEC Alumni Meet 2026',
-    tagline: e?.tagline ?? 'Batches 2001–2010',
+    title: e?.title ?? '',
+    tagline: e?.tagline ?? '',
     description: e?.description ?? '',
     venue: e?.venue ?? 'Jabalpur Engineering College, Jabalpur',
     venue_map_url: e?.venue_map_url ?? '',
@@ -172,8 +172,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
 
       <section className="space-y-4">
         <SectionTitle>Event</SectionTitle>
-        <Field label="Title">{(p) => <Input {...p} value={f.title} onChange={set('title')} maxLength={120} />}</Field>
-        <Field label="Tagline" optional>{(p) => <Input {...p} value={f.tagline} onChange={set('tagline')} maxLength={200} />}</Field>
+        <Field label="Title">{(p) => <Input {...p} value={f.title} onChange={set('title')} maxLength={120} placeholder="e.g. JEC Alumni Meet 2026" />}</Field>
+        <Field label="Tagline" optional>{(p) => <Input {...p} value={f.tagline} onChange={set('tagline')} maxLength={200} placeholder="e.g. Batches 2001–2010" />}</Field>
         <Field label="Description / programme" optional>{(p) => <Textarea {...p} rows={6} value={f.description} onChange={set('description')} maxLength={5000} />}</Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Starts (India time)">{(p) => <Input {...p} type="datetime-local" value={f.starts_at} onChange={set('starts_at')} />}</Field>

@@ -110,7 +110,7 @@ export function MeetPage() {
               {years.map((y) => (
                 <div key={y} className="rounded-xl border border-border bg-surface px-1 py-2 text-center">
                   <p className="text-[15px] font-bold tabular-nums">{y}</p>
-                  <p className="text-xs text-muted">{countByYear.get(y) ?? 0} in</p>
+                  <p className="text-xs text-muted">{countByYear.get(y) ? `${countByYear.get(y)} in` : 'Be first'}</p>
                 </div>
               ))}
             </div>

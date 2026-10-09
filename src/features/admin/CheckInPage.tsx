@@ -147,7 +147,7 @@ export function CheckInPage() {
         <form onSubmit={submitManual} className="flex gap-2">
           <div className="relative flex-1">
             <Keyboard className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />
-            <Input aria-label="Ticket code" placeholder="Type code, e.g. 7KQ4M2" className="pl-11 font-mono uppercase" value={manual} onChange={(e) => setManual(e.target.value)} autoCapitalize="characters" />
+            <Input aria-label="Ticket code" placeholder="Code, e.g. 7KQ4M2" className="pl-11 font-mono uppercase" value={manual} onChange={(e) => setManual(e.target.value)} autoCapitalize="characters" />
           </div>
           <Button type="submit" loading={busy}>
             Check

@@ -15,9 +15,21 @@
     <meta property="og:description" content="Register for the JEC Alumni Meet 2026 (batches 2001–2010) and reconnect with your batch." />
     <meta property="og:image" content="/pwa-512.png" />
     <title>JEC Alumni Connect</title>
+      <style>
+      .splash { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 14px; background: linear-gradient(160deg, #0b4a37, #062a20); color: #e8f3ed; font: 600 15px/1.2 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 0.02em; }
+      .splash-mark { width: 72px; height: 72px; border-radius: 20px; display: grid; place-items: center; background: rgba(255,255,255,0.1); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18); font: 800 26px/1 system-ui, sans-serif; color: #fff; animation: splash-pulse 1.4s ease-in-out infinite; }
+      @keyframes splash-pulse { 50% { transform: scale(0.94); opacity: 0.8; } }
+      @media (prefers-reduced-motion: reduce) { .splash-mark { animation: none; } }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- shown instantly while the app loads; replaced as soon as the app starts -->
+      <div class="splash" role="status" aria-label="Loading JEC Alumni Connect">
+        <div class="splash-mark">JEC</div>
+        <p>JEC Alumni Connect</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
