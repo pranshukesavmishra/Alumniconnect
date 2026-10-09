@@ -215,9 +215,10 @@ function Spotlight() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('spotlights')
-        .select('id, headline, story, starts_on, profile:profiles(id, full_name, avatar_url, grad_year, branch)')
+        .select('id, headline, story, starts_on, profile:profiles!spotlights_profile_id_fkey(id, full_name, avatar_url, grad_year, branch)')
         .lte('starts_on', new Date().toISOString().slice(0, 10))
         .order('starts_on', { ascending: false })
+        .order('created_at', { ascending: false }) // newest wins when two start the same day
         .limit(1)
         .maybeSingle()
       if (error) throw error

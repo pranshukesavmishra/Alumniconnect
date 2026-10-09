@@ -675,3 +675,8 @@ on conflict (slug) do nothing;
 do $$ declare r record; begin
   for r in select id from public.profiles where onboarded loop perform public._ensure_batch_groups(r.id); end loop;
 end $$;
+
+-- Admin changes to circles, the spotlight and batch sizes go in the activity log (circle creation by members is not logged).
+create trigger groups_audit after update or delete on public.groups for each row execute function public._audit_config_change();
+create trigger spotlights_audit after insert or update or delete on public.spotlights for each row execute function public._audit_config_change();
+create trigger batch_sizes_audit after insert or update or delete on public.batch_sizes for each row execute function public._audit_config_change();
