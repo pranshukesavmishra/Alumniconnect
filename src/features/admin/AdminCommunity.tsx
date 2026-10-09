@@ -135,7 +135,7 @@ function SpotlightEditor() {
   const list = useQuery({
     queryKey: ['admin-spotlights'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('spotlights').select('id, headline, starts_on, profile:profiles!spotlights_profile_id_fkey(id, full_name, avatar_url)').order('starts_on', { ascending: false }).limit(10)
+      const { data, error } = await supabase.from('spotlights').select('id, headline, starts_on, profile:profiles!spotlights_profile_id_fkey(id, full_name, avatar_url)').order('starts_on', { ascending: false }).order('created_at', { ascending: false }).limit(10)
       if (error) throw error
       return data as unknown as Spot[]
     },
