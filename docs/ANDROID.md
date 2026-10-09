@@ -56,6 +56,22 @@ a feature graphic (1024×500), at least 2 phone screenshots, a short and full de
 `https://YOUR-SITE/privacy`. Under "Data safety" declare: name, email, phone, photos, messages and purchase info are
 collected, encrypted in transit, and deletable on request.
 
+### Location (Nearby JECians) and the Data safety form
+
+The app asks for **foreground, approximate location only**, and only when a member taps "Turn on city sharing" (off by default).
+It uses the browser Geolocation API with low accuracy; the TWA needs no `ACCESS_BACKGROUND_LOCATION` and must not request it.
+Do **not** add background-location permissions to the Bubblewrap manifest; Chrome shows the Android prompt for the website's own
+permission request, on a user action.
+
+Declare in Play Console → App content → Data safety:
+
+* Data types: **Approximate location** is collected and shared with other app users (city name only). Precise location is not collected.
+* Purpose: App functionality (finding batchmates nearby). Not used for advertising, analytics or tracking; not sold.
+* Handling: encrypted in transit; optional (the app works without it); users can delete it any time (profile → Turn off and delete)
+  and it is deleted with their account.
+* Background location: no (foreground only).
+* Map tiles come from OpenStreetMap (the city being viewed, not the member's position). City names come from GeoNames (CC BY 4.0).
+
 ## Notes
 
 * Updates to the website reach the app immediately. You only rebuild the `.aab` to change the icon, package settings or

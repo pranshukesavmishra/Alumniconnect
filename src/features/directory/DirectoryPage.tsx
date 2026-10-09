@@ -1,6 +1,6 @@
 import { shortBranch } from '../../lib/constants'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { Search, ShieldAlert, SlidersHorizontal, Users } from 'lucide-react'
+import { MapPin, Search, ShieldAlert, SlidersHorizontal, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -12,6 +12,7 @@ import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 import { useMyProfile } from '../auth/AuthProvider'
+import { useT } from '../../i18n'
 
 const PAGE = 30
 
@@ -25,6 +26,7 @@ function useDebounced<T>(value: T, ms = 300) {
 }
 
 export function DirectoryPage() {
+  const tx = useT()
   const { data: me } = useMyProfile()
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState(params.get('q') ?? '')
@@ -112,6 +114,13 @@ export function DirectoryPage() {
                 </Select>
               </div>
             )}
+            <Link to="/nearby" className="flex min-h-12 items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-2 hover:border-primary/40">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary"><MapPin className="size-5" aria-hidden /></span>
+              <span className="min-w-0">
+                <span className="block font-semibold">{tx('nearby.entry')}</span>
+                <span className="block truncate text-sm text-muted">{tx('nearby.entryHint')}</span>
+              </span>
+            </Link>
             {me?.grad_year && !year && !dq && (
               <button type="button" className="text-sm font-semibold text-primary" onClick={() => { setShowFilters(true); setFilter('year', String(me.grad_year)) }}>
                 Show my batch ({me.grad_year})

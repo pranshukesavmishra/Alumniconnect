@@ -33,6 +33,7 @@ export async function collectMyData(uid: string) {
         supabase.from('event_payments').select('*').in('registration_id', regIds).then((r) => r.data ?? []),
       ])
     : [[], []]
+  const { data: loc } = await supabase.rpc('my_location')
   const { data: sent } = await supabase.from('messages').select('id, chat_id, kind, body, created_at').eq('sender_id', uid).is('deleted_at', null).order('created_at', { ascending: false }).limit(5000)
   return {
     exported_at: new Date().toISOString(),
@@ -50,6 +51,7 @@ export async function collectMyData(uid: string) {
     event_registration_items: items,
     event_payments: payments,
     notifications,
+    shared_location: loc ?? null,
   }
 }
 

@@ -21,6 +21,7 @@
     "@tanstack/react-query": "^5.104.1",
     "clsx": "^2.1.1",
     "jszip": "^3.10.2",
+    "leaflet": "1.9.4",
     "lucide-react": "^1.53.0",
     "papaparse": "^5.7.0",
     "pdfjs-dist": "^6.4.299",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/leaflet": "1.9.20",
     "@types/node": "^24.13.3",
     "@types/papaparse": "^5.5.2",
     "@types/qrcode": "^1.5.6",

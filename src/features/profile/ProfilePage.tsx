@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import type { Education, Experience } from '../../lib/types'
 import { signOut, useMyProfile, useUserId } from '../auth/AuthProvider'
+import { LocationSettings } from '../location/LocationSharing'
 import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
@@ -152,6 +153,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
               { to: '/businesses', label: 'Businesses', hint: 'Support JECian-owned', icon: '🏪' },
               { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
               { to: '/people', label: tx('home.findJecians'), hint: tx('profile.findHint'), icon: '🔎' },
+              { to: '/nearby', label: tx('nearby.title'), hint: tx('nearby.entryHint'), icon: '📍' },
               { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
               ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
             ].map((l) => (
@@ -245,6 +247,12 @@ export function ProfilePage({ self }: { self?: boolean }) {
           <section aria-labelledby="lang-title">
             <SectionTitle><span id="lang-title">भाषा / Language</span></SectionTitle>
             <LanguageSwitch />
+          </section>
+        )}
+
+        {isMe && (
+          <section aria-label={tx('loc.title')}>
+            <LocationSettings />
           </section>
         )}
 

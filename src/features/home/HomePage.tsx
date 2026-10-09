@@ -19,6 +19,7 @@ import { LanguageSwitch } from '../../i18n/LanguageSwitch'
 import { Composer } from '../community/Composer'
 import { FeedList } from '../community/FeedList'
 import { useGroups, useNotifications } from '../community/queries'
+import { LocationPromptCard } from '../location/LocationSharing'
 
 function greeting(): MsgKey {
   const h = Number(new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()))
@@ -155,6 +156,7 @@ export function HomePage() {
 
       {verified ? (
         <>
+          <LocationPromptCard />
           <Spotlight />
           <LatestJobs />
           <Birthdays />

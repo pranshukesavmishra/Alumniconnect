@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
+import { LocationAutoRefresh } from './features/location/LocationAutoRefresh'
 import { readCachedTicket } from './features/events/ticketCache'
 import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
@@ -43,6 +44,7 @@ const ConnectionsPage = lazy(() => import('./features/community/ConnectionsPage'
 const InvitePage = lazy(() => import('./features/community/InvitePage').then((m) => ({ default: m.InvitePage })))
 const ChatListPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatListPage })))
 const ChatThreadPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatThreadPage })))
+const NearbyPage = lazy(() => import('./features/location/NearbyPage').then((m) => ({ default: m.NearbyPage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -135,6 +137,7 @@ export function App() {
   return (
     <BrowserRouter>
       <ClaimInvite />
+      <LocationAutoRefresh />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />
@@ -164,6 +167,7 @@ export function App() {
             <Route path="me/connections" element={m(<ConnectionsPage />)} />
             <Route path="invite" element={m(<InvitePage />)} />
             <Route path="people" element={m(<DirectoryPage />)} />
+            <Route path="nearby" element={m(<NearbyPage />)} />
             <Route path="people/:id" element={m(<ProfilePage />)} />
             <Route path="me" element={m(<ProfilePage self />)} />
             <Route path="me/edit" element={m(<EditProfilePage />)} />
