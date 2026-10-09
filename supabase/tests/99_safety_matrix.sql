@@ -127,6 +127,7 @@ insert into public.t93_cases values
   ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a5')$q$, 'ac'),
   ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a6')$q$, 'a'),
   ('post_announcement', $q$select public.post_announcement('93000000-0000-0000-0000-0000000000e1', 'Title', 'Body text', false)$q$, 'ac'),
+  ('event_announcement_audience', $q$select public.event_announcement_audience('93000000-0000-0000-0000-0000000000e1')$q$, 'ac'),
   ('moderate_photo', $q$select public.moderate_photo('93000000-0000-0000-0000-0000000000a7', true)$q$, 'ac'),
   -- moderation: moderators and admins
   ('admin_reports', $q$select * from public.admin_reports('open')$q$, 'am'),

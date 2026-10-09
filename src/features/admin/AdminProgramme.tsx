@@ -29,9 +29,9 @@ function Announcements({ eventId }: { eventId: string }) {
   const registered = useQuery({
     queryKey: ['announce-audience', eventId],
     queryFn: async () => {
-      const { count, error } = await supabase.from('event_registrations').select('id', { count: 'exact', head: true }).eq('event_id', eventId).neq('status', 'cancelled')
+      const { data, error } = await supabase.rpc('event_announcement_audience', { p_event: eventId })
       if (error) throw error
-      return count ?? 0
+      return (data as number) ?? 0
     },
   })
   const send = useMutation({
