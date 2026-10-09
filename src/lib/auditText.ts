@@ -57,6 +57,18 @@ export const AUDIT_LABELS: Record<string, string> = {
   import_preview: 'Checked a member import file',
   dismiss_duplicate: 'Marked two members as different people',
   merge_member: 'Merged a duplicate profile',
+  send_event_message: 'Sent a message to event attendees',
+  schedule_event_message: 'Scheduled a message to event attendees',
+  cancel_event_message: 'Cancelled a scheduled message',
+  record_refund: 'Recorded a refund',
+  refund_payment: 'Marked a payment as refunded',
+  export_ledger: 'Downloaded the finance ledger',
+  transfer_registration: 'Transferred a registration to another member',
+  promote_waitlist: 'Offered a place to someone on the waiting list',
+  run_waitlist: 'Offered free places to the waiting list',
+  remove_waitlist: 'Removed someone from the waiting list',
+  add_waitlist: 'Added someone to the waiting list',
+  save_event_ops: 'Changed waiting list or daily capacity settings',
 }
 
 export function auditSummary(details: Record<string, unknown>): string {
@@ -72,9 +84,14 @@ export function auditSummary(details: Record<string, unknown>): string {
   if (d.verification?.from !== d.verification?.to && d.verification) parts.push(`verification ${d.verification.from} → ${d.verification.to}`)
   if (d.is_admin && d.is_admin.from !== d.is_admin.to) parts.push(d.is_admin.to ? 'made admin' : 'admin removed')
   if (d.bulk) parts.push('bulk action')
-  if (typeof d.count === 'number') parts.push(`${d.count} member${d.count === 1 ? '' : 's'}${d.contact ? ', with phone and e-mail' : ''}`)
+  if (typeof d.count === 'number' && typeof d.title !== 'string') parts.push(`${d.count} member${d.count === 1 ? '' : 's'}${d.contact ? ', with phone and e-mail' : ''}`)
   if (d.merged_id) parts.push(`merged ${d.name || 'a profile'}${d.email ? ` (${d.email})` : ''} into this one`)
   if (typeof d.new === 'number') parts.push(`${d.new} new, ${d.exists} already members, ${d.duplicate} possible duplicates, ${d.invalid} with problems`)
+  if (d.from?.name && d.to?.name) parts.push(`${d.from.name} → ${d.to.name}`)
+  else if (d.name && d.headcount !== undefined) parts.push(`${String(d.name)} (${d.headcount})`)
+  if (typeof d.title === 'string') parts.push(`“${d.title}”${typeof d.count === 'number' ? ` to ${d.count}` : ''}`)
+  if (typeof d.offered === 'number') parts.push(`${d.offered} offered`)
+  if (d.method && d.amount && d.payment_id) parts.push(`via ${String(d.method).replace('_', ' ')}${d.reference ? ` (${d.reference})` : ''}`)
   if (d.reason) parts.push(`“${d.reason}”`)
   else if (d.note) parts.push(`“${d.note}”`)
   return parts.join(' · ')

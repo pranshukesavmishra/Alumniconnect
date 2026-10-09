@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { CameraOff, CheckCircle2, Keyboard, TriangleAlert, Undo2, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Navigate, useParams } from 'react-router'
 import { PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
@@ -10,6 +11,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import type { Registration } from '../../lib/types'
+import { ArrivalsCounter, GateSearch } from './CheckInTools'
 import { useAdminEvent, useEventRole } from './queries'
 
 type Result =
@@ -30,6 +32,7 @@ export function CheckInPage() {
   const [manual, setManual] = useState('')
   const [busy, setBusy] = useState(false)
   const [count, setCount] = useState(0)
+  const qc = useQueryClient()
 
   const eventId = data?.event.id
   const check = useCallback(
@@ -42,6 +45,7 @@ export function CheckInPage() {
       setBusy(true)
       const { data: rows, error } = await supabase.rpc('check_in', { p_event: eventId, p_code: code, p_undo: undo })
       setBusy(false)
+      void qc.invalidateQueries({ queryKey: ['event-arrivals', eventId] })
       if (error) {
         setResult({ kind: 'error', message: friendlyError(error) })
         navigator.vibrate?.([80, 60, 80])
@@ -58,7 +62,7 @@ export function CheckInPage() {
       }
       navigator.vibrate?.(reg.status === 'confirmed' && !row.already_checked_in ? 60 : [80, 60, 80])
     },
-    [eventId],
+    [eventId, qc],
   )
 
   useEffect(() => {
@@ -153,6 +157,8 @@ export function CheckInPage() {
             Check
           </Button>
         </form>
+        <GateSearch eventId={data.event.id} onPick={(code) => check(code)} />
+        <ArrivalsCounter eventId={data.event.id} compact />
         <p className="text-center text-sm text-muted">Point the camera at the attendee’s QR code. Green = welcome, amber = already in, red = help desk.</p>
       </div>
     </div>

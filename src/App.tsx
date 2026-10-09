@@ -51,6 +51,7 @@ const ChatThreadPage = lazy(() => import('./features/chat/ChatPages').then((m) =
 const NearbyPage = lazy(() => import('./features/location/NearbyPage').then((m) => ({ default: m.NearbyPage })))
 const TripsPage = lazy(() => import('./features/location/TripsPage').then((m) => ({ default: m.TripsPage })))
 const CityPage = lazy(() => import('./features/location/CityPage').then((m) => ({ default: m.CityPage })))
+const AdminBadges = lazy(() => import('./features/admin/AdminBadges').then((m) => ({ default: m.AdminBadges })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -192,6 +193,7 @@ export function App() {
             <Route path="admin/community" element={m(<AdminCommunity />)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
+            <Route path="admin/events/:slug/badges" element={m(<AdminBadges />)} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="install" element={<InstallPage />} />

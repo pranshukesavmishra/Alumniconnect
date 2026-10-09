@@ -13,10 +13,11 @@ const safe = (v: string | null | undefined) => {
   const t = v ?? ''
   return /^[=+\-@\t\r]/.test(t) ? `'${t}` : t
 }
+export const spreadsheetSafe = safe
 /** Long digit strings (phones, UTRs) as text so Excel keeps every digit ("+91…" not "9.19E+11"). */
 const asText = (v: string | null | undefined) => (v ? `="${v.replace(/"/g, '')}"` : '')
 
-function save(name: string, rows: Record<string, unknown>[]) {
+export function saveCsv(name: string, rows: Record<string, unknown>[]) {
   // BOM so Excel opens UTF-8 (names, ₹) correctly
   downloadFile(name, '﻿' + Papa.unparse(rows), 'text/csv;charset=utf-8')
 }
@@ -28,7 +29,7 @@ export function exportRegistrations(event: EventRow, d: AdminData) {
   for (const i of d.items) itemsBy.set(i.registration_id, [itemsBy.get(i.registration_id), `${i.label} x${i.quantity}`].filter(Boolean).join('; '))
   const paidBy = new Map<string, number>()
   for (const p of d.payments) if (p.status === 'verified' && p.method !== 'waiver') paidBy.set(p.registration_id, (paidBy.get(p.registration_id) ?? 0) + p.amount_paise)
-  save(
+  saveCsv(
     `${event.slug}-registrations-${stamp()}.csv`,
     d.registrations.map((r) => ({
       Code: r.code,
@@ -64,12 +65,12 @@ export function exportAttendees(event: EventRow, d: AdminData) {
     rows.push({ Code: r.code, Status: r.status, Name: safe(r.full_name), Type: 'Alumnus', Batch: batch, Food: food(r.food_pref), 'Registered by': safe(r.full_name) })
     for (const g of r.guests) rows.push({ Code: r.code, Status: r.status, Name: safe(g.name), Type: safe(g.relation ?? 'Guest'), Batch: '', Food: food(r.food_pref), 'Registered by': safe(r.full_name) })
   }
-  save(`${event.slug}-attendees-${stamp()}.csv`, rows)
+  saveCsv(`${event.slug}-attendees-${stamp()}.csv`, rows)
 }
 
 export function exportPayments(event: EventRow, d: AdminData) {
   const reg = new Map(d.registrations.map((r) => [r.id, r]))
-  save(
+  saveCsv(
     `${event.slug}-payments-${stamp()}.csv`,
     d.payments.map((p) => ({
       Code: reg.get(p.registration_id)?.code ?? '',
@@ -108,7 +109,7 @@ export interface MemberExportRow {
 
 /** Members as a spreadsheet. Phone and e-mail columns only appear when the admin asked for them (a logged export). */
 export function exportMembers(rows: MemberExportRow[], contact: boolean) {
-  save(
+  saveCsv(
     `members-${stamp()}.csv`,
     rows.map((m) => ({
       Name: safe(m.full_name),

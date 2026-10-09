@@ -163,3 +163,10 @@
   border: 3px solid var(--surface); box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
 }
 .nearby-pin-active { outline: 3px solid var(--accent, var(--primary-hover)); }
+
+/* Name badges: print only the badge sheets (the app's own navigation stays off the paper) */
+@media print {
+  body.print-badges aside, body.print-badges nav, body.print-badges header { display: none !important; }
+  body.print-badges, body.print-badges #root, body.print-badges main { background: #fff !important; }
+  @page { size: A4; margin: 8mm; }
+}

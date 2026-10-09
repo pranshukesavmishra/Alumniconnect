@@ -10,14 +10,18 @@ import { friendlyError } from '../../lib/errors'
 import { plural } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
 import { useMyProfile } from '../auth/AuthProvider'
+import { AdminDayOf } from './AdminDayOf'
+import { AdminFinance } from './AdminFinance'
+import { AdminMessages } from './AdminMessages'
 import { AdminPayments } from './AdminPayments'
 import { AdminPeople } from './AdminPeople'
 import { AdminSettings } from './AdminSettings'
 import { AdminProgramme } from './AdminProgramme'
 import { AdminTeam } from './AdminTeam'
+import { AdminWaitlist } from './AdminWaitlist'
 import { useAdminData, useAdminEvent, useEventRole, type AdminData } from './queries'
 
-type Tab = 'overview' | 'payments' | 'people' | 'programme' | 'settings' | 'team'
+type Tab = 'overview' | 'payments' | 'people' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'settings' | 'team'
 
 export function AdminEventPage() {
   const { slug = '' } = useParams()
@@ -50,9 +54,13 @@ export function AdminEventPage() {
         { id: 'payments', label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
         { id: 'people', label: 'People' },
         { id: 'programme', label: 'Programme' },
+        { id: 'messages', label: 'Messages' },
+        { id: 'finance', label: 'Finance' },
+        { id: 'waitlist', label: 'Waitlist' },
+        { id: 'dayof', label: 'Day-of' },
         ...(me.is_admin ? ([{ id: 'settings', label: 'Settings' }, { id: 'team', label: 'Team' }] as const) : []),
       ]
-    : [{ id: 'people', label: 'People' }]
+    : [{ id: 'people', label: 'People' }, { id: 'dayof', label: 'Day-of' }]
   const tab = (tabs.find((t) => t.id === params.get('tab'))?.id ?? tabs[0]!.id) as Tab
 
   return (
@@ -86,7 +94,7 @@ export function AdminEventPage() {
       </div>
       <Page wide className="space-y-4">
         {admin.error && <Notice tone="danger" title={friendlyError(admin.error)} />}
-        {tab !== 'settings' && tab !== 'team' && (
+        {tab !== 'settings' && tab !== 'team' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && (
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" icon={<RefreshCw className={clsx('size-4', admin.isFetching && 'animate-spin')} />} onClick={() => admin.refetch()}>
               Refresh
@@ -97,6 +105,10 @@ export function AdminEventPage() {
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} initialQuery={params.get('q') ?? ''} /> : <PageSkeleton />)}
         {tab === 'programme' && <AdminProgramme eventId={data.event.id} />}
+        {tab === 'messages' && <AdminMessages eventId={data.event.id} isAdmin={!!me.is_admin} />}
+        {tab === 'finance' && <AdminFinance event={data.event} />}
+        {tab === 'waitlist' && <AdminWaitlist event={data.event} />}
+        {tab === 'dayof' && <AdminDayOf event={data.event} manager={manager} />}
         {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} />}
       </Page>

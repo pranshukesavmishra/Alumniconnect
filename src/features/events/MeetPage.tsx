@@ -12,6 +12,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { clock, groupByDay, useAnnouncements, useProgramme } from './programme'
 import { registrationOpen, useEvent, useEventStats, useMyRegistration, useTicketTypes } from './queries'
 import { StatusBadge } from './StatusBadge'
+import { WaitlistCard } from './WaitlistCard'
 
 export function MeetPage() {
   const tx = useT()
@@ -101,6 +102,8 @@ export function MeetPage() {
             <StatusBadge status={reg.status} />
           </Card>
         )}
+
+        {!active && open && !waiting && !!session && <WaitlistCard eventId={event.id} />}
 
         {!!announcements.data?.length && (
           <section aria-label="Announcements" className="space-y-2">

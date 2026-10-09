@@ -13,6 +13,7 @@ import type { EventRow, Registration, RegistrationStatus } from '../../lib/types
 import { PaymentBadge, StatusBadge } from '../events/StatusBadge'
 import { exportAttendees, exportPayments, exportRegistrations } from './export'
 import { useRecordOfflinePayment, type AdminData } from './queries'
+import { RegistrationAdjustments } from './RegistrationAdjustments'
 import { RegistrationEditor } from './RegistrationEditor'
 
 const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
@@ -104,7 +105,7 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
 function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; data: AdminData; manager: boolean; eventId: string; onClose: () => void }) {
   const items = data.items.filter((i) => i.registration_id === reg.id)
   const payments = data.payments.filter((p) => p.registration_id === reg.id)
-  const covered = payments.filter((p) => p.status !== 'rejected').reduce((a, p) => a + p.amount_paise, 0)
+  const covered = payments.filter((p) => p.status === 'submitted' || p.status === 'verified').reduce((a, p) => a + p.amount_paise, 0)
   const due = Math.max(0, reg.amount_paise - covered)
   const offline = useRecordOfflinePayment(eventId)
   const [method, setMethod] = useState<'cash' | 'bank_transfer' | 'waiver'>('cash')
@@ -171,6 +172,7 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
         </Card>
 
         {manager && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
+        {manager && <RegistrationAdjustments key={`adj:${reg.id}:${reg.updated_at}`} reg={reg} payments={payments} due={due} onClose={onClose} />}
 
         {manager && (
           <>
@@ -195,6 +197,7 @@ function Detail({ reg, data, manager, eventId, onClose }: { reg: Registration; d
             {due > 0 && reg.status !== 'cancelled' && (
               <Card className="mt-4 space-y-3 p-4">
                 <p className="font-semibold">Record a desk payment · {formatPaise(due)} due</p>
+                <p className="-mt-1 text-sm text-muted">Part payments are fine: the rest stays due. “Waive” clears everything still due (a comp ticket).</p>
                 <ChoiceGroup
                   label="Method"
                   columns={3}
