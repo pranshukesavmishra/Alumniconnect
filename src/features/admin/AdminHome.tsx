@@ -1,4 +1,4 @@
-import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -89,6 +89,11 @@ export function AdminHome() {
             <Link to="/admin/roles" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><KeyRound className="size-5" aria-hidden /></span>
               <span className="flex-1"><span className="block font-semibold">Roles</span><span className="block text-sm text-muted">Admins, treasurers, content managers, moderators</span></span>
+              <ChevronRight className="size-5 text-muted" aria-hidden />
+            </Link>
+            <Link to="/admin/health" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Activity className="size-5" aria-hidden /></span>
+              <span className="flex-1"><span className="block font-semibold">Health</span><span className="block text-sm text-muted">Backups, push, storage</span></span>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
             <Link to="/admin/activity" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">

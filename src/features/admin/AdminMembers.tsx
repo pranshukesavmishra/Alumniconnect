@@ -260,15 +260,20 @@ const BULK_WORDS: Record<VerificationStatus, { verb: string; done: string; warn:
 function BulkSheet({ to, ids, onClose, onDone }: { to: VerificationStatus | null; ids: string[]; onClose: () => void; onDone: () => void }) {
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
+  // one request id per open sheet: if the answer is lost and you press the button again, nothing is done twice
+  const [request, setRequest] = useState(() => crypto.randomUUID())
   useEffect(() => {
-    if (!to) setNote('')
+    if (!to) {
+      setNote('')
+      setRequest(crypto.randomUUID())
+    }
   }, [to])
   if (!to) return null
   const w = BULK_WORDS[to]
   const n = ids.length
   async function run() {
     setBusy(true)
-    const { data, error } = await supabase.rpc('admin_bulk_set_verification', { p_ids: ids, p_verification: to!, p_note: note.trim() || null })
+    const { data, error } = await supabase.rpc('admin_bulk_set_verification', { p_ids: ids, p_verification: to!, p_note: note.trim() || null, p_request: request })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
     const r = data as { changed: number; unchanged: number }
@@ -544,7 +549,7 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
               {p && <p className="text-sm text-muted">Joined {formatDateTime(p.created_at)}</p>}
             </div>
           </div>
-          <button type="button" className="grid size-11 place-items-center rounded-full hover:bg-surface-2" onClick={onClose} aria-label="Close">
+          <button type="button" className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-surface-2" onClick={onClose} aria-label="Close">
             <X className="size-5" />
           </button>
         </div>

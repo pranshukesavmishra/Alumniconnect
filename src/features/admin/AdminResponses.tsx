@@ -59,7 +59,7 @@ function Who({ r, extra }: { r: Registration; extra?: ReactNode }) {
         {extra && <span className="block text-muted">{extra}</span>}
       </span>
       {r.phone && (
-        <a className="inline-flex min-h-9 items-center gap-1 font-semibold text-primary" href={`tel:${r.phone.replace(/\s/g, '')}`}>
+        <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={`tel:${r.phone.replace(/\s/g, '')}`}>
           <Phone className="size-3.5" aria-hidden /> {r.phone}
         </a>
       )}

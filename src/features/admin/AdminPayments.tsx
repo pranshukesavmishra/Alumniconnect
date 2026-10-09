@@ -13,6 +13,7 @@ import type { EventRow, Payment, Registration } from '../../lib/types'
 import { indexAfterRemoval, reviewAction, stepIndex } from '../../lib/paymentQueue'
 import { useBulkReview } from './opsQueries'
 import { proofUrl, useReviewPayment, type AdminData } from './queries'
+import { usePaged } from '../../lib/paging'
 
 const REJECT_REASONS = [
   'UPI reference not found in our bank statement. Please check the 12-digit UTR and submit again.',
@@ -33,6 +34,7 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
 
   const regs = useMemo(() => new Map(data.registrations.map((r) => [r.id, r])), [data.registrations])
   const queue = data.payments.filter((p) => p.status === 'submitted')
+  const paged = usePaged(queue, 50)
   const matched = matches ? queue.filter((p) => matches.get(p.id)?.status === 'matched') : []
   const chosen = queue.filter((p) => selected.has(p.id))
 
@@ -54,7 +56,7 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
     try {
       const res = await bulkReview.mutateAsync({ ids, approve, note })
       if (res.failed.length) toast.error(`${res.done} done, ${res.failed.length} could not be reviewed (${res.failed[0]!.error}). Please check them one by one.`)
-      else toast.success(`${res.done} ${approve ? 'payments verified' : 'payments marked as not received'}`)
+      else toast.success(`${res.done} ${approve ? 'payments verified' : 'payments marked as not received'}${res.unchanged ? ` (${res.unchanged} already were)` : ''}`)
       setSelected(new Set())
     } catch (e) {
       toast.error(friendlyError(e))
@@ -153,7 +155,7 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
             </div>
           )}
           <ul className="space-y-3">
-            {queue.map((p) => (
+            {paged.shown.map((p) => (
               <PaymentCard
                 key={p.id}
                 p={p}
@@ -167,6 +169,7 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
               />
             ))}
           </ul>
+          {paged.hidden > 0 && <Button variant="secondary" block onClick={paged.more}>Show {Math.min(50, paged.hidden)} more ({paged.hidden} not shown)</Button>}
         </>
       )}
 
@@ -234,7 +237,7 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSel
             <dt className="text-muted">UTR</dt>
             <dd className="flex items-center gap-1 font-mono font-semibold">
               {p.utr}
-              <button type="button" aria-label="Copy UTR" className="grid size-8 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => navigator.clipboard?.writeText(p.utr ?? '').then(() => toast.success('UTR copied'))}>
+              <button type="button" aria-label="Copy UTR" className="grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => navigator.clipboard?.writeText(p.utr ?? '').then(() => toast.success('UTR copied'))}>
                 <Copy className="size-3.5" />
               </button>
             </dd>
@@ -247,7 +250,7 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSel
             <dt className="text-muted">Mobile</dt>
             <dd>
               {reg?.phone ? (
-                <a className="inline-flex items-center gap-1 font-semibold text-primary" href={`tel:${reg.phone.replace(/\s/g, '')}`}>
+                <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={`tel:${reg.phone.replace(/\s/g, '')}`}>
                   <Phone className="size-3.5" aria-hidden /> {reg.phone}
                 </a>
               ) : (

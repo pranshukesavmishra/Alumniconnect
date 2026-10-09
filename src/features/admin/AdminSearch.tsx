@@ -30,7 +30,7 @@ export function AdminSearch({ members }: { members: boolean }) {
         <Input
           type="search"
           aria-label="Search everything"
-          placeholder={members ? 'Name, ticket code, UTR, phone, e-mail…' : 'Name, ticket code, UTR, phone…'}
+          placeholder={members ? 'Name, code, UTR, phone…' : 'Name, code, UTR, phone…'}
           className="pl-11 pr-11"
           value={q}
           onChange={(e) => setQ(e.target.value)}

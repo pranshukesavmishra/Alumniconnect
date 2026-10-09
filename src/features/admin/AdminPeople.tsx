@@ -16,6 +16,7 @@ import { useRecordOfflinePayment, type AdminData } from './queries'
 import { RegistrationAdjustments } from './RegistrationAdjustments'
 import { AdminReunionDetail } from './AdminReunionDetail'
 import { RegistrationEditor } from './RegistrationEditor'
+import { usePaged } from '../../lib/paging'
 
 const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -39,6 +40,7 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
     )
   }, [data.registrations, q, filter])
   const open = data.registrations.find((r) => r.id === openId)
+  const paged = usePaged(list, 100, `${q}|${filter}`)
 
   return (
     <div className="space-y-4">
@@ -68,7 +70,7 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
               type="button"
               aria-pressed={filter === f.id}
               onClick={() => setFilter(f.id)}
-              className={clsx('min-h-10 shrink-0 rounded-full border px-4 text-sm font-semibold', filter === f.id ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-muted')}
+              className={clsx('min-h-11 shrink-0 rounded-full border px-4 text-sm font-semibold', filter === f.id ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-muted')}
             >
               {f.label} · {n}
             </button>
@@ -80,7 +82,7 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
         <EmptyState title="No registrations here" />
       ) : (
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-          {list.map((r) => (
+          {paged.shown.map((r) => (
             <li key={r.id}>
               <button type="button" className="flex w-full items-center gap-3 p-3.5 text-left hover:bg-surface-2" onClick={() => setOpenId(r.id)}>
                 <div className="min-w-0 flex-1">
@@ -98,6 +100,7 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
           ))}
         </ul>
       )}
+      {paged.hidden > 0 && <Button variant="secondary" block onClick={paged.more}>Show {Math.min(100, paged.hidden)} more ({paged.hidden} not shown)</Button>}
       {open && <Detail reg={open} data={data} manager={manager} event={event} onClose={() => setOpenId(null)} />}
     </div>
   )
@@ -133,17 +136,17 @@ function Detail({ reg, data, manager, event, onClose }: { reg: Registration; dat
             <h2 className="text-xl font-bold">{reg.full_name}</h2>
             <p className="font-mono text-sm text-muted">{reg.code}</p>
           </div>
-          <button type="button" className="grid size-11 place-items-center rounded-full hover:bg-surface-2" onClick={onClose} aria-label="Close">
+          <button type="button" className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-surface-2" onClick={onClose} aria-label="Close">
             <X className="size-5" />
           </button>
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <StatusBadge status={reg.status} />
           {manager && (<>
-          <a href={`tel:${reg.phone.replace(/\s/g, '')}`} className="inline-flex min-h-9 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-primary">
+          <a href={`tel:${reg.phone.replace(/\s/g, '')}`} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-primary">
             <Phone className="size-3.5" aria-hidden /> {reg.phone}
           </a>
-          <a href={`https://wa.me/${reg.phone.replace(/[^\d]/g, '').replace(/^(\d{10})$/, '91$1')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-9 items-center rounded-full border border-border px-3 text-sm font-semibold text-primary">
+          <a href={`https://wa.me/${reg.phone.replace(/[^\d]/g, '').replace(/^(\d{10})$/, '91$1')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-sm font-semibold text-primary">
             WhatsApp
           </a>
           </>)}

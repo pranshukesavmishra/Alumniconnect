@@ -60,7 +60,7 @@ test('roles page: give and remove a moderator with confirmation, no self-demotio
 
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: `Remove moderator role from Rolemod ${tag}` }).click()
-  await expect(page.getByTestId('moderators-list')).toHaveCount(0)
+  await expect(page.getByTestId('moderators-list').getByText(`Rolemod ${tag}`)).toHaveCount(0)
   expect(sql(`select count(*) from site_roles where user_id = (select id from auth.users where email like 'adm-${ts}-${tag}rm@%')`)).toBe('0')
 
   // activity log: filter to roles, search by name

@@ -108,7 +108,7 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
         <SectionTitle>New message</SectionTitle>
         <div className="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Start from a template">
           {TEMPLATES.map((t) => (
-            <button key={t.id} type="button" onClick={() => applyTemplate(t.id)} className="min-h-10 shrink-0 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary hover:bg-primary-soft">
+            <button key={t.id} type="button" onClick={() => applyTemplate(t.id)} className="min-h-11 shrink-0 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary hover:bg-primary-soft">
               {t.label}
             </button>
           ))}

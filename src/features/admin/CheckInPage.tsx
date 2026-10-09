@@ -139,7 +139,7 @@ export function CheckInPage() {
                 {result.reg.guests.length > 0 && <p className="mt-1 text-sm opacity-90">With: {result.reg.guests.map((g) => g.name || g.relation).join(', ')}</p>}
                 <p className="mt-1 font-mono text-sm opacity-80">{result.reg.code}</p>
                 {result.kind === 'ok' && (
-                  <button type="button" className="mt-3 inline-flex min-h-10 items-center gap-1.5 rounded-full bg-white/20 px-4 text-sm font-semibold" onClick={() => check(result.reg.code, true)}>
+                  <button type="button" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-white/20 px-4 text-sm font-semibold" onClick={() => check(result.reg.code, true)}>
                     <Undo2 className="size-4" aria-hidden /> Undo
                   </button>
                 )}

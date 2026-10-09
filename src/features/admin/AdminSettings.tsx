@@ -249,13 +249,13 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                   Main ticket (the alumnus; exactly one per registration)
                 </Checkbox>
                 <div className="flex">
-                  <button type="button" disabled={i === visibleIdx[0]} aria-label="Move up" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, -1)}>
+                  <button type="button" disabled={i === visibleIdx[0]} aria-label="Move up" className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, -1)}>
                     <ArrowUp className="size-4" />
                   </button>
-                  <button type="button" disabled={i === visibleIdx[visibleIdx.length - 1]} aria-label="Move down" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, 1)}>
+                  <button type="button" disabled={i === visibleIdx[visibleIdx.length - 1]} aria-label="Move down" className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, 1)}>
                     <ArrowDown className="size-4" />
                   </button>
-                  <button type="button" aria-label="Remove ticket" className="grid size-10 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => setT(i, { _delete: true })}>
+                  <button type="button" aria-label="Remove ticket" className="grid size-11 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => setT(i, { _delete: true })}>
                     <Trash2 className="size-4" />
                   </button>
                 </div>

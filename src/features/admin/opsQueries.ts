@@ -324,14 +324,21 @@ export function useAttendance(eventId: string, enabled: boolean) {
 }
 
 // ------------------------------------------------------------------ payments
+const pendingRequests = new Map<string, string>()
+
 /** Verify or reject many payments in one go; the server handles each separately and reports the ones that failed. */
 export function useBulkReview(eventId: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (input: { ids: string[]; approve: boolean; note?: string }) => {
-      const { data, error } = await supabase.rpc('admin_bulk_review_payments', { p_ids: input.ids, p_approve: input.approve, p_note: input.note ?? null })
+      // the same selection and action keeps its request id until it succeeds, so a retry after a lost answer is harmless
+      const key = `${input.approve}:${[...input.ids].sort().join(',')}`
+      const request = pendingRequests.get(key) ?? crypto.randomUUID()
+      pendingRequests.set(key, request)
+      const { data, error } = await supabase.rpc('admin_bulk_review_payments', { p_ids: input.ids, p_approve: input.approve, p_note: input.note ?? null, p_request: request })
       if (error) throw error
-      return data as unknown as { done: number; failed: { id: string; error: string }[] }
+      pendingRequests.delete(key)
+      return data as unknown as { done: number; unchanged?: number; failed: { id: string; error: string }[] }
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: adminDataKey(eventId) })

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
+import { AdminTranslator } from './i18n/AdminTranslator'
 import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
@@ -39,6 +40,7 @@ const AdminModeration = lazy(() => import('./features/admin/AdminModeration').th
 const AdminMemberTimeline = lazy(() => import('./features/admin/AdminMemberTimeline').then((m) => ({ default: m.AdminMemberTimeline })))
 const AdminDuplicates = lazy(() => import('./features/admin/AdminDuplicates').then((m) => ({ default: m.AdminDuplicates })))
 const AdminImport = lazy(() => import('./features/admin/AdminImport').then((m) => ({ default: m.AdminImport })))
+const AdminHealth = lazy(() => import('./features/admin/AdminHealth').then((m) => ({ default: m.AdminHealth })))
 const AdminInbox = lazy(() => import('./features/admin/AdminInbox').then((m) => ({ default: m.AdminInbox })))
 const AdminViewAs = lazy(() => import('./features/admin/AdminViewAs').then((m) => ({ default: m.AdminViewAs })))
 const AdminRoles = lazy(() => import('./features/admin/AdminRoles').then((m) => ({ default: m.AdminRoles })))
@@ -147,6 +149,7 @@ export function App() {
     <BrowserRouter>
       <ClaimInvite />
       <LocationAutoRefresh />
+      <AdminTranslator />
       <Suspense fallback={<PageSkeleton />}>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />
@@ -189,6 +192,7 @@ export function App() {
             <Route path="admin/members/duplicates" element={m(<AdminDuplicates />)} />
             <Route path="admin/members/:id" element={m(<AdminMemberTimeline />)} />
             <Route path="admin/members/:id/preview" element={m(<AdminViewAs />)} />
+            <Route path="admin/health" element={m(<AdminHealth />)} />
             <Route path="admin/inbox" element={m(<AdminInbox />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
             <Route path="admin/roles" element={m(<AdminRoles />)} />

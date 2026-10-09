@@ -39,7 +39,12 @@ Deno.serve(async (req) => {
   } catch (e) {
     return new Response(`DB error: ${(e as Error).message}`, { status: 500 })
   }
-  if (!driveConfigured()) return Response.json({ ok: true, backup: 'skipped (Drive not configured)' })
+  // the admin health page shows when this last ran and whether it worked
+  const record = (ok: boolean, detail: string) => asService().upsert('system_events', { kind: 'backup', ok, detail: detail.slice(0, 500) }).catch((e) => console.error(e))
+  if (!driveConfigured()) {
+    await record(true, 'Ran, but Google Drive is not set up, so no files were saved')
+    return Response.json({ ok: true, backup: 'skipped (Drive not configured)' })
+  }
 
   const stamp = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 16).replace('T', '_').replace(':', '-')
   const done: string[] = []
@@ -56,9 +61,11 @@ Deno.serve(async (req) => {
       await uploadText({ name: `${ev.slug} tickets ${stamp}.csv`, parent: folder, mimeType: 'text/csv', content: csv(items) })
       done.push(`${ev.slug}: ${regs.length} registrations, ${pays.length} payments`)
     }
+    await record(true, done.length ? done.join('; ') : 'Ran; no event has a Drive folder yet')
     return Response.json({ ok: true, backup: done })
   } catch (e) {
     console.error(e)
+    await record(false, `Failed: ${(e as Error).message}`)
     return new Response(`Backup failed: ${(e as Error).message}`, { status: 502 })
   }
 })

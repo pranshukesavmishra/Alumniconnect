@@ -502,3 +502,56 @@ export function useViewAsMember(id: string | undefined) {
     },
   })
 }
+
+// ------------------------------------------------------------------ member import jobs and health
+export interface ImportJob {
+  id: string
+  created_at: string
+  total: number
+  verified: boolean
+  by: string | null
+  pending: number
+  processing: number
+  done: number
+  failed: number
+  failures: { id: number; line: number; name: string | null; email: string | null; error: string | null }[]
+}
+
+/** The latest import jobs with progress; polls while anything is unfinished. */
+export function useImportJobs(enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-import-jobs'],
+    enabled,
+    refetchInterval: (q) => ((q.state.data as ImportJob[] | undefined)?.some((j) => j.pending + j.processing > 0) ? 2000 : false),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_import_jobs')
+      if (error) throw error
+      return data as unknown as ImportJob[]
+    },
+  })
+}
+
+export interface Health {
+  generated_at: string
+  database_bytes: number
+  backup: { last: { at: string; ok: boolean; detail: string | null } | null; last_ok_at: string | null }
+  storage: { bucket: string; objects: number; bytes: number }[]
+  push: { subscriptions: number; last_used_at: string | null; requests_24h: number | null; failures_24h: number | null; configured: boolean }
+  members: number
+  import_failed_rows: number
+  import_unfinished_rows: number
+  audit_last_day: number
+}
+
+export function useHealth(enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-health'],
+    enabled,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_health')
+      if (error) throw error
+      return data as unknown as Health
+    },
+  })
+}

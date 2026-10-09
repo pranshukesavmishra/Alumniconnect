@@ -22,7 +22,7 @@ export function AdminProgramme({ eventId }: { eventId: string }) {
 
 function Announcements({ eventId }: { eventId: string }) {
   const qc = useQueryClient()
-  const { data } = useAnnouncements(eventId, true)
+  const { data, error: annError } = useAnnouncements(eventId, true)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [pinned, setPinned] = useState(false)
@@ -82,6 +82,7 @@ function Announcements({ eventId }: { eventId: string }) {
           <Button type="submit" icon={<Megaphone className="size-4" />} loading={send.isPending}>Send announcement</Button>
         </form>
       </Card>
+      {annError && <Notice tone="danger" title={friendlyError(annError)} />}
       {!!data?.length && (
         <Card className="mt-3 divide-y divide-border">
           {data.map((a) => (
@@ -109,7 +110,7 @@ const EMPTY = { starts: '', ends: '', title: '', venue: '', details: '' }
 
 function Programme({ eventId }: { eventId: string }) {
   const qc = useQueryClient()
-  const { data } = useProgramme(eventId)
+  const { data, isLoading, error } = useProgramme(eventId)
   const [f, setF] = useState(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -171,7 +172,11 @@ function Programme({ eventId }: { eventId: string }) {
           </form>
         </Card>
       )}
-      {!data?.length ? (
+      {error ? (
+        <Notice tone="danger" title={friendlyError(error)} />
+      ) : isLoading ? (
+        <p className="text-[15px] text-muted" role="status">Loading…</p>
+      ) : !data?.length ? (
         !open && <p className="text-[15px] text-muted">No sessions yet. Add the day’s schedule so attendees know what to expect.</p>
       ) : (
         groupByDay(data).map((d) => (

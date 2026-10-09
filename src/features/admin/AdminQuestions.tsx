@@ -123,16 +123,16 @@ export function QuestionsEditor({ eventId }: { eventId: string }) {
               </p>
             </div>
             <div className="flex shrink-0">
-              <button type="button" aria-label={`Move “${q.label}” up`} disabled={i === 0} className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, -1)}>
+              <button type="button" aria-label={`Move “${q.label}” up`} disabled={i === 0} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, -1)}>
                 <ArrowUp className="size-4" />
               </button>
-              <button type="button" aria-label={`Move “${q.label}” down`} disabled={i === (questions?.length ?? 0) - 1} className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, 1)}>
+              <button type="button" aria-label={`Move “${q.label}” down`} disabled={i === (questions?.length ?? 0) - 1} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30" onClick={() => move(i, 1)}>
                 <ArrowDown className="size-4" />
               </button>
               <button
                 type="button"
                 aria-label={`Edit “${q.label}”`}
-                className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft"
+                className="grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft"
                 onClick={() => setDraft({ id: q.id, kind: q.kind, label: q.label, help: q.help ?? '', options: q.options.join('\n'), required: q.required, is_active: q.is_active })}
               >
                 <Pencil className="size-4" />
@@ -140,7 +140,7 @@ export function QuestionsEditor({ eventId }: { eventId: string }) {
               <button type="button" aria-label={q.is_active ? `Switch off “${q.label}”` : `Switch on “${q.label}”`} className="min-h-10 px-2 text-sm font-semibold text-primary" onClick={() => toggle(q)}>
                 {q.is_active ? 'Switch off' : 'Switch on'}
               </button>
-              <button type="button" aria-label={`Delete “${q.label}”`} className="grid size-10 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => remove(q)}>
+              <button type="button" aria-label={`Delete “${q.label}”`} className="grid size-11 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => remove(q)}>
                 <Trash2 className="size-4" />
               </button>
             </div>

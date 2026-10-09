@@ -40,6 +40,7 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
       p_details: { food_pref: food, tshirt_size: tshirt, phone, feedback, ...(fundPaise !== reg.fund_paise ? { fund_paise: fundPaise } : {}) },
       p_items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: qty[t.id] ?? 0 })),
       p_reason: reason.trim(),
+      p_expected: reg.updated_at,
     })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
@@ -54,7 +55,7 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
     if (!why?.trim()) return
     // cancelling a paid registration: was the money given back? (then it stops counting as collected)
     const refunded = cancel && reg.amount_paise > 0 && window.confirm('Has the money been refunded to the member?\n\nOK = refunded (it stops counting as collected and they can register and pay again).\nCancel = keep the payment on record.')
-    const { error } = await supabase.rpc('admin_set_registration_status', { p_registration: reg.id, p_cancel: cancel, p_reason: why.trim(), p_refunded: refunded })
+    const { error } = await supabase.rpc('admin_set_registration_status', { p_registration: reg.id, p_cancel: cancel, p_reason: why.trim(), p_refunded: refunded, p_expected: reg.updated_at })
     if (error) return toast.error(friendlyError(error))
     toast.success(cancel ? 'Registration cancelled' : 'Registration reopened')
     await done()
