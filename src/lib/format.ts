@@ -35,3 +35,8 @@ export function relativeTime(iso: string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`
   return formatDate(iso)
 }
+
+/** "1 person" / "2 people" */
+export function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`
+}

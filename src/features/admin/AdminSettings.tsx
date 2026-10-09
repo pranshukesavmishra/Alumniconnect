@@ -269,7 +269,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       </Card>
 
       {save.error && <Notice tone="danger" title={friendlyError(save.error)} />}
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
+      <div className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
         <Button type="submit" size="lg" block loading={save.isPending}>
           {e ? 'Save changes' : 'Create event'}
         </Button>

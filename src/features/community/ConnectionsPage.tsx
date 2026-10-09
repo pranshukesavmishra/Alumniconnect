@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Card, EmptyState, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { shortBranch } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
@@ -45,7 +46,7 @@ export function ConnectionsPage() {
   const rows = data ?? []
   const incoming = rows.filter((c) => c.status === 'pending' && c.addressee === uid)
   const connected = rows.filter((c) => c.status === 'accepted').map((c) => (c.requester === uid ? c.a : c.r))
-  const line = (p: Person) => (p.current_title && p.current_company ? `${p.current_title} · ${p.current_company}` : [p.branch, p.grad_year].filter(Boolean).join(' '))
+  const line = (p: Person) => (p.current_title && p.current_company ? `${p.current_title} · ${p.current_company}` : [p.grad_year ? `Batch ${p.grad_year}` : null, shortBranch(p.branch)].filter(Boolean).join(' · '))
 
   return (
     <div>

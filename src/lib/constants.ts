@@ -50,3 +50,21 @@ export function yearRange(from: number, to: number): number[] {
 }
 
 export const CURRENT_YEAR = new Date().getFullYear()
+
+const BRANCH_SHORT: Record<string, string> = {
+  'Civil Engineering': 'Civil',
+  'Computer Science & Engineering': 'CSE',
+  'Electrical Engineering': 'Electrical',
+  'Electronics & Telecommunication Engineering': 'E&TC',
+  'Industrial & Production Engineering': 'IPE',
+  'Information Technology': 'IT',
+  'Mechanical Engineering': 'Mechanical',
+  'Artificial Intelligence & Data Science': 'AI & DS',
+  'M.Sc. (Applied Sciences)': 'M.Sc.',
+}
+
+/** Short branch name for tight list rows ("CSE" instead of "Computer Science & Engineering"). */
+export function shortBranch(branch: string | null | undefined): string | null {
+  if (!branch) return null
+  return BRANCH_SHORT[branch] ?? branch
+}

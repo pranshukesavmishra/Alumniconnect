@@ -7,6 +7,7 @@ import { Button, ButtonLink } from '../../components/ui/Button'
 import { Badge, Card, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { FOOD_PREFS, TSHIRT_SIZES } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { plural } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
 import { useMyProfile } from '../auth/AuthProvider'
 import { AdminPayments } from './AdminPayments'
@@ -46,10 +47,10 @@ export function AdminEventPage() {
     ? [
         { id: 'overview', label: 'Overview' },
         { id: 'payments', label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
-        { id: 'people', label: 'Registrations' },
+        { id: 'people', label: 'People' },
         ...(me.is_admin ? ([{ id: 'settings', label: 'Settings' }, { id: 'team', label: 'Team' }] as const) : []),
       ]
-    : [{ id: 'people', label: 'Registrations' }]
+    : [{ id: 'people', label: 'People' }]
   const tab = (tabs.find((t) => t.id === params.get('tab'))?.id ?? tabs[0]!.id) as Tab
 
   return (
@@ -64,15 +65,16 @@ export function AdminEventPage() {
           </ButtonLink>
         }
       />
-      <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 border-b border-border bg-bg/95 backdrop-blur">
-        <div role="tablist" className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3">
+      <div className="sticky top-[calc(4rem+env(safe-area-inset-top))] z-10 border-b border-border bg-bg/90 backdrop-blur-xl">
+        <div role="tablist" className="mx-auto flex max-w-6xl snap-x scroll-px-3 gap-1 overflow-x-auto px-3">
           {tabs.map((t) => (
             <button
               key={t.id}
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setParams({ tab: t.id }, { replace: true })}
-              className={clsx('flex min-h-12 shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold', tab === t.id ? 'border-primary text-primary' : 'border-transparent text-muted')}
+              ref={(el) => { if (el && tab === t.id) el.scrollIntoView({ inline: 'center', block: 'nearest' }) }}
+              className={clsx('flex min-h-12 shrink-0 snap-start items-center gap-1.5 border-b-2 px-3 text-sm font-semibold', tab === t.id ? 'border-primary text-primary' : 'border-transparent text-muted')}
             >
               {t.label}
               {!!t.count && <Badge tone="accent">{t.count}</Badge>}
@@ -163,13 +165,13 @@ function Overview({ data }: { data: AdminData }) {
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Registrations" value={s.total} hint={`${s.pending} unpaid · ${s.review} being verified`} />
-        <Stat label="Confirmed" value={s.confirmed} hint={`${s.confirmedPeople} people`} tone="success" />
-        <Stat label="Collected (verified)" value={formatPaise(s.collected)} hint={s.waived ? `${formatPaise(s.waived)} waived` : undefined} tone="success" />
-        <Stat label="Awaiting verification" value={formatPaise(s.awaitingAmount)} hint={`${s.awaitingCount} payments`} tone="accent" />
+        <Stat label="Confirmed" value={s.confirmed} hint={plural(s.confirmedPeople, 'person', 'people')} tone="success" />
+        <Stat label="Collected (verified)" value={formatPaise(s.collected, { zeroAsFree: false })} hint={s.waived ? `${formatPaise(s.waived)} waived` : undefined} tone="success" />
+        <Stat label="Awaiting verification" value={formatPaise(s.awaitingAmount, { zeroAsFree: false })} hint={plural(s.awaitingCount, 'payment', 'payments')} tone="accent" />
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Accommodation requests" value={s.accommodation} />
-        <Stat label="Checked in" value={s.checkedIn} hint={`of ${s.confirmedPeople} people`} tone="primary" />
+        <Stat label="Checked in" value={s.checkedIn} hint={`of ${plural(s.confirmedPeople, 'person', 'people')}`} tone="primary" />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-4">

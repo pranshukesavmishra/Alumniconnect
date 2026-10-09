@@ -48,9 +48,9 @@ export function InvitePage() {
       <PageHeader title="Invite friends" back="/me" />
       <Page className="space-y-6">
         <Card className="overflow-hidden">
-          <div className="bg-[#0c1e45] p-5 text-white">
+          <div className="bg-hero p-5 text-white">
             <p className="text-xl font-bold">Bring your batch in</p>
-            <p className="mt-1 text-[#C9D4EA]">Friends who join with your link are verified faster, because you vouch for them.</p>
+            <p className="mt-1 text-hero-text">Friends who join with your link are verified faster, because you vouch for them.</p>
             {p && (
               <div className="mt-4">
                 <p className="text-sm font-semibold">
@@ -58,7 +58,7 @@ export function InvitePage() {
                 </p>
                 {pct !== null && (
                   <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/20">
-                    <div className="h-full rounded-full bg-[#F2A33A]" style={{ width: `${pct}%` }} />
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
                   </div>
                 )}
               </div>
@@ -67,7 +67,7 @@ export function InvitePage() {
           <div className="flex flex-col items-center gap-4 p-5">
             <QrCode value={link} size={190} label="Invite QR code" />
             <div className="grid w-full gap-2 sm:grid-cols-3">
-              <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#1F9D57] px-4 font-semibold text-white">
+              <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#128c4a] px-4 font-semibold text-white">
                 <WhatsAppIcon className="size-5" /> WhatsApp
               </a>
               <button type="button" onClick={() => navigator.clipboard?.writeText(link).then(() => toast.success('Link copied'))} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-border px-4 font-semibold text-primary">

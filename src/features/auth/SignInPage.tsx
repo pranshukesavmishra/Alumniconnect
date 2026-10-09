@@ -88,19 +88,34 @@ export function SignInPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-safe pb-safe">
-      <div className="flex-1 pt-14">
-        <div className="mb-8 flex items-center gap-3">
-          <img src="/pwa-192.png" alt="" className="size-12 rounded-2xl" />
-          <div>
-            <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
-            <p className="text-sm text-muted">Jabalpur Engineering College</p>
+    <div className="min-h-dvh bg-bg md:grid md:grid-cols-[1.1fr_1fr]">
+      {/* brand panel */}
+      <section className="relative overflow-hidden bg-hero px-6 pb-12 pt-[calc(env(safe-area-inset-top)+2.5rem)] text-white max-md:rounded-b-[2.5rem] md:flex md:flex-col md:justify-center md:px-16">
+        <div aria-hidden className="absolute -right-24 -top-28 size-80 rounded-full bg-hero-2" />
+        <div aria-hidden className="absolute -bottom-16 -left-10 size-48 rounded-full bg-accent/15" />
+        <div className="relative mx-auto w-full max-w-md md:mx-0">
+          <div className="flex items-center gap-3">
+            <img src="/pwa-192.png" alt="" className="size-12 rounded-2xl shadow-pop" />
+            <div>
+              <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
+              <p className="text-sm text-hero-text">Jabalpur Engineering College</p>
+            </div>
           </div>
+          <h2 className="mt-8 text-[32px] font-extrabold leading-[1.1] tracking-tight md:text-5xl">Every JECian,<br />one tap away.</h2>
+          <p className="mt-3 max-w-sm text-hero-text">Find your batch, share your journey and register for the Alumni Meet 2026.</p>
+          <ul className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
+            {['Batch communities', 'Alumni directory', 'Meet 2026'].map((t) => (
+              <li key={t} className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{t}</li>
+            ))}
+          </ul>
         </div>
+      </section>
 
+      <div className="mx-auto flex w-full max-w-md flex-col px-5 pb-safe md:justify-center md:px-10">
+      <div className="flex-1 pt-8 md:flex-none md:pt-0">
         {step === 'choose' && (
           <>
-            <h1 className="text-[28px] font-bold leading-tight tracking-tight">Welcome, JECian</h1>
+            <h1 className="text-[26px] font-bold leading-tight tracking-tight">Welcome, JECian</h1>
             <p className="mt-2 text-muted">Sign in to register for the Alumni Meet and reconnect with your batch. No password needed.</p>
             <div className="mt-8 space-y-3">
               <Button variant="secondary" size="lg" block icon={<GoogleLogo />} loading={busy === 'google'} onClick={() => oauth('google')}>
@@ -188,8 +203,9 @@ export function SignInPage() {
         {error && <Notice tone="danger" className="mt-5" title={error} />}
       </div>
       <p className="py-6 text-center text-sm text-muted">
-        By continuing you agree to our <a className="text-primary underline" href="/privacy">privacy notice</a>.
+        By continuing you agree to our <a className="inline-flex min-h-11 items-center text-primary underline" href="/privacy">privacy notice</a>.
       </p>
+      </div>
     </div>
   )
 }

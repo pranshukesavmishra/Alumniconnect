@@ -77,7 +77,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   return (
     <div>
       {!isMe && <PageHeader title={p.full_name} back="/people" />}
-      <div className="h-24 bg-gradient-to-r from-[#0c1e45] to-[#14306B] sm:h-32" aria-hidden />
+      <div className="h-24 bg-gradient-to-r from-hero to-hero-2 sm:h-32" aria-hidden />
       <Page className="-mt-14 space-y-6 pt-0">
         <section>
           <Avatar src={p.avatar_url} name={p.full_name} size={104} className="border-4 border-bg" />

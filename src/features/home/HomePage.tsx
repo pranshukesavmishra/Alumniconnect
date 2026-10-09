@@ -39,16 +39,16 @@ export function profileCompleteness(p: Profile): { percent: number; next: { labe
 
 function Landing() {
   return (
-    <div className="min-h-dvh bg-[#0c1e45] text-white">
+    <div className="min-h-dvh bg-hero text-white">
       <div className="relative mx-auto max-w-3xl overflow-hidden px-5 pb-16 pt-[calc(env(safe-area-inset-top)+3rem)]">
-        <div aria-hidden className="absolute -right-32 -top-24 size-96 rounded-full bg-[#14306B]" />
+        <div aria-hidden className="absolute -right-32 -top-24 size-96 rounded-full bg-hero-2" />
         <div className="relative">
           <img src="/pwa-192.png" alt="" className="size-14 rounded-2xl" />
           <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">Every JECian, one tap away.</h1>
-          <p className="mt-4 max-w-xl text-lg text-[#C9D4EA]">
+          <p className="mt-4 max-w-xl text-lg text-hero-text">
             For everyone who studied at Jabalpur Engineering College, the oldest technical institution in Central India (est. 1947). Find your batch, see where everyone is today, and register for the Alumni Meet 2026.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:text-[#14306B]">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:text-hero">
             <ButtonLink to="/signin" size="lg">
               Sign in or join
             </ButtonLink>
@@ -79,7 +79,7 @@ export function HomePage() {
   const { session, loading } = useAuth()
   const { data: profile, isLoading } = useMyProfile()
   const { data: event } = useEvent(MEET_SLUG)
-  const { data: mine } = useMyRegistration(event?.id)
+  const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
   const { data: groups } = useGroups()
 
   if (loading || (session && isLoading)) return <PageSkeleton />
@@ -107,21 +107,21 @@ export function HomePage() {
       </header>
 
       {event && (
-        <Link to={reg ? '/meet/my' : '/meet'} className="block overflow-hidden rounded-2xl bg-[#0c1e45] text-white">
+        <Link to={reg ? '/meet/my' : '/meet'} className="block overflow-hidden rounded-3xl bg-gradient-to-br from-hero to-hero-2 text-white shadow-pop">
           <div className="relative p-5">
-            <div aria-hidden className="absolute -right-10 -top-14 size-40 rounded-full bg-[#14306B]" />
+            <div aria-hidden className="absolute -right-10 -top-14 size-40 rounded-full bg-hero-2" />
             <div className="relative">
               <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#F2A33A]">
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent">
                   <CalendarHeart className="size-4" aria-hidden /> {days ? `In ${days} days` : 'Alumni Meet'}
                 </span>
                 {reg && <StatusBadge status={reg.status} />}
               </div>
               <p className="mt-2 text-xl font-bold">{event.title}</p>
-              <p className="text-sm text-[#C9D4EA]">{formatDateRange(event.starts_at, event.ends_at)}</p>
-              <p className="mt-4 inline-flex items-center gap-1 font-semibold">
-                {reg ? (reg.status === 'confirmed' ? 'View your entry pass' : reg.status === 'pending_payment' ? 'Complete your payment' : 'See your registration') : 'Register now'}
-                <ArrowRight className="size-4" aria-hidden />
+              <p className="text-sm text-hero-text">{formatDateRange(event.starts_at, event.ends_at)}</p>
+              <p className="mt-4 inline-flex min-h-6 items-center gap-1 font-semibold">
+                {regPending ? <span className="skeleton inline-block h-5 w-40 rounded-md bg-white/20" aria-busy="true" aria-label="Loading" /> : reg ? (reg.status === 'confirmed' ? 'View your entry pass' : reg.status === 'pending_payment' ? 'Complete your payment' : 'See your registration') : 'Register now'}
+                {!regPending && <ArrowRight className="size-4" aria-hidden />}
               </p>
             </div>
           </div>

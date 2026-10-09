@@ -4,8 +4,9 @@ const inrWhole = new Intl.NumberFormat('en-IN', { style: 'currency', currency: '
 const inrPaise = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /** "₹2,500", "₹2,500.50" (never "₹2,500.5"), or "Free". */
-export function formatPaise(paise: number): string {
-  if (paise === 0) return 'Free'
+/** ₹ amount; zero shows as "Free" for prices, or pass { zeroAsFree: false } for totals (₹0). */
+export function formatPaise(paise: number, opts: { zeroAsFree?: boolean } = {}): string {
+  if (paise === 0 && opts.zeroAsFree !== false) return 'Free'
   return (paise % 100 === 0 ? inrWhole : inrPaise).format(paise / 100)
 }
 

@@ -1,4 +1,4 @@
-import clsx from 'clsx'
+import { cn } from '../../lib/cn'
 import { Loader2 } from 'lucide-react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router'
@@ -7,22 +7,22 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost' | '
 type Size = 'md' | 'lg' | 'sm'
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors select-none ' +
-  'disabled:opacity-50 disabled:pointer-events-none active:scale-[0.99]'
+  'inline-flex items-center justify-center gap-2 rounded-full font-semibold tracking-[-0.005em] transition-[background-color,box-shadow,transform] duration-150 select-none ' +
+  'disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]'
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-primary text-on-primary hover:bg-primary-hover',
-  secondary: 'bg-surface text-primary border border-border hover:bg-primary-soft',
+  primary: 'bg-primary text-on-primary shadow-[0_8px_20px_-10px_var(--primary)] hover:bg-primary-hover',
+  secondary: 'bg-surface text-text border border-border shadow-sm hover:bg-surface-2',
   ghost: 'text-primary hover:bg-primary-soft',
-  danger: 'bg-danger text-white hover:opacity-90',
+  danger: 'bg-danger text-on-danger hover:opacity-90',
   'danger-ghost': 'text-danger hover:bg-danger-soft',
-  success: 'bg-success text-white hover:opacity-90',
+  success: 'bg-success text-on-success hover:opacity-90',
 }
 
 const sizes: Record<Size, string> = {
-  sm: 'min-h-9 px-3.5 text-sm',
-  md: 'min-h-11 px-5 text-[15px]',
-  lg: 'min-h-13 px-6 text-base',
+  sm: 'min-h-11 px-4 text-sm',
+  md: 'min-h-12 px-6 text-[15px]',
+  lg: 'min-h-14 px-7 text-base',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -37,7 +37,7 @@ export function Button({ variant = 'primary', size = 'md', loading, block, icon,
   return (
     <button
       type="button"
-      className={clsx(base, variants[variant], sizes[size], block && 'w-full', className)}
+      className={cn(base, variants[variant], sizes[size], block && 'w-full', className)}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}
@@ -58,7 +58,7 @@ export function ButtonLink({
   ...rest
 }: LinkProps & { variant?: Variant; size?: Size; block?: boolean; icon?: ReactNode }) {
   return (
-    <Link className={clsx(base, variants[variant], sizes[size], block && 'w-full', className)} {...rest}>
+    <Link className={cn(base, variants[variant], sizes[size], block && 'w-full', className)} {...rest}>
       {icon}
       {children}
     </Link>

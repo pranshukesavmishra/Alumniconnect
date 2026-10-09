@@ -52,7 +52,7 @@ export function RegisterPage() {
     needs_accommodation: false,
     arrival_note: '',
     notes: '',
-    photo_consent: true,
+    photo_consent: false, // consent is an active choice, never pre-ticked
     accept_terms: false,
   }))
 
@@ -148,7 +148,14 @@ export function RegisterPage() {
     }
     if (s === 2 && !form.accept_terms) e.accept_terms = 'Please accept to continue.'
     setErrors(e)
-    return Object.keys(e).length === 0
+    const ok = Object.keys(e).length === 0
+    // bring the first problem into view (the sticky footer can hide it) and move focus there
+    if (!ok) requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>('[data-field-error], [role="alert"]')
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el?.closest('section, div')?.querySelector<HTMLElement>('input, select, button')?.focus({ preventScroll: true })
+    })
+    return ok
   }
 
   function nextStep() {
@@ -380,7 +387,7 @@ export function RegisterPage() {
                 .
               </Checkbox>
               {errors.accept_terms && (
-                <p className="text-sm text-danger" role="alert">
+                <p className="text-sm font-semibold text-danger" role="alert" data-field-error>
                   {errors.accept_terms}
                 </p>
               )}
@@ -390,7 +397,7 @@ export function RegisterPage() {
         )}
 
         {/* actions */}
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
+        <div className="sticky bottom-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
           <div className="mb-2 flex items-center justify-between text-[15px]">
             <span className="text-muted">
               {people} {people === 1 ? 'person' : 'people'}

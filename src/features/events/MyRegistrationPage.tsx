@@ -94,10 +94,10 @@ export function MyRegistrationPage() {
 function OfflineTicket({ t }: { t: CachedTicket }) {
   return (
     <Card className="overflow-hidden">
-      <div className="bg-[#0c1e45] px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#F2A33A]">Entry pass · saved on this phone</p>
+      <div className="bg-hero px-5 py-4 text-white">
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent">Entry pass · saved on this phone</p>
         <p className="text-lg font-bold">{t.title}</p>
-        <p className="text-sm text-[#C9D4EA]">{t.when}</p>
+        <p className="text-sm text-hero-text">{t.when}</p>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
         <QrCode value={t.code} size={200} label={`Entry QR code ${t.code}`} />
@@ -377,10 +377,10 @@ function TicketCard({ event, mine }: { event: EventRow; mine: MyRegistration }) 
   const reg = mine.registration
   return (
     <Card className="overflow-hidden">
-      <div className="bg-[#0c1e45] px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-[#F2A33A]">Entry pass</p>
+      <div className="bg-hero px-5 py-4 text-white">
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent">Entry pass</p>
         <p className="text-lg font-bold">{event.title}</p>
-        <p className="text-sm text-[#C9D4EA]">{formatDateRange(event.starts_at, event.ends_at)}</p>
+        <p className="text-sm text-hero-text">{formatDateRange(event.starts_at, event.ends_at)}</p>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
         <QrCode value={reg.code} size={200} label={`Entry QR code ${reg.code}`} />
@@ -459,7 +459,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
         href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#1F9D57] px-5 text-[15px] font-semibold text-white hover:opacity-90"
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#128c4a] px-5 text-[15px] font-semibold text-white hover:opacity-90"
       >
         <WhatsAppIcon className="size-4" /> Invite batchmates on WhatsApp
       </a>

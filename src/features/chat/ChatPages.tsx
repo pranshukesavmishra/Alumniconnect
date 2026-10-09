@@ -110,7 +110,7 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
             <p className={clsx('shrink-0 text-xs', unread && !c.muted ? 'font-semibold text-primary' : 'text-muted')}>{listStamp(c.last_message_at)}</p>
           </div>
           <div className="mt-0.5 flex items-center gap-1.5">
-            {mine && c.kind === 'dm' && (seen ? <CheckCheck className="size-4 shrink-0 text-[#1d9bf0]" aria-label="Seen" /> : <Check className="size-4 shrink-0 text-muted" aria-label="Sent" />)}
+            {mine && c.kind === 'dm' && (seen ? <CheckCheck className="size-4 shrink-0 text-primary" aria-label="Seen" /> : <Check className="size-4 shrink-0 text-muted" aria-label="Sent" />)}
             <p className={clsx('min-w-0 flex-1 truncate text-sm', unread ? 'font-medium text-text' : 'text-muted')}>
               {c.last_message ? `${who}${c.last_message}` : c.kind === 'group' ? 'Say hello to the group 👋' : 'No messages yet'}
             </p>
@@ -236,7 +236,7 @@ const EDIT_WINDOW_MS = 15 * 60_000
 
 function TickStatus({ m, seen }: { m: Message; seen: boolean }) {
   if (m.pending) return <Clock className="size-3.5" aria-label="Sending" />
-  if (seen) return <CheckCheck className="size-4 text-[#53bdeb]" aria-label="Seen" />
+  if (seen) return <CheckCheck className="size-4 text-accent" aria-label="Seen" />
   return <Check className="size-4" aria-label="Sent" />
 }
 

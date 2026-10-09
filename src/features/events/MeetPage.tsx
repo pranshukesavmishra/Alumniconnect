@@ -16,7 +16,7 @@ export function MeetPage() {
   const { data: event, isLoading, error } = useEvent(MEET_SLUG)
   const { data: tickets } = useTicketTypes(event?.id)
   const { data: stats } = useEventStats(event?.id)
-  const { data: mine } = useMyRegistration(event?.id)
+  const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
 
   if (isLoading) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title="Couldn’t load the event">{friendlyError(error)}</Notice></Page>
@@ -29,7 +29,11 @@ export function MeetPage() {
   const countByYear = new Map((stats?.by_year ?? []).map((y) => [y.year, y.count]))
   const years = event.eligible_from_year && event.eligible_to_year ? yearRange(event.eligible_from_year, event.eligible_to_year).reverse() : []
 
-  const cta = active ? (
+  // while a signed-in member's registration is still loading, show a placeholder, never the wrong button
+  const waiting = !!session && regPending
+  const cta = waiting ? (
+    <div className="skeleton h-14 w-full rounded-full" aria-busy="true" aria-label="Loading your registration" />
+  ) : active ? (
     <ButtonLink to="/meet/my" size="lg" block icon={<Ticket className="size-5" />}>
       {reg.status === 'confirmed' ? 'View my ticket' : reg.status === 'pending_payment' ? 'Complete payment' : 'View my registration'}
     </ButtonLink>
@@ -42,24 +46,24 @@ export function MeetPage() {
   return (
     <div>
       {/* hero */}
-      <section className="relative overflow-hidden bg-[#0c1e45] px-5 pb-8 pt-[calc(env(safe-area-inset-top)+2rem)] text-white">
-        <div aria-hidden className="absolute -right-24 -top-24 size-72 rounded-full bg-[#14306B]" />
-        <div aria-hidden className="absolute -bottom-20 right-10 size-40 rounded-full bg-[#F2A33A]/15" />
+      <section className="relative overflow-hidden bg-hero px-5 pb-8 pt-[calc(env(safe-area-inset-top)+2rem)] text-white">
+        <div aria-hidden className="absolute -right-24 -top-24 size-72 rounded-full bg-hero-2" />
+        <div aria-hidden className="absolute -bottom-20 right-10 size-40 rounded-full bg-accent/15" />
         <div className="relative mx-auto max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-[#F2A33A]">Jabalpur Engineering College</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-accent">Jabalpur Engineering College</p>
           <h1 className="mt-2 text-[32px] font-bold leading-[1.1] tracking-tight sm:text-4xl">{event.title}</h1>
-          {event.tagline && <p className="mt-2 text-lg text-[#C9D4EA]">{event.tagline}</p>}
-          <ul className="mt-6 space-y-2.5 text-[15px] text-[#E6ECF8]">
+          {event.tagline && <p className="mt-2 text-lg text-hero-text">{event.tagline}</p>}
+          <ul className="mt-6 space-y-2.5 text-[15px] text-hero-text">
             <li className="flex items-start gap-3">
-              <CalendarDays className="mt-0.5 size-5 shrink-0 text-[#F2A33A]" aria-hidden />
+              <CalendarDays className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
               <span>
                 {formatDateRange(event.starts_at, event.ends_at)}
-                {days !== null && days > 0 && <span className="text-[#C9D4EA]"> · in {days} days</span>}
+                {days !== null && days > 0 && <span className="text-hero-text"> · in {days} days</span>}
               </span>
             </li>
             {event.venue && (
               <li className="flex items-start gap-3">
-                <MapPin className="mt-0.5 size-5 shrink-0 text-[#F2A33A]" aria-hidden />
+                <MapPin className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
                 {event.venue_map_url ? (
                   <a href={event.venue_map_url} target="_blank" rel="noreferrer" className="underline decoration-white/40 underline-offset-4">
                     {event.venue}
@@ -71,14 +75,14 @@ export function MeetPage() {
             )}
             {stats && stats.registered > 0 && (
               <li className="flex items-start gap-3">
-                <Users className="mt-0.5 size-5 shrink-0 text-[#F2A33A]" aria-hidden />
+                <Users className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
                 <span>
                   {stats.registered} alumni registered · {stats.people} people coming
                 </span>
               </li>
             )}
           </ul>
-          <div className="mt-7 hidden max-w-xs sm:block [&_a]:bg-white [&_a]:text-[#14306B] [&_a:hover]:bg-[#EAF0FB]">{cta}</div>
+          <div className="mt-7 hidden max-w-xs sm:block [&_a]:bg-white [&_a]:text-hero [&_a:hover]:bg-primary-soft">{cta}</div>
         </div>
       </section>
 
@@ -170,7 +174,7 @@ export function MeetPage() {
       </Page>
 
       {cta && (
-        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:hidden">
+        <div className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-10 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:hidden">
           {cta}
         </div>
       )}

@@ -1,3 +1,4 @@
+import { shortBranch } from '../../lib/constants'
 import { useInfiniteQuery } from '@tanstack/react-query'
 import { Search, ShieldAlert, SlidersHorizontal, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -137,7 +138,7 @@ export function DirectoryPage() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{p.full_name}</p>
                         <p className="truncate text-sm">{p.current_title && p.current_company ? `${p.current_title} · ${p.current_company}` : (p.headline ?? '')}</p>
-                        <p className="truncate text-sm text-muted">{[p.branch, p.grad_year, p.city].filter(Boolean).join(' · ')}</p>
+                        <p className="truncate text-sm text-muted">{[p.grad_year ? `Batch ${p.grad_year}` : null, shortBranch(p.branch), p.city].filter(Boolean).join(' · ')}</p>
                       </div>
                       {p.help_tags.includes('Referrals') && <Badge tone="accent">Referrals</Badge>}
                     </Link>

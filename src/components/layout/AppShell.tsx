@@ -38,16 +38,22 @@ export function AppShell() {
   const organiser = useIsOrganiser()
   const unread = useUnreadChats()
   useInboxLive()
-  // Focused screens (an open chat) use the whole height, like WhatsApp: no bottom tabs.
-  const focused = !!useMatch('/chat/:id')
+  // Focused screens (an open chat, the registration form, the check-in scanner) use the whole height: no bottom tabs.
+  const inChat = useMatch('/chat/:id')
+  const inRegister = useMatch('/meet/register')
+  const inCheckIn = useMatch('/admin/events/:slug/check-in')
+  const focused = !!(inChat || inRegister || inCheckIn)
   const desktopTabs = organiser ? [...tabs, { to: '/admin', label: 'Organise', icon: ShieldCheck } as Tab] : tabs
   return (
     <div className="min-h-dvh md:flex">
       {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface px-3 py-5 md:flex">
-        <Link to="/" className="mb-6 flex items-center gap-3 px-3">
-          <img src="/pwa-192.png" alt="" className="size-9 rounded-xl" />
-          <span className="font-bold leading-tight">JEC Alumni Connect</span>
+      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-4 py-6 backdrop-blur md:flex">
+        <Link to="/" className="mb-8 flex items-center gap-3 px-2">
+          <img src="/pwa-192.png" alt="" className="size-10 rounded-2xl shadow-card" />
+          <span className="leading-tight">
+            <span className="block text-[17px] font-bold tracking-tight">JEC Alumni</span>
+            <span className="block text-xs font-medium text-muted">Jabalpur Engineering College</span>
+          </span>
         </Link>
         <nav className="space-y-1" aria-label="Main">
           {desktopTabs.map((t) => (
@@ -57,20 +63,20 @@ export function AppShell() {
               end={t.end}
               className={({ isActive }) =>
                 clsx(
-                  'flex min-h-11 items-center gap-3 rounded-xl px-3 font-medium',
-                  isActive ? 'bg-primary-soft text-primary' : 'text-muted hover:bg-surface-2 hover:text-text',
+                  'flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold transition-colors',
+                  isActive ? 'bg-primary text-on-primary shadow-[0_8px_20px_-10px_var(--primary)]' : 'text-muted hover:bg-surface-2 hover:text-text',
                 )
               }
             >
               <t.icon className="size-5" aria-hidden />
               {t.label}
-              {t.to === '/chat' && unread > 0 && <span className="ml-auto rounded-full bg-danger px-2 text-xs font-bold text-white">{unread}</span>}
+              {t.to === '/chat' && unread > 0 && <span className="ml-auto rounded-full bg-accent px-2 text-xs font-bold leading-5 text-[#2b1d00]">{unread}</span>}
             </NavLink>
           ))}
         </nav>
         {profile && (
-          <Link to="/me" className="mt-auto flex items-center gap-3 rounded-xl p-2 hover:bg-surface-2">
-            <Avatar src={profile.avatar_url} name={profile.full_name} size={36} />
+          <Link to="/me" className="mt-auto flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card hover:bg-surface-2">
+            <Avatar src={profile.avatar_url} name={profile.full_name} size={40} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{profile.full_name || 'Your profile'}</span>
               <span className="block truncate text-xs text-muted">{profile.grad_year ? `Batch ${profile.grad_year}` : 'Complete profile'}</span>
@@ -79,44 +85,40 @@ export function AppShell() {
         )}
       </aside>
 
-      <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]')}>
+      <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(6rem+env(safe-area-inset-bottom))]')}>
         <Outlet />
       </main>
 
-      {/* phone bottom tabs */}
+      {/* phone bottom tabs: a floating glass bar */}
       {!focused && (
-      <nav
-        aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface/95 pb-safe backdrop-blur md:hidden"
-      >
-        <ul className="mx-auto flex max-w-lg">
-          {tabs.map((t) => (
-            <li key={t.to} className="flex-1">
-              <NavLink
-                to={t.to}
-                end={t.end}
-                className={({ isActive }) =>
-                  clsx('flex min-h-15 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold', isActive ? 'text-primary' : 'text-muted')
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span className={clsx('relative grid h-7 w-12 place-items-center rounded-full transition-colors', isActive && 'bg-primary-soft')}>
-                      <t.icon className="size-5" aria-hidden />
-                      {t.to === '/chat' && unread > 0 && (
-                        <span className="absolute -right-0.5 -top-1 min-w-4.5 rounded-full bg-danger px-1 text-[10px] font-bold leading-4.5 text-white" aria-label={`${unread} unread`}>
-                          {unread > 9 ? '9+' : unread}
-                        </span>
-                      )}
-                    </span>
-                    {t.label}
-                  </>
-                )}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
+        <nav aria-label="Main" className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
+          <ul className="pointer-events-auto mx-auto flex max-w-md gap-1 rounded-[1.75rem] border border-border/70 bg-surface/85 p-1.5 shadow-pop backdrop-blur-xl">
+            {tabs.map((t) => (
+              <li key={t.to} className="flex-1">
+                <NavLink
+                  to={t.to}
+                  end={t.end}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] text-[11px] font-semibold transition-colors',
+                      isActive ? 'bg-primary text-on-primary shadow-[0_6px_16px_-8px_var(--primary)]' : 'text-muted active:bg-surface-2',
+                    )
+                  }
+                >
+                  <span className="relative grid h-6 place-items-center">
+                    <t.icon className="size-[22px]" aria-hidden />
+                    {t.to === '/chat' && unread > 0 && (
+                      <span className="absolute -right-2.5 -top-1.5 min-w-4.5 rounded-full bg-accent px-1 text-[10px] font-bold leading-4.5 text-[#2b1d00]" aria-label={`${unread} unread`}>
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </span>
+                  {t.label}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
       )}
     </div>
   )
@@ -125,17 +127,17 @@ export function AppShell() {
 /** Page header with title and optional back link / action, used on every screen. */
 export function PageHeader({ title, subtitle, back, action }: { title: ReactNode; subtitle?: ReactNode; back?: string; action?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-bg/90 pt-safe backdrop-blur">
-      <div className="mx-auto flex min-h-14 max-w-3xl items-center gap-2 px-4">
+    <header className="sticky top-0 z-20 bg-bg/80 pt-safe backdrop-blur-xl">
+      <div className="mx-auto flex min-h-16 max-w-3xl items-center gap-2 px-4">
         {back && (
-          <Link to={back} className="-ml-2 grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label="Back">
-            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+          <Link to={back} className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-text hover:bg-surface-2" aria-label="Back">
+            <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="m15 18-6-6 6-6" />
             </svg>
           </Link>
         )}
         <div className="min-w-0 flex-1 py-2">
-          <h1 className="truncate text-lg font-bold leading-tight">{title}</h1>
+          <h1 className="truncate text-[22px] font-bold leading-tight tracking-tight">{title}</h1>
           {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
         </div>
         {action}
@@ -145,5 +147,5 @@ export function PageHeader({ title, subtitle, back, action }: { title: ReactNode
 }
 
 export function Page({ children, className, wide }: { children: ReactNode; className?: string; wide?: boolean }) {
-  return <div className={clsx('mx-auto w-full px-4 py-5', wide ? 'max-w-6xl' : 'max-w-3xl', className)}>{children}</div>
+  return <div className={clsx('mx-auto w-full px-4 pb-6 pt-3', wide ? 'max-w-6xl' : 'max-w-3xl', className)}>{children}</div>
 }
