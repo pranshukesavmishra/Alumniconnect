@@ -9,6 +9,7 @@ import { formatDate } from '../../lib/format'
 import type { Education, Experience } from '../../lib/types'
 import { signOut, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { LocationSettings } from '../location/LocationSharing'
+import { TripChips } from '../location/TripChips'
 import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
@@ -143,6 +144,8 @@ export function ProfilePage({ self }: { self?: boolean }) {
 
         <BadgesRow memberId={p.id} />
 
+        <TripChips userId={p.id} isMe={isMe} />
+
         {isMe && (
           <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('profile.shortcuts')}>
             {[
@@ -154,6 +157,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
               { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
               { to: '/people', label: tx('home.findJecians'), hint: tx('profile.findHint'), icon: '🔎' },
               { to: '/nearby', label: tx('nearby.title'), hint: tx('nearby.entryHint'), icon: '📍' },
+              { to: '/trips', label: tx('trips.title'), hint: tx('trips.subtitle'), icon: '✈️' },
               { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
               ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
             ].map((l) => (

@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { Card, Notice, Skeleton } from '../../components/ui/Display'
-import { Checkbox } from '../../components/ui/Form'
+import { Checkbox, Select } from '../../components/ui/Form'
 import { useT } from '../../i18n'
 import { relativeTime } from '../../lib/format'
 import { useMyProfile } from '../auth/AuthProvider'
@@ -27,7 +27,7 @@ export function SharingExplainer() {
 export function LocationSettings() {
   const t = useT()
   const { data: loc, isLoading, error: loadError } = useMyLocation()
-  const { enable, refresh, setUpdateProfile, turnOff } = useLocationActions()
+  const { enable, refresh, setUpdateProfile, turnOff, setAlerts } = useLocationActions()
   const [updateProfile, setUpdate] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -106,6 +106,34 @@ export function LocationSettings() {
             {t('loc.turnOn')}
           </Button>
         )}
+      </div>
+      <div className="mt-4 space-y-1 border-t border-border pt-3" role="group" aria-label={t('alerts.title')}>
+        <p className="text-sm font-semibold">{t('alerts.title')}</p>
+        {([
+          ['batchmate', 'alerts.batchmate'],
+          ['trip', 'alerts.trip'],
+        ] as const).map(([kind, label]) => (
+          <div key={kind}>
+            <Checkbox
+              checked={loc.alerts[kind]}
+              onChange={(v) => void run(`alert-${kind}`, () => setAlerts({ ...loc.alerts, [kind]: v }), t('alerts.saved'))}
+            >
+              {t(label)}
+            </Checkbox>
+            {loc.alerts[kind] && (
+              <Select
+                aria-label={`${t(label)}: ${t('alerts.scope')}`}
+                className="mb-2 ml-1 max-w-xs"
+                value={loc.alerts[`${kind}_scope`]}
+                onChange={(e) => void run(`alert-${kind}-scope`, () => setAlerts({ ...loc.alerts, [`${kind}_scope`]: e.target.value as 'batch' | 'everyone' }), t('alerts.saved'))}
+              >
+                <option value="batch">{t('alerts.scopeBatch')}</option>
+                <option value="everyone">{t('alerts.scopeEveryone')}</option>
+              </Select>
+            )}
+          </div>
+        ))}
+        <p className="text-xs text-muted">{t('alerts.note')}</p>
       </div>
     </Card>
   )

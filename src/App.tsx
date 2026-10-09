@@ -45,6 +45,8 @@ const InvitePage = lazy(() => import('./features/community/InvitePage').then((m)
 const ChatListPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatListPage })))
 const ChatThreadPage = lazy(() => import('./features/chat/ChatPages').then((m) => ({ default: m.ChatThreadPage })))
 const NearbyPage = lazy(() => import('./features/location/NearbyPage').then((m) => ({ default: m.NearbyPage })))
+const TripsPage = lazy(() => import('./features/location/TripsPage').then((m) => ({ default: m.TripsPage })))
+const CityPage = lazy(() => import('./features/location/CityPage').then((m) => ({ default: m.CityPage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -168,6 +170,8 @@ export function App() {
             <Route path="invite" element={m(<InvitePage />)} />
             <Route path="people" element={m(<DirectoryPage />)} />
             <Route path="nearby" element={m(<NearbyPage />)} />
+            <Route path="trips" element={m(<TripsPage />)} />
+            <Route path="city/:id" element={m(<CityPage />)} />
             <Route path="people/:id" element={m(<ProfilePage />)} />
             <Route path="me" element={m(<ProfilePage self />)} />
             <Route path="me/edit" element={m(<EditProfilePage />)} />

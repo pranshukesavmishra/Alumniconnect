@@ -37,6 +37,10 @@ function describe(n: Notification, tx: (key: MsgKey, params?: Params) => string)
       return { text: `${who} can’t take on a new mentee right now`, to: '/mentors/mine' }
     case 'help_request':
       return { text: tx('notif.help', { who, body }), to: '/help' }
+    case 'nearby_batchmate':
+      return { text: tx('notif.nearbyBatchmate', { who, city: body }), to: '/nearby' }
+    case 'nearby_trip':
+      return { text: tx('notif.nearbyTrip', { who, city: body }), to: '/nearby' }
     case 'invite_joined':
       return { text: tx('notif.invite', { who }), to: `/people/${n.actor?.id}` }
     default:

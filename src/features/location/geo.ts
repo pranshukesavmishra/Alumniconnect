@@ -80,7 +80,7 @@ export function getPosition(env: GeoEnv = globalThis as GeoEnv, timeoutMs = 20_0
         clearTimeout(timer)
         reject(new LocationError(codeFromPositionError(e.code)))
       },
-      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 30 * 60_000 },
+      { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 0 },
     )
   })
 }

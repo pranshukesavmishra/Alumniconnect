@@ -63,6 +63,10 @@ export function describe(n: Row): { title: string; body: string; url: string; ta
       return { title: 'JEC Alumni Connect', body: `${who} can’t take on a new mentee right now`, url: '/mentors/mine', tag: `mentor:${n.target_id}`, urgency: 'normal' }
     case 'help_request':
       return { title: `${who} needs help`, body: clip(n.body), url: '/help', tag: `help:${n.target_id}`, urgency: 'normal' }
+    case 'nearby_batchmate':
+      return { title: 'JEC Alumni Connect', body: `${who} is now in ${clip(n.body)}`, url: '/nearby', tag: `nearby:${n.actor_id}`, urgency: 'normal' }
+    case 'nearby_trip':
+      return { title: 'JEC Alumni Connect', body: `${who} plans to visit ${clip(n.body)}`, url: '/nearby', tag: `trip:${n.target_id}`, urgency: 'normal' }
     default:
       return { title: 'JEC Alumni Connect', body: clip(n.body) || 'You have a new notification', url: '/notifications', tag: `n:${n.id}`, urgency: 'normal' }
   }

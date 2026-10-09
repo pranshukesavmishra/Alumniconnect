@@ -14,6 +14,8 @@ export interface MyLocation {
   lat: number | null
   lng: number | null
   updated_at: string | null
+  city_id?: number | null
+  alerts: { batchmate: boolean; batchmate_scope: 'batch' | 'everyone'; trip: boolean; trip_scope: 'batch' | 'everyone' }
   history: { action: string; at: string }[]
 }
 
@@ -71,11 +73,16 @@ export function useLocationActions() {
 
   const setUpdateProfile = useCallback(
     async (on: boolean) => {
+      const before = qc.getQueryData<MyLocation>(myLocationKey(uid))
+      qc.setQueryData<MyLocation>(myLocationKey(uid), (d) => (d ? { ...d, update_profile: on } : d))
       const { data, error } = await supabase.rpc('set_location_sharing', { p_on: true, p_update_profile: on })
-      if (error) throw error
+      if (error) {
+        qc.setQueryData(myLocationKey(uid), before)
+        throw error
+      }
       apply(data)
     },
-    [apply],
+    [apply, qc, uid],
   )
 
   const turnOff = useCallback(async () => {
@@ -84,13 +91,33 @@ export function useLocationActions() {
     apply(data)
   }, [apply])
 
+  const setAlerts = useCallback(
+    async (a: MyLocation['alerts']) => {
+      // show the new switch position at once; the server's answer replaces it (or it snaps back on an error)
+      const before = qc.getQueryData<MyLocation>(myLocationKey(uid))
+      qc.setQueryData<MyLocation>(myLocationKey(uid), (d) => (d ? { ...d, alerts: a } : d))
+      const { data, error } = await supabase.rpc('set_location_alerts', {
+        p_batchmate: a.batchmate,
+        p_batchmate_scope: a.batchmate_scope,
+        p_trip: a.trip,
+        p_trip_scope: a.trip_scope,
+      })
+      if (error) {
+        qc.setQueryData(myLocationKey(uid), before)
+        throw error
+      }
+      apply(data)
+    },
+    [apply, qc, uid],
+  )
+
   const dismissPrompt = useCallback(async () => {
     const { error } = await supabase.rpc('dismiss_location_prompt')
     if (error) throw error
     qc.setQueryData<MyLocation>(myLocationKey(uid), (d) => (d ? { ...d, prompt_dismissed: true } : d))
   }, [qc, uid])
 
-  return { enable, refresh, setUpdateProfile, turnOff, dismissPrompt }
+  return { enable, refresh, setUpdateProfile, turnOff, dismissPrompt, setAlerts }
 }
 
 export interface CitySuggestion {
