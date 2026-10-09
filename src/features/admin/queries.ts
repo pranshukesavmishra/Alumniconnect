@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMyProfile } from '../auth/AuthProvider'
 import { useMyStaffEvents } from '../events/queries'
 import { supabase } from '../../lib/supabase'
@@ -222,15 +222,18 @@ export interface SearchResults {
   registrations: { id: string; code: string; full_name: string; status: RegistrationStatus; amount_paise: number; headcount: number; event_slug: string; event_title: string; user_id: string; matched_on: string }[]
   payments: { id: string; utr: string | null; amount_paise: number; status: PaymentStatus; method: string; payer_name: string | null; created_at: string; registration_id: string; code: string; full_name: string; event_slug: string; event_title: string }[]
   by_contact: boolean
+  limit: number
 }
 
-export function useAdminSearch(q: string) {
+/** limit: results per group (8 by default; "See all" asks for up to 50). */
+export function useAdminSearch(q: string, limit = 8) {
   return useQuery({
-    queryKey: ['admin-search', q],
+    queryKey: ['admin-search', q, limit],
     enabled: q.length >= 2,
     staleTime: 15_000,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_search', { p_q: q })
+      const { data, error } = await supabase.rpc('admin_search', { p_q: q, p_limit: limit })
       if (error) throw error
       return data as unknown as SearchResults
     },
@@ -251,6 +254,129 @@ export function useRolesOverview(enabled: boolean) {
       const { data, error } = await supabase.rpc('admin_roles_overview')
       if (error) throw error
       return data as unknown as RolesOverview
+    },
+  })
+}
+
+// ------------------------------------------------------------------ member management
+export interface MemberListRow {
+  id: string
+  full_name: string
+  avatar_url: string | null
+  member_type: string | null
+  branch: string | null
+  grad_year: number | null
+  city: string | null
+  verification: VerificationStatus
+  is_admin: boolean
+  onboarded: boolean
+  created_at: string
+  last_sign_in_at: string | null
+  notes: number
+}
+
+export const MEMBER_PAGE = 40
+
+/** The filtered member list (admin_list_members), 40 at a time, with the total that matches. */
+export function useMemberList(filter: Record<string, string>, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: ['admin-members', filter],
+    enabled,
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await supabase.rpc('admin_list_members', { p_filter: filter, p_limit: MEMBER_PAGE, p_offset: pageParam })
+      if (error) throw error
+      return data as unknown as { total: number; rows: MemberListRow[] }
+    },
+    getNextPageParam: (last, all) => (last.rows.length === MEMBER_PAGE ? all.length * MEMBER_PAGE : undefined),
+  })
+}
+
+/** Every id matching the filter (up to 2000), for "select all". */
+export async function fetchMemberIds(filter: Record<string, string>): Promise<{ total: number; ids: string[] }> {
+  const { data, error } = await supabase.rpc('admin_list_members', { p_filter: filter, p_ids_only: true })
+  if (error) throw error
+  return data as unknown as { total: number; ids: string[] }
+}
+
+export interface MemberView {
+  id: string
+  name: string
+  filter: Record<string, unknown>
+  created_by: string | null
+  created_at: string
+}
+
+export function useMemberViews(enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-member-views'],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('admin_member_views').select('*').order('name')
+      if (error) throw error
+      return data as MemberView[]
+    },
+  })
+}
+
+export type TimelineItem =
+  | { at: string; kind: 'joined' | 'signin' }
+  | { at: string; kind: 'admin' | 'admin_registration' | 'did'; action: string; details: Record<string, unknown>; actor_id?: string | null; actor_name?: string | null; target_table?: string }
+  | { at: string; kind: 'registration'; code: string; status: RegistrationStatus; amount_paise: number; headcount: number; event_slug: string; event_title: string; checked_in_at: string | null }
+  | { at: string; kind: 'payment'; code: string; status: PaymentStatus; method: string; amount_paise: number; utr: string | null; event_slug: string; event_title: string; reviewed_at: string | null }
+  | { at: string; kind: 'report_by' | 'report_about'; target_type: string; reason: string; status: string; reporter_name?: string | null }
+  | { at: string; kind: 'note'; id: string; body: string; actor_id: string | null; actor_name: string | null }
+
+export interface Timeline {
+  member: {
+    id: string; full_name: string; avatar_url: string | null; branch: string | null; grad_year: number | null; city: string | null
+    verification: VerificationStatus; is_admin: boolean; onboarded: boolean; created_at: string; last_sign_in_at: string | null; added_by_admin: boolean
+  }
+  items: TimelineItem[]
+}
+
+export function useMemberTimeline(id: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-member-timeline', id],
+    enabled: enabled && !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_member_timeline', { p_id: id! })
+      if (error) throw error
+      return data as unknown as Timeline
+    },
+  })
+}
+
+export interface DuplicateSide {
+  id: string; full_name: string; grad_year: number | null; branch: string | null; city: string | null; verification: VerificationStatus
+  is_admin: boolean; onboarded: boolean; created_at: string; last_sign_in_at: string | null
+}
+export interface DuplicatePair { a: DuplicateSide; b: DuplicateSide; reasons: ('phone' | 'name' | 'similar_name')[] }
+
+export function useDuplicates(q: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-duplicates', q],
+    enabled,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_member_duplicates', { p_q: q || null })
+      if (error) throw error
+      return data as unknown as DuplicatePair[]
+    },
+  })
+}
+
+export interface MergeSide extends Omit<DuplicateSide, never> { current_company: string | null; email: string | null; has_phone: boolean }
+export interface MergePreview { keep: MergeSide; drop: MergeSide; moves: Record<string, number>; blocks: string[] }
+
+export function useMergePreview(keep: string | null, drop: string | null) {
+  return useQuery({
+    queryKey: ['admin-merge-preview', keep, drop],
+    enabled: !!keep && !!drop,
+    staleTime: 0,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_merge_preview', { p_keep: keep!, p_drop: drop! })
+      if (error) throw error
+      return data as unknown as MergePreview
     },
   })
 }

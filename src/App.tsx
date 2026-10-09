@@ -35,6 +35,9 @@ const BusinessDetailPage = lazy(() => import('./features/businesses/BusinessDeta
 const AddBusinessPage = lazy(() => import('./features/businesses/AddBusinessPage').then((m) => ({ default: m.AddBusinessPage })))
 const AdminCommunity = lazy(() => import('./features/admin/AdminCommunity').then((m) => ({ default: m.AdminCommunity })))
 const AdminModeration = lazy(() => import('./features/admin/AdminModeration').then((m) => ({ default: m.AdminModeration })))
+const AdminMemberTimeline = lazy(() => import('./features/admin/AdminMemberTimeline').then((m) => ({ default: m.AdminMemberTimeline })))
+const AdminDuplicates = lazy(() => import('./features/admin/AdminDuplicates').then((m) => ({ default: m.AdminDuplicates })))
+const AdminImport = lazy(() => import('./features/admin/AdminImport').then((m) => ({ default: m.AdminImport })))
 const AdminRoles = lazy(() => import('./features/admin/AdminRoles').then((m) => ({ default: m.AdminRoles })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
 const GroupsPage = lazy(() => import('./features/community/GroupsPage').then((m) => ({ default: m.GroupsPage })))
@@ -171,6 +174,9 @@ export function App() {
             <Route path="me/import" element={m(<LinkedInImportPage />)} />
             <Route path="admin" element={m(<AdminHome />)} />
             <Route path="admin/members" element={m(<AdminMembers />)} />
+            <Route path="admin/members/import" element={m(<AdminImport />)} />
+            <Route path="admin/members/duplicates" element={m(<AdminDuplicates />)} />
+            <Route path="admin/members/:id" element={m(<AdminMemberTimeline />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
             <Route path="admin/roles" element={m(<AdminRoles />)} />
             <Route path="admin/reports" element={m(<AdminModeration />)} />

@@ -11,11 +11,12 @@ async function noSideScroll(page: Page) {
 
 test('admin home: attention queue, search and roles work end to end, and each role sees only its own', async ({ browser }) => {
   const tag = `cc${ts}`.slice(0, 12)
+  const n = String(Math.floor(Math.random() * 9e4) + 1e4) // phones differ per run so earlier runs' people never crowd the results
   const boss = await makeUser(`${tag}boss`, { admin: true, name: `Boss ${tag}` })
   const treasurer = await makeUser(`${tag}tre`, { name: `Treasurer ${tag}` })
   const volunteer = await makeUser(`${tag}vol`, { name: `Volunteer ${tag}` })
-  const waiting = await makeUser(`${tag}wait`, { name: `Quillwaiter ${tag}`, verified: false, phone: '+91 91234 55501' })
-  const buyer = await makeUser(`${tag}buy`, { name: `Buyer ${tag}`, phone: '+91 91234 55502' })
+  const waiting = await makeUser(`${tag}wait`, { name: `Quillwaiter ${tag}`, verified: false, phone: `+91 91234 ${n}` })
+  const buyer = await makeUser(`${tag}buy`, { name: `Buyer ${tag}`, phone: `+91 91235 ${n}` })
   const ev = makeEvent(tag)
   sql(`insert into event_staff (event_id, user_id, role) values ('${ev.id}', '${treasurer.id}', 'manager'), ('${ev.id}', '${volunteer.id}', 'checkin')`)
   const { reg, payment } = await register(buyer, ev, true)
@@ -68,15 +69,15 @@ test('admin home: attention queue, search and roles work end to end, and each ro
   await expect(results).toContainText(`Verify ${tag}`)
 
   const lookups = auditCount(`action = 'search_contact' and actor = '${boss.id}'`)
-  await search.fill('91234 55502')
+  await search.fill(`91235 ${n}`)
   await expect(results).toContainText(`Buyer ${tag}`.slice(0, 20))
   await expect(results).toContainText('matched phone')
   await expect(results).toContainText('recorded in the activity log')
-  await expect(page.locator('main')).not.toContainText('91234 55502') // matched, never echoed
+  await expect(page.locator('main')).not.toContainText(`91235 ${n}`) // matched, never echoed
   await expect.poll(() => auditCount(`action = 'search_contact' and actor = '${boss.id}'`)).toBeGreaterThan(lookups)
 
   await search.fill(`Quillwaiter ${tag}`)
-  await results.getByRole('link', { name: new RegExp(`Quillwaiter ${tag}`) }).click()
+  await results.getByRole('link', { name: new RegExp(`Quillwaiter ${tag}`) }).first().click()
   await expect(page).toHaveURL(/\/admin\/members/)
   await expect(page.getByRole('dialog', { name: 'Edit member' })).toContainText(`Quillwaiter ${tag}`)
 

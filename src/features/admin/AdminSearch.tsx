@@ -1,4 +1,4 @@
-import { CreditCard, Search, Ticket, UserRound, X } from 'lucide-react'
+import { CreditCard, History, Search, Ticket, UserRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { Avatar, Badge, Card, Notice, Skeleton } from '../../components/ui/Display'
@@ -18,7 +18,9 @@ export function AdminSearch({ members }: { members: boolean }) {
     const t = setTimeout(() => setDq(q.trim()), 250)
     return () => clearTimeout(t)
   }, [q])
-  const { data, isFetching, error } = useAdminSearch(dq)
+  const [all, setAll] = useState<string | null>(null) // the query "See all" was pressed for
+  const { data, isFetching, error } = useAdminSearch(dq, all === dq ? 50 : 8)
+  const more = (n: number) => n >= 8 && all !== dq
   const none = !!data && !data.members.length && !data.registrations.length && !data.payments.length
 
   return (
@@ -46,10 +48,10 @@ export function AdminSearch({ members }: { members: boolean }) {
           {isFetching && !data && <Skeleton className="h-16" />}
           {none && !isFetching && <Notice tone="info" title={`Nothing found for “${dq}”`}>Try a name, the ticket code (JEC-…), the 12-digit UTR or a phone number.</Notice>}
           {!!data?.members.length && (
-            <Group icon={<UserRound className="size-4" aria-hidden />} title="Members">
+            <Group icon={<UserRound className="size-4" aria-hidden />} title="Members" more={more(data.members.length) ? () => setAll(dq) : undefined}>
               {data.members.map((m) => (
-                <li key={m.id}>
-                  <Link to={`/admin/members?open=${m.id}`} className={row}>
+                <li key={m.id} className="flex items-center">
+                  <Link to={`/admin/members?open=${m.id}`} className={`${row} min-w-0 flex-1`}>
                     <Avatar src={null} name={m.full_name || '?'} size={40} />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-semibold">{m.full_name || '(no name yet)'}</span>
@@ -58,12 +60,15 @@ export function AdminSearch({ members }: { members: boolean }) {
                     {m.is_admin && <Badge tone="primary">Admin</Badge>}
                     {m.verification === 'verified' ? <Badge tone="success">Verified</Badge> : m.verification === 'rejected' ? <Badge tone="danger">Rejected</Badge> : <Badge>Not verified</Badge>}
                   </Link>
+                  <Link to={`/admin/members/${m.id}`} aria-label={`History of ${m.full_name || 'member'}`} className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface-2">
+                    <History className="size-5" aria-hidden />
+                  </Link>
                 </li>
               ))}
             </Group>
           )}
           {!!data?.registrations.length && (
-            <Group icon={<Ticket className="size-4" aria-hidden />} title="Registrations">
+            <Group icon={<Ticket className="size-4" aria-hidden />} title="Registrations" more={more(data.registrations.length) ? () => setAll(dq) : undefined}>
               {data.registrations.map((r) => (
                 <li key={r.id}>
                   <Link to={`/admin/events/${r.event_slug}?tab=people&q=${encodeURIComponent(r.code)}`} className={row}>
@@ -78,7 +83,7 @@ export function AdminSearch({ members }: { members: boolean }) {
             </Group>
           )}
           {!!data?.payments.length && (
-            <Group icon={<CreditCard className="size-4" aria-hidden />} title="Payments and UTRs">
+            <Group icon={<CreditCard className="size-4" aria-hidden />} title="Payments and UTRs" more={more(data.payments.length) ? () => setAll(dq) : undefined}>
               {data.payments.map((p) => (
                 <li key={p.id}>
                   <Link to={`/admin/events/${p.event_slug}?tab=${p.status === 'submitted' ? 'payments' : 'people'}&q=${encodeURIComponent(p.code)}`} className={row}>
@@ -99,11 +104,14 @@ export function AdminSearch({ members }: { members: boolean }) {
   )
 }
 
-function Group({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function Group({ icon, title, children, more }: { icon: React.ReactNode; title: string; children: React.ReactNode; more?: () => void }) {
   return (
     <div>
       <h3 className="mb-1.5 flex items-center gap-1.5 text-[13px] font-bold uppercase tracking-wide text-muted">{icon} {title}</h3>
-      <Card className="overflow-hidden"><ul className="divide-y divide-border">{children}</ul></Card>
+      <Card className="overflow-hidden">
+        <ul className="divide-y divide-border">{children}</ul>
+        {more && <button type="button" onClick={more} className="min-h-11 w-full border-t border-border text-sm font-semibold text-primary hover:bg-surface-2">See all</button>}
+      </Card>
     </div>
   )
 }

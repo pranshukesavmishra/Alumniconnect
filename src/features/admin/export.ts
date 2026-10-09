@@ -85,3 +85,48 @@ export function exportPayments(event: EventRow, d: AdminData) {
     })),
   )
 }
+
+export interface MemberExportRow {
+  full_name: string
+  member_type: string | null
+  branch: string | null
+  grad_year: number | null
+  join_year: number | null
+  city: string | null
+  country: string | null
+  current_title: string | null
+  current_company: string | null
+  linkedin_url: string | null
+  verification: string
+  is_admin: boolean
+  onboarded: boolean
+  created_at: string
+  last_sign_in_at: string | null
+  phone?: string | null
+  email?: string | null
+}
+
+/** Members as a spreadsheet. Phone and e-mail columns only appear when the admin asked for them (a logged export). */
+export function exportMembers(rows: MemberExportRow[], contact: boolean) {
+  save(
+    `members-${stamp()}.csv`,
+    rows.map((m) => ({
+      Name: safe(m.full_name),
+      ...(contact ? { Mobile: asText(m.phone), Email: safe(m.email) } : {}),
+      Type: m.member_type ?? '',
+      Branch: m.branch ?? '',
+      'Passing-out year': m.grad_year ?? '',
+      'Joining year': m.join_year ?? '',
+      City: safe(m.city),
+      Country: safe(m.country),
+      Role: safe(m.current_title),
+      Company: safe(m.current_company),
+      LinkedIn: safe(m.linkedin_url),
+      Verification: m.verification === 'pending' ? 'not yet verified' : m.verification,
+      Admin: m.is_admin ? 'Yes' : 'No',
+      'Profile completed': m.onboarded ? 'Yes' : 'No',
+      Joined: ist(m.created_at),
+      'Last sign-in': ist(m.last_sign_in_at),
+    })),
+  )
+}
