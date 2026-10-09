@@ -2,7 +2,7 @@
 
 The home of Jabalpur Engineering College alumni: verified profiles, a searchable directory, batch communities and
 interest circles, chat (direct and group, with full history for late joiners), a jobs board, "Ask JEC" help network,
-mentorship, and the **Alumni Meet 2026** (registration, UPI payment, QR tickets, check-in, photos, programme and
+mentorship, and the **Alumni Connect Grand Reunion 2026** (26–27 Dec, batches 2003–2012: registration, UPI payment, QR tickets, check-in, photos, programme and
 announcements). Built to run on free tiers and last for years.
 
 **Stack:** React 19 + Vite + TypeScript (installable PWA) · Supabase (Postgres with row-level security, Auth, Storage,

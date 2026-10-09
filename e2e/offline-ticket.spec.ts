@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { onboard, signInWithEmail, sql } from './helpers'
 
 // Needs the production build (service worker): npm run build && npx vite preview --port 5190 --strictPort
-test.use({ baseURL: 'http://localhost:5190' })
+test.use({ baseURL: `http://localhost:${process.env.PREVIEW_PORT ?? 5190}` })
 
 const run = Date.now().toString(36).slice(-5)
 

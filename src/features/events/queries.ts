@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUserId } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
-import type { EventRow, Guest, Payment, Registration, RegistrationItem, StaffRole, TicketType } from '../../lib/types'
+import type { CustomAnswer, EventQuestion, EventRow, Experience, Guest, Payment, Registration, RegistrationItem, StaffRole, TicketType } from '../../lib/types'
 
 export const eventKeys = {
   event: (slug: string) => ['event', slug] as const,
@@ -9,6 +9,53 @@ export const eventKeys = {
   stats: (eventId: string) => ['event-stats', eventId] as const,
   mine: (eventId: string, uid: string | null) => ['my-registration', eventId, uid] as const,
   staff: (uid: string | null) => ['my-staff-events', uid] as const,
+  questions: (eventId: string) => ['event-questions', eventId] as const,
+  experiences: (uid: string | null) => ['my-experiences', uid] as const,
+}
+
+/** The organisers' own registration questions (active and inactive; members only see active ones). */
+export function useEventQuestions(eventId: string | undefined) {
+  return useQuery({
+    queryKey: eventKeys.questions(eventId ?? ''),
+    enabled: !!eventId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('event_questions').select('*').eq('event_id', eventId!).order('sort').order('created_at')
+      if (error) throw error
+      return data as EventQuestion[]
+    },
+  })
+}
+
+/** My jobs (LinkedIn import or added by hand): the registration records the current and earlier ones. */
+export function useMyExperiences() {
+  const uid = useUserId()
+  return useQuery({
+    queryKey: eventKeys.experiences(uid),
+    enabled: !!uid,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('experiences').select('*').eq('profile_id', uid!).order('is_current', { ascending: false }).order('start_date', { ascending: false, nullsFirst: false })
+      if (error) throw error
+      return data as Experience[]
+    },
+  })
+}
+
+/** Adds earlier jobs typed into the registration ("title at company") to my profile. */
+export function useAddExperiences() {
+  const qc = useQueryClient()
+  const uid = useUserId()
+  return useMutation({
+    mutationFn: async (rows: { title: string; company: string; is_current?: boolean }[]) => {
+      if (!rows.length) return
+      const { error } = await supabase.from('experiences').insert(rows.map((r) => ({ profile_id: uid, title: r.title, company: r.company, is_current: !!r.is_current, source: 'manual' })))
+      if (error) throw error
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: eventKeys.experiences(uid) })
+      void qc.invalidateQueries({ queryKey: ['member', uid] })
+    },
+  })
 }
 
 export function useEvent(slug: string) {
@@ -95,12 +142,42 @@ export interface RegistrationDetails {
   city: string
   tshirt_size: string
   food_pref: string
-  needs_accommodation: boolean
+  needs_accommodation: boolean | null
   arrival_note: string
   notes: string
   guests: Guest[]
   accept_terms: boolean
   photo_consent: boolean
+  // reunion answers (validated again on the server)
+  needs_local_travel?: boolean | null
+  org_team_interest?: boolean | null
+  org_teams?: string[]
+  fund_interest?: boolean | null
+  fund_paise?: number | null
+  sponsor_interest?: boolean | null
+  sponsor_level?: string
+  sponsor_org?: string
+  sponsor_note?: string
+  perform_interest?: boolean | null
+  perform_types?: string[]
+  perform_group?: boolean | null
+  perform_members?: string
+  perform_description?: string
+  perform_minutes?: number | null
+  feedback?: string
+  nickname?: string
+  hostel?: string
+  faculty_wish?: string
+  song_requests?: string[]
+  memory?: string
+  memory_wall_consent?: boolean
+  arrival_from?: string
+  arrival_date?: string
+  arrival_mode?: string
+  emergency_name?: string
+  emergency_phone?: string
+  medical_notes?: string
+  custom_answers?: Record<string, CustomAnswer>
 }
 
 export function useUpsertRegistration(eventId: string) {

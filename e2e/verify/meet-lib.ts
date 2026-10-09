@@ -40,8 +40,8 @@ export function createMember(opts: { email: string; name: string; year?: number;
   const id = randomUUID()
   sql(`insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, raw_user_meta_data, created_at, updated_at)
        values ('${id}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', ${q(opts.email)}, now(), '{}'::jsonb, now(), now())`)
-  sql(`update profiles set full_name = ${q(opts.name)}, member_type = 'alumnus', branch = 'Computer Science & Engineering',
-         grad_year = ${opts.year ?? 2005}, city = 'Pune', onboarded = true,
+  sql(`update profiles set full_name = ${q(opts.name)}, member_type = 'alumnus', branch = 'B.E. in Computer Science & Engineering',
+         grad_year = ${opts.year ?? 2005}, city = 'Pune', country = 'India', current_title = 'Engineer', current_company = 'Acme', onboarded = true,
          verification = '${opts.verified ? 'verified' : 'pending'}', is_admin = ${opts.admin ? 'true' : 'false'} where id = '${id}'`)
   sql(`update profile_private set phone = ${q(opts.phone ?? '+91 98765 43210')} where id = '${id}'`)
   return id
@@ -62,7 +62,7 @@ export function createEvent(opts: { capacity?: number | null; closes?: string | 
   const id = sql(`insert into events (slug, title, starts_at, ends_at, registration_closes_at, eligible_from_year, eligible_to_year, capacity,
                    upi_id, upi_payee_name, is_published)
                   values ('${slug}', 'Verify Meet ${slug}', now() + interval '60 days', now() + interval '61 days',
-                   ${opts.closes === undefined ? "now() + interval '30 days'" : opts.closes === null ? 'null' : q(opts.closes)}, 2001, 2010,
+                   ${opts.closes === undefined ? "now() + interval '30 days'" : opts.closes === null ? 'null' : q(opts.closes)}, 2003, 2012,
                    ${opts.capacity ?? 'null'}, 'jec.alumni@okhdfcbank', 'JEC Alumni Association', ${opts.published === false ? 'false' : 'true'})
                   returning id`).split('\n')[0]!
   const t = (label: string, price: number, primary: boolean, max: number, sort: number) =>

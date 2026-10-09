@@ -1,6 +1,6 @@
 // Alumni Meet UI, end to end in the browser (phone viewport unless noted), with a DB check after each step.
 import { expect, test, devices, type Page } from '@playwright/test'
-import { onboard, signInWithEmail } from '../helpers'
+import { onboard, registerForReunion, signInWithEmail } from '../helpers'
 import { as, createEvent, createMember, newUtr, q, register, sql, SEEDED_EVENT, signInContext, stamp } from './meet-lib'
 
 const S = stamp()
@@ -21,49 +21,75 @@ function upiParams(href: string) {
 }
 
 
-test('registration: tickets, family names, draft survives reload, preferences, paise total, consent, cancel and re-register', async ({ page }) => {
+const price = (label: string) =>
+  Number(sql(`select price_paise from event_ticket_types where event_id = (select id from events where slug = 'alumni-meet-2026') and label like '${label}%'`))
+const rupees = (p: number) => `₹${(p / 100).toLocaleString('en-IN')}`
+
+test('registration: days, family names, draft survives reload, preferences, paise total, consent, cancel and re-register', async ({ page }) => {
   const email = mail('reg')
+  const cont = () => page.getByRole('button', { name: 'Continue', exact: true }).click()
+  const both = price('Both days')
+  const adult = price('Family adult')
+  const kid = price('Child 5–12')
   await page.goto('/meet')
   await page.getByRole('link', { name: 'Register now' }).filter({ visible: true }).first().click()
   await signInWithEmail(page, email)
   await onboard(page, `Reg Tester ${S.slice(-4)}`, '2006')
   await expect(page).toHaveURL(/\/meet\/register/)
 
-  // step 1: main ticket is preselected; add spouse + 2 kids (5–12) + 1 infant
-  await expect(page.getByText('Alumnus / Alumna').first()).toBeVisible()
-  await page.getByRole('button', { name: 'More: Spouse' }).click()
-  await page.getByRole('button', { name: 'More: Child (5–12 years)' }).click()
-  await page.getByRole('button', { name: 'More: Child (5–12 years)' }).click()
-  await page.getByRole('button', { name: 'More: Child (under 5)' }).click()
-  await page.getByLabel('Spouse 1 name').fill('Meera Tester')
-  await page.getByLabel('Child (5–12 years) 1 name').fill('Kid One')
-  await page.getByLabel('Child (5–12 years) 2 name').fill('Kid Two')
-  await page.getByLabel('Child (under 5) 1 name').fill('Baby Tester')
-  // ₹2,500 + ₹1,500 + 2 × ₹500 + ₹0 = ₹5,000, 5 people
+  // step 1: profile card; the missing designation and company are completed right here
+  await page.getByLabel('Current designation').fill('QA Lead')
+  await page.getByLabel('Company', { exact: true }).fill('Acme')
+  await page.getByRole('button', { name: 'Save details' }).click()
+  await expect(page.getByText('Saved to your profile')).toBeVisible()
+  await cont()
+
+  // step 2: family tickets appear only once the days include the 27th
+  await expect(page.getByRole('button', { name: 'More: Family adult · 27 Dec' })).toHaveCount(0)
+  await page.getByText(/26 Dec only/).first().click()
+  await expect(page.getByText('Family can join on 27 Dec only')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'More: Family adult · 27 Dec' })).toHaveCount(0)
+  await page.getByText(/Both days/).first().click()
+  await page.getByRole('button', { name: 'More: Family adult · 27 Dec' }).click()
+  await page.getByRole('button', { name: 'More: Child 5–12 years · 27 Dec' }).click()
+  await page.getByRole('button', { name: 'More: Child 5–12 years · 27 Dec' }).click()
+  await page.getByRole('button', { name: 'More: Child under 5 · 27 Dec' }).click()
+  await page.getByLabel('Family adult · 27 Dec 1 name').fill('Meera Tester')
+  await page.getByLabel('Child 5–12 years · 27 Dec 1 name').fill('Kid One')
+  await page.getByLabel('Child 5–12 years · 27 Dec 2 name').fill('Kid Two')
+  await page.getByLabel('Child under 5 · 27 Dec 1 name').fill('Baby Tester')
+  const total1 = both + adult + 2 * kid
   await expect(page.getByText('5 people')).toBeVisible()
-  await expect(page.getByText('₹5,000').first()).toBeVisible()
+  await expect(page.getByText(rupees(total1)).first()).toBeVisible()
 
   // draft persistence across a reload (e.g. the phone evicting the tab)
   await page.waitForTimeout(600) // draft is saved after 300 ms
   await page.reload()
-  await expect(page.getByLabel('Child (5–12 years) 2 name')).toHaveValue('Kid Two')
-  await expect(page.getByLabel('Spouse 1 name')).toHaveValue('Meera Tester')
-  await expect(page.getByText('₹5,000').first()).toBeVisible()
+  await cont()
+  await expect(page.getByLabel('Child 5–12 years · 27 Dec 2 name')).toHaveValue('Kid Two')
+  await expect(page.getByLabel('Family adult · 27 Dec 1 name')).toHaveValue('Meera Tester')
+  await expect(page.getByText(rupees(total1)).first()).toBeVisible()
 
-  // step 2: preferences are required
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
+  // step 2 answers are required
+  await cont()
   await expect(page.getByText('Please choose a food preference.')).toBeVisible()
   await expect(page.getByText('Please choose your T-shirt size.')).toBeVisible()
-  await page.getByText('Jain', { exact: true }).click()
+  await expect(page.getByText('Please choose yes or no.').first()).toBeVisible()
+  await page.locator('label').filter({ hasText: /^Jain$/ }).click()
   await page.getByLabel('Your T-shirt size').selectOption('XXL')
-  await page.getByText('Yes, please share options').click()
+  await page.getByRole('group', { name: 'Do you need help with accommodation?' }).getByText('Yes', { exact: true }).click()
+  await page.getByRole('group', { name: 'Do you need help with local travel or pickup?' }).getByText('No', { exact: true }).click()
   await page.getByLabel('Arrival plan').fill('Arriving 25 Dec by train')
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await cont()
+  for (const question of ['Would you like to be part of the organising teams?', 'Would you like to perform at the reunion?', 'Would you like to contribute to the Reunion Fund?', 'Would you or your organisation like to sponsor the event?']) {
+    await page.getByRole('group', { name: question }).getByText('No', { exact: true }).click()
+  }
+  await cont()
+  await cont()
 
-  // step 3: review, photo consent off, terms required
+  // review: grouped, photo consent off, terms required
   await expect(page.getByText('Total · 5 people')).toBeVisible()
-  await expect(page.getByText('Child (5–12 years) × 2')).toBeVisible()
+  await expect(page.getByText('Child 5–12 years · 27 Dec × 2')).toBeVisible()
   await page.getByRole('checkbox', { name: /Photos and videos of me/ }).uncheck()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
   await expect(page.getByText('Please accept to continue.')).toBeVisible()
@@ -74,7 +100,7 @@ test('registration: tickets, family names, draft survives reload, preferences, p
   await expect(page).toHaveURL(/\/meet\/my/)
 
   let r = myReg(email)!
-  expect(r).toMatchObject({ status: 'pending_payment', amount_paise: 500000, headcount: 5, food_pref: 'jain', tshirt_size: 'XXL', needs_accommodation: true, photo_consent: false, grad_year: 2006, arrival_note: 'Arriving 25 Dec by train' })
+  expect(r).toMatchObject({ status: 'pending_payment', amount_paise: total1, headcount: 5, food_pref: 'jain', tshirt_size: 'XXL', needs_accommodation: true, photo_consent: false, grad_year: 2006, arrival_note: 'Arriving 25 Dec by train', designation: 'QA Lead', company: 'Acme' })
   expect((r.guests as { name: string }[]).map((g) => g.name)).toEqual(['Meera Tester', 'Kid One', 'Kid Two', 'Baby Tester'])
   expect(r.terms_accepted_at).not.toBeNull()
   expect(sql(`select count(*) from event_registration_items where registration_id = '${r.id}'`)).toBe('4')
@@ -83,23 +109,23 @@ test('registration: tickets, family names, draft survives reload, preferences, p
 
   // payment panel: UPI deep link (Android) carries pa, pn, am, cu=INR and the ticket code as the note
   await expect(page.getByText('Step 1 · Pay by UPI')).toBeVisible()
-  await expect(page.getByText('₹5,000').first()).toBeVisible()
+  await expect(page.getByText(rupees(total1)).first()).toBeVisible()
   const href = (await page.getByRole('link', { name: /with a UPI app/ }).getAttribute('href'))!
-  expect(upiParams(href)).toEqual({ pa: 'sample.do-not-pay@upi', pn: 'SAMPLE - DO NOT PAY', am: '5000', cu: 'INR', tn: r.code })
+  expect(upiParams(href)).toEqual({ pa: 'sample.do-not-pay@upi', pn: 'SAMPLE - DO NOT PAY', am: String(total1 / 100), cu: 'INR', tn: r.code })
   await page.getByRole('button', { name: /Show QR code/ }).click()
-  await expect(page.getByRole('img', { name: /UPI QR code to pay ₹5,000/ })).toBeVisible()
+  await expect(page.getByRole('img', { name: new RegExp(`UPI QR code to pay ${rupees(total1)}`) })).toBeVisible()
 
-  // edit before payment: drop the spouse; the total is re-priced on the server
+  // edit before payment: drop the family adult; the total is re-priced on the server
   await page.getByRole('link', { name: 'Edit preferences' }).click()
-  await expect(page.getByLabel('Spouse 1 name')).toHaveValue('Meera Tester') // prefilled from the saved registration
-  await page.getByRole('button', { name: 'Fewer: Spouse' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await cont()
+  await expect(page.getByLabel('Family adult · 27 Dec 1 name')).toHaveValue('Meera Tester') // prefilled from the saved registration
+  await page.getByRole('button', { name: 'Fewer: Family adult · 27 Dec' }).click()
+  for (let i = 0; i < 3; i++) await cont()
   await page.getByRole('checkbox', { name: /My details are correct/ }).check()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
   await expect(page).toHaveURL(/\/meet\/my/)
   r = myReg(email)!
-  expect(r).toMatchObject({ amount_paise: 350000, headcount: 4, status: 'pending_payment' })
+  expect(r).toMatchObject({ amount_paise: both + 2 * kid, headcount: 4, status: 'pending_payment' })
   expect((r.guests as { name: string }[]).map((g) => g.name)).toEqual(['Kid One', 'Kid Two', 'Baby Tester'])
 
   // cancel, then register again
@@ -108,20 +134,13 @@ test('registration: tickets, family names, draft survives reload, preferences, p
   await expect(page).toHaveURL(/\/meet$/)
   expect(myReg(email)!.status).toBe('cancelled')
   await page.getByRole('link', { name: 'Register now' }).filter({ visible: true }).first().click()
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByText('Vegetarian', { exact: true }).click()
-  await page.getByLabel('Your T-shirt size').selectOption('M')
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByRole('checkbox', { name: /My details are correct/ }).check()
-  await page.getByRole('button', { name: 'Confirm and pay' }).click()
+  await registerForReunion(page, { size: 'M' })
   await expect(page).toHaveURL(/\/meet\/my/)
   const again = myReg(email)!
-  expect(again).toMatchObject({ id: r.id, code: r.code, status: 'pending_payment', amount_paise: 250000, headcount: 1, food_pref: 'veg' })
+  expect(again).toMatchObject({ id: r.id, code: r.code, status: 'pending_payment', amount_paise: both, headcount: 1, food_pref: 'veg' })
 })
 
-// BUG: RegisterPage pre-fills the form from the saved registration but NOT photo_consent, so the checkbox comes
-// back ticked (default true). A member who declined photo consent and later edits e.g. the T-shirt size silently
-// re-grants consent. (src/features/events/RegisterPage.tsx:88-97)
+// A member who declined photo consent and later edits e.g. the T-shirt size must not silently re-grant consent.
 test('editing a registration keeps the member’s photo-consent choice', async ({ browser }) => {
   const email = mail('consent')
   const uid = createMember({ email, name: 'Consent Keeper', year: 2004 })
@@ -129,20 +148,14 @@ test('editing a registration keeps the member’s photo-consent choice', async (
   await signInContext(ctx, uid, email)
   const page = await ctx.newPage()
   await page.goto('/meet/register')
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByText('Vegetarian', { exact: true }).click()
-  await page.getByLabel('Your T-shirt size').selectOption('L')
-  await page.getByRole('button', { name: 'Continue' }).click()
-  await page.getByRole('checkbox', { name: /Photos and videos of me/ }).uncheck()
-  await page.getByRole('checkbox', { name: /My details are correct/ }).check()
-  await page.getByRole('button', { name: 'Confirm and pay' }).click()
+  await registerForReunion(page, { photoConsent: false })
   await expect(page).toHaveURL(/\/meet\/my/)
   expect(myReg(email)!.photo_consent).toBe(false)
   // later: change only the T-shirt size
   await page.getByRole('link', { name: 'Edit preferences' }).click()
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByLabel('Your T-shirt size').selectOption('XL')
-  await page.getByRole('button', { name: 'Continue' }).click()
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await page.getByRole('checkbox', { name: /My details are correct/ }).check()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
   await expect(page).toHaveURL(/\/meet\/my/)
@@ -154,9 +167,10 @@ test('editing a registration keeps the member’s photo-consent choice', async (
 async function registerViaApi(email: string, name: string, year = 2005, list?: [string, number][]) {
   const uid = createMember({ email, name, year })
   const ev = SEEDED_EVENT()
-  const primary = sql(`select id from event_ticket_types where event_id = '${ev}' and is_primary`)
+  const primary = sql(`select id from event_ticket_types where event_id = '${ev}' and is_primary and label like 'Both days%'`)
   const lines = (list ?? [[primary, 1]]).map(([ticket_type_id, quantity]) => ({ ticket_type_id, quantity }))
-  as(uid, `select upsert_registration('${ev}', ${q(JSON.stringify({ full_name: name, phone: '+91 98765 43210', accept_terms: true, grad_year: String(year), food_pref: 'veg', tshirt_size: 'M', email }))}::jsonb, ${q(JSON.stringify(lines))}::jsonb)`)
+  const answers = { needs_accommodation: false, needs_local_travel: false, org_team_interest: false, fund_interest: false, sponsor_interest: false, perform_interest: false }
+  as(uid, `select upsert_registration('${ev}', ${q(JSON.stringify({ full_name: name, phone: '+91 98765 43210', accept_terms: true, grad_year: String(year), food_pref: 'veg', tshirt_size: 'M', email, ...answers }))}::jsonb, ${q(JSON.stringify(lines))}::jsonb)`)
   return uid
 }
 
@@ -200,7 +214,7 @@ test('payment: UTR validation & reuse, treasurer rejects with reason, member res
   await page.getByRole('button', { name: 'Submit payment details' }).click()
   await expect(page.getByText('Payment received. The treasurer is verifying it.')).toBeVisible()
   expect(myReg(email)!.status).toBe('under_review')
-  expect(sql(`select amount_paise || '|' || status || '|' || utr from event_payments where utr = '${utr1}'`)).toBe(`250000|submitted|${utr1}`)
+  expect(sql(`select amount_paise || '|' || status || '|' || utr from event_payments where utr = '${utr1}'`)).toBe(`${price('Both days')}|submitted|${utr1}`)
 
   // treasurer: "Not received" with a reason
   const admin = await adminPage(browser, 'paytreas')
@@ -265,7 +279,7 @@ test('iPhone: per-app UPI links (GPay, PhonePe, Paytm) carry the same parameters
   const page = await ctx.newPage()
   await page.goto('/meet/my')
   const code = myReg(email)!.code
-  const expected = { pa: 'sample.do-not-pay@upi', pn: 'SAMPLE - DO NOT PAY', am: '2500', cu: 'INR', tn: code }
+  const expected = { pa: 'sample.do-not-pay@upi', pn: 'SAMPLE - DO NOT PAY', am: String(price('Both days') / 100), cu: 'INR', tn: code }
   for (const [app, prefix] of [['Google Pay', 'gpay://upi/pay?'], ['PhonePe', 'phonepe://pay?'], ['Paytm', 'paytmmp://pay?']] as const) {
     const href = (await page.getByRole('link', { name: app, exact: true }).getAttribute('href'))!
     expect(href.startsWith(prefix), href).toBe(true)

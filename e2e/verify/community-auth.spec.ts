@@ -56,7 +56,7 @@ test('email code sign-in from a protected page, onboarding validation, next redi
 
   // bad phone
   await page.getByLabel('Full name').fill('  Auth   Tester  ')
-  await page.getByLabel('Branch').selectOption('Mechanical Engineering')
+  await page.getByLabel('Branch').selectOption('B.E. in Mechanical Engineering')
   await page.getByLabel('Passing-out year', { exact: true }).selectOption('2009')
   await page.getByLabel('Joining year').selectOption('2005')
   await page.getByLabel('City you live in').fill('Indore')
@@ -72,12 +72,12 @@ test('email code sign-in from a protected page, onboarding validation, next redi
 
   const uid = sql(`select id from auth.users where email = '${mail}'`)
   expect(sql(`select full_name||'|'||member_type||'|'||branch||'|'||grad_year||'|'||join_year||'|'||city||'|'||onboarded||'|'||verification from profiles where id='${uid}'`)).toBe(
-    'Auth Tester|alumnus|Mechanical Engineering|2009|2005|Indore|true|pending',
+    'Auth Tester|alumnus|B.E. in Mechanical Engineering|2009|2005|Indore|true|pending',
   )
   expect(sql(`select phone from profile_private where id='${uid}'`)).toBe('+91 99887 76655')
   // auto batch + year groups
   expect(sql(`select string_agg(g.slug, ',' order by g.slug) from group_members m join groups g on g.id=m.group_id where m.user_id='${uid}'`)).toBe(
-    'jec-2009,mechanical-engineering-2009',
+    'b-e-in-mechanical-engineering-2009,jec-2009',
   )
 
   // session persists across reload and a new tab

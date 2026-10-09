@@ -30,7 +30,7 @@ def on_cover(c, doc):
     c.drawString(MARGIN, PAGE_H - 295, "Build plan, Phase 1")
     c.setFont("Body", 17)
     c.setFillColor(colors.HexColor("#C9D4EA"))
-    c.drawString(MARGIN, PAGE_H - 325, "The app foundation and the Alumni Meet 2026 (batches 2001–2010)")
+    c.drawString(MARGIN, PAGE_H - 325, "The app foundation and the Alumni Connect Grand Reunion 2026 (batches 2003–2012)")
     c.setFont("Body", 13)
     c.drawString(MARGIN, PAGE_H - 372, "What we build, in what order, how we guarantee quality,")
     c.drawString(MARGIN, PAGE_H - 390, "and the decisions we need from the committee.")
@@ -80,7 +80,7 @@ def build():
 
     # 01
     st += section(1, "What we build first, and why")
-    st.append(P("The Alumni Meet for batches 2001–2010 in December needs registrations, payments and photos handled "
+    st.append(P("The Grand Reunion for batches 2003–2012 on 26–27 December needs registrations, payments and photos handled "
                 "through the app. We build it as part of the full app, not as a throwaway website, for three reasons:"))
     st += bullets([
         "<b>One sign-up, forever.</b> Everyone who registers for the meet gets a profile in JEC Alumni Connect. "

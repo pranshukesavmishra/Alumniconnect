@@ -145,6 +145,7 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy }: { p: Payment;
           <div className="text-right">
             <p className="text-xl font-bold tabular-nums">{formatPaise(p.amount_paise)}</p>
             <p className="text-xs text-muted">{relativeTime(p.created_at)}</p>
+            {!!reg?.fund_paise && <p className="text-xs text-muted">incl. {formatPaise(reg.fund_paise)} Reunion Fund</p>}
           </div>
         </div>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">

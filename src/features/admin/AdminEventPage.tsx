@@ -14,10 +14,12 @@ import { AdminPayments } from './AdminPayments'
 import { AdminPeople } from './AdminPeople'
 import { AdminSettings } from './AdminSettings'
 import { AdminProgramme } from './AdminProgramme'
+import { AdminResponses } from './AdminResponses'
 import { AdminTeam } from './AdminTeam'
+import { fundTotals, ticketRevenue } from './responses'
 import { useAdminData, useAdminEvent, useEventRole, type AdminData } from './queries'
 
-type Tab = 'overview' | 'payments' | 'people' | 'programme' | 'settings' | 'team'
+type Tab = 'overview' | 'payments' | 'people' | 'responses' | 'programme' | 'settings' | 'team'
 
 export function AdminEventPage() {
   const { slug = '' } = useParams()
@@ -49,6 +51,7 @@ export function AdminEventPage() {
         { id: 'overview', label: 'Overview' },
         { id: 'payments', label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
         { id: 'people', label: 'People' },
+        { id: 'responses', label: 'Responses' },
         { id: 'programme', label: 'Programme' },
         ...(me.is_admin ? ([{ id: 'settings', label: 'Settings' }, { id: 'team', label: 'Team' }] as const) : []),
       ]
@@ -96,6 +99,7 @@ export function AdminEventPage() {
         {tab === 'overview' && (admin.data ? <Overview data={admin.data} /> : <PageSkeleton />)}
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} /> : <PageSkeleton />)}
+        {tab === 'responses' && (admin.data ? <AdminResponses event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'programme' && <AdminProgramme eventId={data.event.id} />}
         {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} />}
@@ -161,6 +165,8 @@ function Overview({ data }: { data: AdminData }) {
       byYear: [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([label, value]) => ({ label, value })),
       food,
       tshirts,
+      fund: fundTotals(data.registrations),
+      ticketRevenue: ticketRevenue(data.registrations),
     }
   }, [data])
 
@@ -174,6 +180,7 @@ function Overview({ data }: { data: AdminData }) {
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Accommodation requests" value={s.accommodation} />
+        <Stat label="Reunion Fund (collected)" value={formatPaise(s.fund.collected, { zeroAsFree: false })} hint={`${formatPaise(s.fund.pledged, { zeroAsFree: false })} pledged · tickets ${formatPaise(s.ticketRevenue, { zeroAsFree: false })}`} tone="success" />
         <Stat label="Checked in" value={s.checkedIn} hint={`of ${plural(s.confirmedPeople, 'person', 'people')}`} tone="primary" />
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
