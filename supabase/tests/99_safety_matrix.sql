@@ -103,6 +103,7 @@ insert into public.t93_cases values
   ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
   ('admin_event_ledger_rows', $q$select * from public.admin_event_ledger_rows('93000000-0000-0000-0000-0000000000e1', null, null, false)$q$, 'at'),
   ('admin_log_event_export', $q$select public.admin_log_event_export('93000000-0000-0000-0000-0000000000e1', 'registrations', 3)$q$, 'at'),
+  ('admin_log_audit_export', $q$select public.admin_log_audit_export(1, '{}')$q$, 'a'),
   ('admin_event_ops', $q$select public.admin_event_ops('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
   ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000b9')$q$, 'at'),
   ('admin_record_refund', $q$select public.admin_record_refund('93000000-0000-0000-0000-0000000000eb', 100, 'cash', 'ref', 'note', false)$q$, 'at'),

@@ -77,6 +77,18 @@ export const AUDIT_LABELS: Record<string, string> = {
   view_as_member: 'Previewed what a member sees',
   import_job_start: 'Started a member import',
   import_job_retry: 'Retried failed import rows',
+  export_audit: 'Downloaded the activity log',
+  groups_update: 'Changed a circle or group',
+  groups_delete: 'Removed a circle or group',
+  spotlights_insert: 'Added a member spotlight',
+  spotlights_update: 'Changed a member spotlight',
+  spotlights_delete: 'Removed a member spotlight',
+  batch_sizes_insert: 'Set a batch size',
+  batch_sizes_update: 'Changed a batch size',
+  batch_sizes_delete: 'Removed a batch size',
+  event_questions_insert: 'Added a registration question',
+  event_questions_update: 'Changed a registration question',
+  event_questions_delete: 'Removed a registration question',
   save_event_ops: 'Changed waiting list or daily capacity settings',
 }
 
@@ -86,7 +98,7 @@ export const AUDIT_GROUPS: { id: string; label: string; actions: string[] }[] = 
   { id: 'moderation', label: 'Moderation', actions: ['hide_post', 'restore_post', 'hide_comment', 'restore_comment', 'hide_job', 'restore_job', 'hide_help', 'restore_help', 'hide_business', 'restore_business', 'remove_message', 'dismiss_reports', 'slow_mode', 'meetup_hidden', 'meetup_closed', 'meetup_restored', 'meetup_member_removed'] },
   { id: 'messages', label: 'Messages', actions: ['send_event_message', 'schedule_event_message', 'cancel_event_message', 'message_needs_approval', 'approve_event_message', 'reject_event_message', 'post_announcement'] },
   { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'export_event_data', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
-  { id: 'members', label: 'Members', actions: ['update_member', 'create_member', 'merge_member', 'export_members', 'import_preview', 'import_job_start', 'import_job_retry', 'view_member_email', 'view_as_member', 'search_contact'] },
+  { id: 'members', label: 'Members', actions: ['update_member', 'create_member', 'merge_member', 'export_members', 'import_preview', 'import_job_start', 'import_job_retry', 'export_audit', 'view_member_email', 'view_as_member', 'search_contact'] },
 ]
 
 export function auditSummary(details: Record<string, unknown>): string {

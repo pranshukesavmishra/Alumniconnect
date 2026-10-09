@@ -79,6 +79,9 @@ export function AdminAudit() {
     try {
       const all = await fetchAuditForExport(applied)
       const nm = await resolveTargets(all)
+      // the download itself is written to the log (before the file is saved)
+      const logged = await supabase.rpc('admin_log_audit_export', { p_count: all.length, p_filter: { actions: applied.actions, q: applied.q, from: applied.from, to: applied.to } })
+      if (logged.error) throw logged.error
       saveCsv('activity-log.csv', all.map((r) => ({ when: r.created_at, who: r.actor_name ?? 'System', action: AUDIT_LABELS[r.action] ?? r.action, about: subject(r, nm) ?? '', details: auditSummary(r.details) })))
       toast.success(`${all.length} entries downloaded`)
     } catch (e) {
