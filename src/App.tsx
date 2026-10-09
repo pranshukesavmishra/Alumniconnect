@@ -28,6 +28,7 @@ const JobsPage = lazy(() => import('./features/jobs/JobsPage').then((m) => ({ de
 const JobDetailPage = lazy(() => import('./features/jobs/JobDetailPage').then((m) => ({ default: m.JobDetailPage })))
 const PostJobPage = lazy(() => import('./features/jobs/PostJobPage').then((m) => ({ default: m.PostJobPage })))
 const MyJobsPage = lazy(() => import('./features/jobs/MyJobsPage').then((m) => ({ default: m.MyJobsPage })))
+const AdminAnalytics = lazy(() => import('./features/admin/AdminAnalytics').then((m) => ({ default: m.AdminAnalytics })))
 const AdminCommunity = lazy(() => import('./features/admin/AdminCommunity').then((m) => ({ default: m.AdminCommunity })))
 const AdminModeration = lazy(() => import('./features/admin/AdminModeration').then((m) => ({ default: m.AdminModeration })))
 const AdminAudit = lazy(() => import('./features/admin/AdminAudit').then((m) => ({ default: m.AdminAudit })))
@@ -162,6 +163,7 @@ export function App() {
             <Route path="admin/members" element={m(<AdminMembers />)} />
             <Route path="admin/activity" element={m(<AdminAudit />)} />
             <Route path="admin/reports" element={m(<AdminModeration />)} />
+            <Route path="admin/analytics" element={m(<AdminAnalytics />)} />
             <Route path="admin/community" element={m(<AdminCommunity />)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />

@@ -1,4 +1,4 @@
-import { CalendarPlus, ChevronRight, Flag, History, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CalendarPlus, ChevronRight, Flag, History, Network, ShieldCheck, Users } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -31,6 +31,11 @@ export function AdminHome() {
             <Link to="/admin/members" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
               <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Users className="size-5" aria-hidden /></span>
               <span className="flex-1"><span className="block font-semibold">Members</span><span className="block text-sm text-muted">Edit profiles, verify, admins</span></span>
+              <ChevronRight className="size-5 text-muted" aria-hidden />
+            </Link>
+            <Link to="/admin/analytics" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><BarChart3 className="size-5" aria-hidden /></span>
+              <span className="flex-1"><span className="block font-semibold">Analytics</span><span className="block text-sm text-muted">Growth, batches, engagement</span></span>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
             <Link to="/admin/community" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
