@@ -35,6 +35,8 @@ const LABELS: Record<string, string> = {
   restore_help: 'Restored a help request',
   hide_job: 'Hid a job posting',
   restore_job: 'Restored a job posting',
+  hide_business: 'Hid a business listing',
+  restore_business: 'Restored a business listing',
   hide_post: 'Hid a post',
   restore_post: 'Restored a post',
   hide_comment: 'Hid a comment',
