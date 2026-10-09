@@ -31,7 +31,7 @@ fi
 
 serve 5190 npx vite preview --port 5190 --strictPort
 for p in 5181 5182 5183 5185; do serve $p npx vite --port $p --strictPort; done
-step "e2e: main flows" npx playwright test e2e/meet.spec.ts e2e/community.spec.ts e2e/chat.spec.ts e2e/chat-rich.spec.ts e2e/chat-moderation.spec.ts e2e/profile-photo.spec.ts e2e/admin-community.spec.ts e2e/admin-command-centre.spec.ts e2e/admin-members.spec.ts e2e/offline-ticket.spec.ts e2e/push.spec.ts e2e/jobs.spec.ts e2e/help.spec.ts e2e/analytics.spec.ts e2e/programme.spec.ts e2e/mentorship.spec.ts e2e/businesses.spec.ts
+step "e2e: main flows" npx playwright test e2e/meet.spec.ts e2e/community.spec.ts e2e/chat.spec.ts e2e/chat-rich.spec.ts e2e/chat-moderation.spec.ts e2e/profile-photo.spec.ts e2e/admin-community.spec.ts e2e/admin-command-centre.spec.ts e2e/admin-members.spec.ts e2e/offline-ticket.spec.ts e2e/push.spec.ts e2e/jobs.spec.ts e2e/help.spec.ts e2e/analytics.spec.ts e2e/programme.spec.ts e2e/mentorship.spec.ts e2e/businesses.spec.ts e2e/location.spec.ts e2e/trips-meetups.spec.ts
 for c in meet admin community linkedin; do step "e2e: verify $c" npx playwright test --config "e2e/verify/playwright.$c.config.ts"; done
 
 exit $fail

@@ -26,6 +26,11 @@ export function PrivacyPage() {
             <li>Your mobile number, which is private: only you and event organisers can see it.</li>
             <li>For events: who is attending with you, food and T-shirt preferences, payment references and screenshots you upload.</li>
             <li>Photos you upload.</li>
+            <li>
+              Your city, only if you turn on “Share my city” (off by default). Your phone’s location is read once, in the foreground, while the app is
+              open. We round it to an area of about 5 km before saving it, and work out the nearest city on our own server, so your position is not sent to
+              any outside service. We never track you in the background.
+            </li>
           </ul>
           <h2>How we use it</h2>
           <ul>
@@ -37,6 +42,10 @@ export function PrivacyPage() {
           <ul>
             <li>Your profile is visible only to verified members. Your phone number, payments and tickets are visible only to you and the organisers.</li>
             <li>Payment screenshots are stored privately and seen only by the treasurers.</li>
+            <li>
+              If you share your city, other verified members see your city and an approximate distance (for example “about 40 km”), never a map position or
+              coordinates. Members you have blocked do not see you. Turn sharing off in your profile at any time: your saved location is deleted straight away.
+            </li>
           </ul>
           <h2>Your choices</h2>
           <ul>
@@ -45,6 +54,13 @@ export function PrivacyPage() {
           </ul>
           <h2>Contact (grievance officer)</h2>
           <p>To be confirmed by the alumni committee.</p>
+          <h2>Credits</h2>
+          <p>
+            City names and positions come from <a className="font-semibold text-primary" href="https://www.geonames.org" target="_blank" rel="noopener noreferrer">GeoNames</a>,
+            licensed under <a className="font-semibold text-primary" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">Creative Commons Attribution 4.0</a>.
+            The optional map uses © <a className="font-semibold text-primary" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors
+            and Leaflet (BSD 2-Clause).
+          </p>
         </Prose>
       </Page>
     </div>
