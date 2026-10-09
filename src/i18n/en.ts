@@ -140,7 +140,7 @@ export const en = {
   'meet.yourReg': 'Your registration',
   'meet.closed': 'Registration has closed',
   'meet.closedBody': 'Please contact the organisers if you still wish to attend.',
-  'meet.batches': 'Batches coming',
+  'meet.batches': 'Batches invited',
   'meet.batchIn': '{n} in',
   'meet.beFirst': 'Be first',
   'meet.fees': 'Registration fees',

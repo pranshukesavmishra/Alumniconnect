@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, MapPin, Phone, Pin, Ticket, Users } from 'lucide-react'
+import { CalendarDays, Clock, MapPin, Phone, Pin, Ticket } from 'lucide-react'
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -10,7 +10,7 @@ import { daysUntil, formatDateRange, formatDateTime, relativeTime } from '../../
 import { formatPaise } from '../../lib/money'
 import { useAuth } from '../auth/AuthProvider'
 import { clock, groupByDay, useAnnouncements, useProgramme } from './programme'
-import { registrationOpen, useEvent, useEventStats, useMyRegistration, useTicketTypes } from './queries'
+import { registrationOpen, useEvent, useMyRegistration, useTicketTypes } from './queries'
 import { StatusBadge } from './StatusBadge'
 import { WaitlistCard } from './WaitlistCard'
 
@@ -19,7 +19,6 @@ export function MeetPage() {
   const { session } = useAuth()
   const { data: event, isLoading, error } = useEvent(MEET_SLUG)
   const { data: tickets } = useTicketTypes(event?.id)
-  const { data: stats } = useEventStats(event?.id)
   const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
   const programme = useProgramme(event?.id)
   const announcements = useAnnouncements(event?.id, !!session)
@@ -32,7 +31,6 @@ export function MeetPage() {
   const days = daysUntil(event.starts_at)
   const reg = mine?.registration
   const active = reg && reg.status !== 'cancelled'
-  const countByYear = new Map((stats?.by_year ?? []).map((y) => [y.year, y.count]))
   const years = event.eligible_from_year && event.eligible_to_year ? yearRange(event.eligible_from_year, event.eligible_to_year).reverse() : []
 
   // while a signed-in member's registration is still loading, show a placeholder, never the wrong button
@@ -77,14 +75,6 @@ export function MeetPage() {
                 ) : (
                   <span>{event.venue}</span>
                 )}
-              </li>
-            )}
-            {stats && stats.registered > 0 && (
-              <li className="flex items-start gap-3">
-                <Users className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-                <span>
-                  {tx('meet.registered', { registered: stats.registered, people: stats.people })}
-                </span>
               </li>
             )}
           </ul>
@@ -154,9 +144,8 @@ export function MeetPage() {
             <SectionTitle>{tx('meet.batches')}</SectionTitle>
             <div className="grid grid-cols-5 gap-2">
               {years.map((y) => (
-                <div key={y} className="rounded-xl border border-border bg-surface px-1 py-2 text-center">
+                <div key={y} className="rounded-xl border border-border bg-surface px-1 py-2.5 text-center">
                   <p className="text-[15px] font-bold tabular-nums">{y}</p>
-                  <p className="text-xs text-muted">{countByYear.get(y) ? tx('meet.batchIn', { n: countByYear.get(y)! }) : tx('meet.beFirst')}</p>
                 </div>
               ))}
             </div>

@@ -147,7 +147,7 @@ export const hi = {
   'meet.yourReg': 'आपका पंजीकरण',
   'meet.closed': 'पंजीकरण बंद हो चुका है',
   'meet.closedBody': 'अगर आप फिर भी आना चाहते हैं तो कृपया आयोजकों से संपर्क करें।',
-  'meet.batches': 'आने वाले बैच',
+  'meet.batches': 'आमंत्रित बैच',
   'meet.batchIn': '{n} आ रहे',
   'meet.beFirst': 'पहले बनें',
   'meet.fees': 'पंजीकरण शुल्क',
