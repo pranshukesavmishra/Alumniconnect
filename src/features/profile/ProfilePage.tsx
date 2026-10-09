@@ -12,6 +12,8 @@ import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
+import { useT } from '../../i18n'
+import { LanguageSwitch } from '../../i18n/LanguageSwitch'
 
 function period(e: Experience) {
   const from = e.start_date ? formatDate(e.start_date, { month: 'short', year: 'numeric' }) : ''
@@ -51,6 +53,7 @@ function EducationItem({ e }: { e: Education }) {
 }
 
 export function ProfilePage({ self }: { self?: boolean }) {
+  const tx = useT()
   const params = useParams()
   const uid = useUserId()
   const id = self ? (uid ?? undefined) : params.id
@@ -92,7 +95,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
           </div>
           {role && <p className="mt-1 text-[17px]">{role}</p>}
           <p className="mt-1 text-[15px] text-muted">
-            {[p.branch, p.grad_year && `Batch ${p.grad_year}`].filter(Boolean).join(' · ')}
+            {[p.branch, p.grad_year && tx('common.batch', { year: p.grad_year })].filter(Boolean).join(' · ')}
           </p>
           {p.city && (
             <p className="mt-0.5 flex items-center gap-1 text-[15px] text-muted">
@@ -103,10 +106,10 @@ export function ProfilePage({ self }: { self?: boolean }) {
             {isMe ? (
               <>
                 <ButtonLink to="/me/edit" icon={<Pencil className="size-4" />}>
-                  Edit profile
+                  {tx('profile.edit')}
                 </ButtonLink>
                 <ButtonLink to="/me/import" variant="secondary" icon={<LinkedInIcon className="size-4" />}>
-                  Import from LinkedIn
+                  {tx('home.importLinkedin')}
                 </ButtonLink>
               </>
             ) : (
@@ -140,17 +143,17 @@ export function ProfilePage({ self }: { self?: boolean }) {
         <BadgesRow memberId={p.id} />
 
         {isMe && (
-          <nav className="grid gap-2 sm:grid-cols-2" aria-label="Shortcuts">
+          <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('profile.shortcuts')}>
             {[
-              { to: '/me/connections', label: 'Connections', hint: 'Requests and your network', icon: '🤝' },
-              { to: '/help', label: 'Ask JEC', hint: 'Get or give help', icon: '🤝' },
-              { to: '/jobs', label: 'Jobs', hint: 'Openings and referrals', icon: '💼' },
+              { to: '/me/connections', label: tx('profile.connections'), hint: tx('profile.connectionsHint'), icon: '🤝' },
+              { to: '/help', label: tx('profile.askJec'), hint: tx('profile.askJecHint'), icon: '🤝' },
+              { to: '/jobs', label: tx('profile.jobs'), hint: tx('profile.jobsHint'), icon: '💼' },
               { to: '/mentors', label: 'Mentorship', hint: 'Find or become a mentor', icon: '🎓' },
               { to: '/businesses', label: 'Businesses', hint: 'Support JECian-owned', icon: '🏪' },
-              { to: '/invite', label: 'Invite friends', hint: 'Bring your batch in', icon: '💌' },
-              { to: '/people', label: 'Find JECians', hint: 'Search the directory', icon: '🔎' },
-              { to: '/notifications', label: 'Notifications', hint: 'Likes, comments, requests', icon: '🔔' },
-              ...(organiser ? [{ to: '/admin', label: 'Organise', hint: 'Events, payments, members', icon: '🛡️' }] : []),
+              { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
+              { to: '/people', label: tx('home.findJecians'), hint: tx('profile.findHint'), icon: '🔎' },
+              { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
+              ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
             ].map((l) => (
               <Link key={l.to} to={l.to} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
                 <span className="text-2xl" aria-hidden>{l.icon}</span>
@@ -164,8 +167,8 @@ export function ProfilePage({ self }: { self?: boolean }) {
         )}
 
         {isMe && p.verification !== 'verified' && (
-          <Notice tone="info" title="Your profile isn’t verified yet">
-            Verified members can see each other. Registering and paying for the Alumni Meet verifies you automatically.
+          <Notice tone="info" title={tx('profile.unverified')}>
+            {tx('profile.unverifiedBody')}
           </Notice>
         )}
 
@@ -239,6 +242,13 @@ export function ProfilePage({ self }: { self?: boolean }) {
         )}
 
         {isMe && (
+          <section aria-labelledby="lang-title">
+            <SectionTitle><span id="lang-title">भाषा / Language</span></SectionTitle>
+            <LanguageSwitch />
+          </section>
+        )}
+
+        {isMe && (
           <section className="pt-2">
             <DownloadMyData />
           </section>
@@ -254,7 +264,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
                 navigate('/', { replace: true })
               }}
             >
-              Sign out
+              {tx('profile.signOut')}
             </Button>
           </section>
         )}

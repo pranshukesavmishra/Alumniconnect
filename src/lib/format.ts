@@ -1,8 +1,10 @@
+import { dateLocale, tr } from '../i18n/core'
+
 const TZ = 'Asia/Kolkata'
 
 export function formatDate(iso: string | null | undefined, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }): string {
   if (!iso) return ''
-  return new Intl.DateTimeFormat('en-IN', { timeZone: TZ, ...opts }).format(new Date(iso))
+  return new Intl.DateTimeFormat(dateLocale(), { timeZone: TZ, ...opts }).format(new Date(iso))
 }
 
 export function formatDateTime(iso: string | null | undefined): string {
@@ -11,7 +13,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 
 /** "26–27 Dec 2026" or "26 Dec 2026" */
 export function formatDateRange(start: string | null, end: string | null): string {
-  if (!start) return 'Date to be announced'
+  if (!start) return tr('fmt.tba')
   const s = new Date(start)
   const e = end ? new Date(end) : null
   const day = (d: Date) => formatDate(d.toISOString(), { day: 'numeric' })
@@ -30,9 +32,9 @@ export function daysUntil(iso: string | null): number | null {
 
 export function relativeTime(iso: string): string {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`
+  if (diff < 60) return tr('fmt.justNow')
+  if (diff < 3600) return tr('fmt.minAgo', { n: Math.floor(diff / 60) })
+  if (diff < 86400) return tr('fmt.hAgo', { n: Math.floor(diff / 3600) })
   return formatDate(iso)
 }
 

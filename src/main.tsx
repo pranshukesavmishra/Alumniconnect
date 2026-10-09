@@ -5,6 +5,7 @@ import { Toaster } from 'sonner'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { AuthProvider } from './features/auth/AuthProvider'
+import { I18nProvider } from './i18n'
 import './index.css'
 
 const queryClient = new QueryClient({
@@ -35,10 +36,12 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-        <Toaster position="top-center" richColors closeButton toastOptions={{ style: { fontFamily: 'inherit' } }} />
+        <I18nProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+          <Toaster position="top-center" richColors closeButton toastOptions={{ style: { fontFamily: 'inherit' } }} />
+        </I18nProvider>
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

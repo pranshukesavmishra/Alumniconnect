@@ -11,7 +11,10 @@ import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../compon
 import { Field, Input } from '../../components/ui/Form'
 import { WhatsAppIcon } from '../../components/ui/Icons'
 import { QrCode } from '../../components/ui/QrCode'
-import { FOOD_PREFS, MEET_SLUG } from '../../lib/constants'
+import { MEET_SLUG } from '../../lib/constants'
+import { useT } from '../../i18n'
+import { tr } from '../../i18n/core'
+import { foodLabel } from '../../i18n/labels'
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange, formatDateTime } from '../../lib/format'
 import { buildIcs, downloadFile } from '../../lib/ics'
@@ -37,6 +40,7 @@ const IOS_APPS = [
 
 
 export function MyRegistrationPage() {
+  const tx = useT()
   const { data: event, isLoading } = useEvent(MEET_SLUG)
   const { data: mine, isLoading: lm, isFetching, error } = useMyRegistration(event?.id)
   const uid = useUserId()
@@ -74,7 +78,7 @@ export function MyRegistrationPage() {
   const reg = mine.registration
   return (
     <div>
-      <PageHeader title="My registration" subtitle={event.title} back="/meet" action={<StatusBadge status={reg.status} />} />
+      <PageHeader title={tx('my.title')} subtitle={event.title} back="/meet" action={<StatusBadge status={reg.status} />} />
       <Page className="space-y-6">
         <Timeline status={reg.status} hasPayment={mine.payments.some((p) => p.status !== 'rejected')} free={reg.amount_paise === 0} />
         {reg.status === 'confirmed' && <TicketCard event={event} mine={mine} />}
@@ -88,33 +92,35 @@ export function MyRegistrationPage() {
 }
 
 function OfflineTicket({ t }: { t: CachedTicket }) {
+  const tx = useT()
   return (
     <Card className="overflow-hidden">
       <div className="bg-hero px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent">Entry pass · saved on this phone</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent">{tx('my.passOffline')}</p>
         <p className="text-lg font-bold">{t.title}</p>
         <p className="text-sm text-hero-text">{t.when}</p>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
-        <QrCode value={t.code} size={200} label={`Entry QR code ${t.code}`} />
+        <QrCode value={t.code} size={200} label={tx('my.qrLabel', { code: t.code })} />
         <p className="font-mono text-2xl font-bold tracking-widest">{t.code}</p>
         <p className="text-center">
           <span className="font-semibold">{t.name}</span>
-          <span className="text-muted"> · admits {t.headcount}</span>
+          <span className="text-muted"> · {tx('my.admits', { count: t.headcount })}</span>
         </p>
-        <p className="text-center text-sm text-muted">You’re offline. This pass was saved when you last opened the app.</p>
+        <p className="text-center text-sm text-muted">{tx('my.offlineNote')}</p>
       </div>
     </Card>
   )
 }
 
 function Timeline({ status, hasPayment, free }: { status: string; hasPayment: boolean; free: boolean }) {
+  const tx = useT()
   const steps = free
-    ? [{ label: 'Registered', done: true }, { label: 'Confirmed', done: status === 'confirmed' }]
+    ? [{ label: tx('my.tlRegistered'), done: true }, { label: tx('my.tlConfirmed'), done: status === 'confirmed' }]
     : [
-        { label: 'Registered', done: true },
-        { label: 'Paid', done: hasPayment || status === 'confirmed' },
-        { label: 'Verified', done: status === 'confirmed' },
+        { label: tx('my.tlRegistered'), done: true },
+        { label: tx('my.tlPaid'), done: hasPayment || status === 'confirmed' },
+        { label: tx('my.tlVerified'), done: status === 'confirmed' },
       ]
   const current = steps.findIndex((s) => !s.done)
   return (
@@ -139,12 +145,13 @@ function Timeline({ status, hasPayment, free }: { status: string; hasPayment: bo
 
 function copy(text: string, what: string) {
   navigator.clipboard?.writeText(text).then(
-    () => toast.success(`${what} copied`),
-    () => toast.error('Couldn’t copy. Please select and copy it manually.'),
+    () => toast.success(tr('my.copied', { what })),
+    () => toast.error(tr('my.copyFailed')),
   )
 }
 
 function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }) {
+  const tx = useT()
   const reg = mine.registration
   const { data: profile } = useMyProfile()
   const submit = useSubmitPayment(event.id)
@@ -165,7 +172,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
     e.preventDefault()
     if (submitting) return
     const clean = normalizeUtr(utr)
-    if (!clean) return setUtrError('The UPI reference (UTR) is the 12-digit number shown in your payment app after paying.')
+    if (!clean) return setUtrError(tx('my.utrError'))
     setUtrError(null)
     setSubmitting(true) // covers screenshot compression too, so a second tap can't submit twice
     let sent = false
@@ -184,7 +191,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
       }
       sent = true
       await submit.mutateAsync({ registrationId: reg.id, utr: clean, payerName: payer, proof: blob, proofExt: ext })
-      toast.success('Payment details sent for verification')
+      toast.success(tx('my.paymentSent'))
     } catch (err) {
       // server errors are shown under the form; this covers e.g. an unreadable screenshot
       if (!sent) toast.error(err instanceof Error ? err.message : friendlyError(err))
@@ -195,8 +202,8 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
 
   if (!upiReady) {
     return (
-      <Notice tone="warning" title="Payment details coming soon">
-        The organisers will publish the payment details shortly. You’ll be able to pay from this page. Your registration is saved.
+      <Notice tone="warning" title={tx('my.soonTitle')}>
+        {tx('my.soonBody')}
       </Notice>
     )
   }
@@ -204,20 +211,20 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
   return (
     <section className="space-y-4">
       {lastRejected && (
-        <Notice tone="danger" title="We couldn’t verify your last payment">
-          {lastRejected.review_note ?? 'Please check the UPI reference and submit again, or contact the organisers.'}
+        <Notice tone="danger" title={tx('my.rejectedTitle')}>
+          {lastRejected.review_note ?? tx('my.rejectedBody')}
         </Notice>
       )}
       <Card className="overflow-hidden">
         <div className="bg-primary-soft p-4">
-          <p className="text-sm font-semibold text-primary">Step 1 · Pay by UPI</p>
+          <p className="text-sm font-semibold text-primary">{tx('my.step1')}</p>
           <p className="mt-1 text-3xl font-bold tabular-nums">{formatPaise(due)}</p>
-          <p className="text-sm text-muted">to {event.upi_payee_name}</p>
+          <p className="text-sm text-muted">{tx('my.payTo', { name: event.upi_payee_name ?? '' })}</p>
         </div>
         <div className="space-y-4 p-4">
           {isIos && link && (
             <div className="space-y-2">
-              <p className="text-center text-sm font-semibold">Pay {formatPaise(due)} with</p>
+              <p className="text-center text-sm font-semibold">{tx('my.payWith', { amount: formatPaise(due) })}</p>
               <div className="grid grid-cols-3 gap-2">
                 {IOS_APPS.map((a) => (
                   <a key={a.name} href={link.replace('upi://pay', a.scheme)} className="flex min-h-12 items-center justify-center rounded-xl border border-border bg-surface px-2 text-center text-sm font-semibold text-primary hover:bg-primary-soft">
@@ -225,7 +232,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
                   </a>
                 ))}
               </div>
-              <p className="text-center text-xs text-muted">Using another app (BHIM, a bank app)? Pay to the UPI ID below.</p>
+              <p className="text-center text-xs text-muted">{tx('my.otherApp')}</p>
             </div>
           )}
           {isPhone && !isIos && link && (
@@ -233,33 +240,33 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
               href={link}
               className="flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 text-base font-semibold text-on-primary hover:bg-primary-hover"
             >
-              <Smartphone className="size-5" aria-hidden /> Pay {formatPaise(due)} with a UPI app
+              <Smartphone className="size-5" aria-hidden /> {tx('my.payApp', { amount: formatPaise(due) })}
             </a>
           )}
           <dl className="divide-y divide-border rounded-xl border border-border px-3">
             <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">UPI ID</dt>
+              <dt className="text-sm text-muted">{tx('my.upiId')}</dt>
               <dd className="flex min-w-0 items-center gap-1">
                 <span className="truncate font-mono text-[15px] font-semibold">{event.upi_id}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(event.upi_id!, 'UPI ID')} aria-label="Copy UPI ID">
+                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(event.upi_id!, tx('my.upiId'))} aria-label={tx('my.copyUpi')}>
                   <Copy className="size-4" />
                 </button>
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">Amount</dt>
+              <dt className="text-sm text-muted">{tx('my.amount')}</dt>
               <dd className="flex items-center gap-1">
                 <span className="font-semibold tabular-nums">{formatPaise(due)}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(String(due / 100), 'Amount')} aria-label="Copy amount">
+                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(String(due / 100), tx('my.amount'))} aria-label={tx('my.copyAmount')}>
                   <Copy className="size-4" />
                 </button>
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">Note / remark</dt>
+              <dt className="text-sm text-muted">{tx('my.note')}</dt>
               <dd className="flex items-center gap-1">
                 <span className="font-mono font-semibold">{reg.code}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(reg.code, 'Code')} aria-label="Copy registration code">
+                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(reg.code, tx('my.code'))} aria-label={tx('my.copyCode')}>
                   <Copy className="size-4" />
                 </button>
               </dd>
@@ -268,12 +275,12 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           {link &&
             (showQr ? (
               <div className="flex flex-col items-center gap-2">
-                <QrCode value={link} size={220} label={`UPI QR code to pay ${formatPaise(due)}`} />
-                <p className="text-center text-sm text-muted">Scan with GPay, PhonePe, Paytm or any UPI app</p>
+                <QrCode value={link} size={220} label={tx('my.upiQr', { amount: formatPaise(due) })} />
+                <p className="text-center text-sm text-muted">{tx('my.scan')}</p>
               </div>
             ) : (
               <button type="button" className="w-full text-center text-sm font-semibold text-primary" onClick={() => setShowQr(true)}>
-                Paying from another phone? Show QR code
+                {tx('my.showQr')}
               </button>
             ))}
           {event.payment_note && <p className="text-sm text-muted">{event.payment_note}</p>}
@@ -281,19 +288,19 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
       </Card>
 
       <Card className="p-4">
-        <p className="text-sm font-semibold text-primary">Step 2 · Tell us you’ve paid</p>
+        <p className="text-sm font-semibold text-primary">{tx('my.step2')}</p>
         <form onSubmit={onSubmit} noValidate className="mt-3 space-y-4">
           <Field
-            label="UPI reference number (UTR)"
+            label={tx('my.utr')}
             error={utrError}
-            hint="12 digits. In GPay: open the payment, “UPI transaction ID”. In PhonePe: “UTR”. In Paytm: “UPI Ref No.”"
+            hint={tx('my.utrHint')}
           >
             {(p) => (
               <Input
                 {...p}
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="e.g. 412345678901"
+                placeholder={tx('my.utrPh')}
                 className="font-mono tracking-wider"
                 value={utr}
                 maxLength={16}
@@ -301,30 +308,30 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
               />
             )}
           </Field>
-          <Field label="Paid from the account of" optional hint="If someone else paid for you, enter their name.">
+          <Field label={tx('my.payer')} optional hint={tx('my.payerHint')}>
             {(p) => <Input {...p} value={payer} maxLength={120} onChange={(e) => setPayer(e.target.value)} />}
           </Field>
           <div>
             <p className="mb-1.5 text-sm font-semibold">
-              Payment screenshot <span className="font-normal text-muted">(optional, speeds up verification)</span>
+              {tx('my.screenshot')} <span className="font-normal text-muted">{tx('my.screenshotHint')}</span>
             </p>
             {proof ? (
               <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
                 <span className="truncate text-sm">{proof.name}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2" onClick={() => setProof(null)} aria-label="Remove screenshot">
+                <button type="button" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2" onClick={() => setProof(null)} aria-label={tx('my.removeShot')}>
                   <X className="size-4" />
                 </button>
               </div>
             ) : (
               <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-[15px] font-semibold text-primary hover:bg-primary-soft">
-                <Upload className="size-4" aria-hidden /> Add screenshot
+                <Upload className="size-4" aria-hidden /> {tx('my.addShot')}
                 <input
                   type="file"
                   accept="image/*,application/pdf"
                   className="sr-only"
                   onChange={(e) => {
                     const f = e.target.files?.[0]
-                    if (f && f.size > 15 * 1024 * 1024) return toast.error('That file is too large (max 15 MB).')
+                    if (f && f.size > 15 * 1024 * 1024) return toast.error(tx('my.tooLarge'))
                     setProof(f ?? null)
                   }}
                 />
@@ -333,7 +340,7 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           </div>
           {submit.error && <Notice tone="danger" title={friendlyError(submit.error)} />}
           <Button type="submit" size="lg" block loading={submitting}>
-            Submit payment details
+            {tx('my.submitPay')}
           </Button>
         </form>
       </Card>
@@ -342,11 +349,12 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
 }
 
 function UnderReview({ mine }: { mine: MyRegistration }) {
+  const tx = useT()
   const pending = mine.payments.filter((p) => p.status === 'submitted')
   return (
     <section className="space-y-3">
-      <Notice tone="info" title="Payment received. The treasurer is verifying it.">
-        This usually takes less than 24 hours. Your ticket will appear here once verified; you don’t need to do anything else.
+      <Notice tone="info" title={tx('my.reviewTitle')}>
+        {tx('my.reviewBody')}
       </Notice>
       {pending.map((p) => (
         <PaymentRow key={p.id} p={p} />
@@ -370,36 +378,38 @@ function PaymentRow({ p }: { p: Payment }) {
 }
 
 function TicketCard({ event, mine }: { event: EventRow; mine: MyRegistration }) {
+  const tx = useT()
   const reg = mine.registration
   return (
     <Card className="overflow-hidden">
       <div className="bg-hero px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent">Entry pass</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent">{tx('my.pass')}</p>
         <p className="text-lg font-bold">{event.title}</p>
         <p className="text-sm text-hero-text">{formatDateRange(event.starts_at, event.ends_at)}</p>
       </div>
       <div className="flex flex-col items-center gap-3 p-5">
-        <QrCode value={reg.code} size={200} label={`Entry QR code ${reg.code}`} />
+        <QrCode value={reg.code} size={200} label={tx('my.qrLabel', { code: reg.code })} />
         <p className="font-mono text-2xl font-bold tracking-widest">{reg.code}</p>
         <p className="text-center">
           <span className="font-semibold">{reg.full_name}</span>
-          <span className="text-muted"> · admits {reg.headcount}</span>
+          <span className="text-muted"> · {tx('my.admits', { count: reg.headcount })}</span>
         </p>
-        {reg.checked_in_at && <p className="text-sm font-semibold text-success">Checked in {formatDateTime(reg.checked_in_at)}</p>}
-        <p className="text-center text-sm text-muted">Show this at the entrance. Tip: take a screenshot in case the network is weak.</p>
+        {reg.checked_in_at && <p className="text-sm font-semibold text-success">{tx('my.checkedIn', { when: formatDateTime(reg.checked_in_at) })}</p>}
+        <p className="text-center text-sm text-muted">{tx('my.showAtGate')}</p>
       </div>
     </Card>
   )
 }
 
 function Details({ mine }: { mine: MyRegistration }) {
+  const tx = useT()
   const reg = mine.registration
   return (
     <section>
-      <SectionTitle>Details</SectionTitle>
+      <SectionTitle>{tx('my.details')}</SectionTitle>
       <Card className="px-4">
         <dl className="divide-y divide-border">
-          <KeyValue label="Registration code">
+          <KeyValue label={tx('my.regCode')}>
             <span className="font-mono">{reg.code}</span>
           </KeyValue>
           {mine.items.map((i) => (
@@ -407,12 +417,12 @@ function Details({ mine }: { mine: MyRegistration }) {
               {formatPaise(i.unit_price_paise * i.quantity)}
             </KeyValue>
           ))}
-          {reg.guests.length > 0 && <KeyValue label="With you">{reg.guests.map((g) => g.name || g.relation).join(', ')}</KeyValue>}
-          <KeyValue label="Food">{FOOD_PREFS.find((f) => f.value === reg.food_pref)?.label ?? '—'}</KeyValue>
-          <KeyValue label="T-shirt">{reg.tshirt_size ?? '—'}</KeyValue>
-          <KeyValue label="Accommodation help">{reg.needs_accommodation ? 'Requested' : 'No'}</KeyValue>
+          {reg.guests.length > 0 && <KeyValue label={tx('my.withYou')}>{reg.guests.map((g) => g.name || g.relation).join(', ')}</KeyValue>}
+          <KeyValue label={tx('reg.foodShort')}>{foodLabel(tx, reg.food_pref) || '—'}</KeyValue>
+          <KeyValue label={tx('reg.tshirtShort')}>{reg.tshirt_size ?? '—'}</KeyValue>
+          <KeyValue label={tx('reg.accomShort')}>{reg.needs_accommodation ? tx('my.requested') : tx('common.no')}</KeyValue>
           <div className="flex items-center justify-between py-3">
-            <dt className="font-semibold">Total</dt>
+            <dt className="font-semibold">{tx('my.totalLabel')}</dt>
             <dd className="text-lg font-bold tabular-nums">{formatPaise(reg.amount_paise)}</dd>
           </div>
         </dl>
@@ -427,14 +437,15 @@ function Details({ mine }: { mine: MyRegistration }) {
 }
 
 function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
+  const tx = useT()
   const reg = mine.registration
   const cancel = useCancelRegistration(event.id)
-  const shareText = `I’m attending ${event.title}${event.tagline ? ` (${event.tagline})` : ''}, ${formatDateRange(event.starts_at, event.ends_at)}. Register here: ${window.location.origin}/meet`
+  const shareText = tx('my.shareText', { title: event.title + (event.tagline ? ` (${event.tagline})` : ''), when: formatDateRange(event.starts_at, event.ends_at), url: `${window.location.origin}/meet` })
 
   return (
     <section className="grid gap-3 sm:grid-cols-2">
       <ButtonLink to="/meet/register" variant="secondary" icon={<Pencil className="size-4" />}>
-        Edit preferences
+        {tx('my.editPrefs')}
       </ButtonLink>
       {event.starts_at && (
         <Button
@@ -448,7 +459,7 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
             )
           }
         >
-          Add to calendar
+          {tx('my.addCal')}
         </Button>
       )}
       <a
@@ -457,19 +468,19 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
         rel="noreferrer"
         className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#128c4a] px-5 text-[15px] font-semibold text-white hover:opacity-90"
       >
-        <WhatsAppIcon className="size-4" /> Invite batchmates on WhatsApp
+        <WhatsAppIcon className="size-4" /> {tx('my.inviteWa')}
       </a>
       {reg.status === 'pending_payment' && (
         <Button
           variant="danger-ghost"
           loading={cancel.isPending}
           onClick={() => {
-            if (window.confirm('Cancel your registration? You can register again later while registration is open.')) {
-              cancel.mutate(reg.id, { onError: (e) => toast.error(friendlyError(e)), onSuccess: () => toast.success('Registration cancelled') })
+            if (window.confirm(tx('my.cancelConfirm'))) {
+              cancel.mutate(reg.id, { onError: (e) => toast.error(friendlyError(e)), onSuccess: () => toast.success(tx('my.cancelled')) })
             }
           }}
         >
-          Cancel registration
+          {tx('my.cancel')}
         </Button>
       )}
     </section>

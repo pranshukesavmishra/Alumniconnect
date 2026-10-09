@@ -4,8 +4,10 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Notice, PageSkeleton } from '../../components/ui/Display'
 import { ChoiceGroup, Field, Input, Select } from '../../components/ui/Form'
-import { BRANCHES, CURRENT_YEAR, MEMBER_TYPES, yearRange } from '../../lib/constants'
+import { BRANCHES, CURRENT_YEAR, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { useT } from '../../i18n'
+import { memberTypeOptions } from '../../i18n/labels'
 import { safeNext } from '../../lib/safeNext'
 import type { MemberType } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
@@ -15,6 +17,7 @@ const PHONE = /^\+?[0-9 ]{10,16}$/
 
 
 export function WelcomePage() {
+  const tx = useT()
   const { session } = useAuth()
   const { data: profile, isLoading } = useMyProfile()
   const importPhoto = useImportProviderPhoto()
@@ -23,7 +26,7 @@ export function WelcomePage() {
   useEffect(() => {
     if (!profile || migrated.current || !profile.avatar_url || isOurAvatar(profile.avatar_url)) return
     migrated.current = true
-    importPhoto.mutate('any', { onSuccess: (r) => toast.success(r.source === 'linkedin' ? 'We used your LinkedIn photo. You can change it anytime in your profile.' : 'We used your Google photo. You can change it anytime in your profile.') })
+    importPhoto.mutate('any', { onSuccess: (r) => toast.success(r.source === 'linkedin' ? tx('welcome.photoLinkedin') : tx('welcome.photoGoogle')) })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per visit
   }, [profile])
   const { data: priv } = useMyPrivate()
@@ -61,12 +64,12 @@ export function WelcomePage() {
 
   function validate() {
     const e: Record<string, string> = {}
-    if (form.full_name.trim().length < 2) e.full_name = 'Please enter your full name.'
-    if (!form.member_type) e.member_type = 'Please choose one.'
-    if (!isFaculty && !form.branch) e.branch = 'Please choose your branch.'
-    if (!isFaculty && !form.grad_year) e.grad_year = isStudent ? 'Please choose your expected passing-out year.' : 'Please choose your passing-out year.'
-    if (!form.city.trim()) e.city = 'Please enter the city you live in.'
-    if (!PHONE.test(form.phone.trim())) e.phone = 'Please enter a valid mobile number, e.g. +91 98765 43210.'
+    if (form.full_name.trim().length < 2) e.full_name = tx('welcome.errName')
+    if (!form.member_type) e.member_type = tx('welcome.errType')
+    if (!isFaculty && !form.branch) e.branch = tx('welcome.errBranch')
+    if (!isFaculty && !form.grad_year) e.grad_year = isStudent ? tx('welcome.errGradStudent') : tx('welcome.errGrad')
+    if (!form.city.trim()) e.city = tx('welcome.errCity')
+    if (!PHONE.test(form.phone.trim())) e.phone = tx('welcome.errPhone')
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -102,24 +105,24 @@ export function WelcomePage() {
       <div className="mb-6 flex items-center gap-4">
         <Avatar src={profile.avatar_url} name={form.full_name || session?.user.email || '?'} size={56} />
         <div>
-          <h1 className="text-[26px] font-bold leading-tight tracking-tight">Welcome to JEC Alumni Connect</h1>
+          <h1 className="text-[26px] font-bold leading-tight tracking-tight">{tx('welcome.title')}</h1>
         </div>
       </div>
-      <p className="mb-6 text-muted">Tell us a little about yourself. It takes under a minute, and you can change it any time.</p>
+      <p className="mb-6 text-muted">{tx('welcome.intro')}</p>
 
       <form onSubmit={submit} noValidate className="space-y-5">
-        <Field label="Full name" error={errors.full_name}>
+        <Field label={tx('welcome.fullName')} error={errors.full_name}>
           {(p) => <Input {...p} autoComplete="name" value={form.full_name} onChange={(e) => set('full_name')(e.target.value)} />}
         </Field>
 
-        <ChoiceGroup label="I am" options={MEMBER_TYPES} value={form.member_type || null} onChange={(v) => set('member_type')(v)} error={errors.member_type} />
+        <ChoiceGroup label={tx('welcome.iAm')} options={memberTypeOptions(tx)} value={form.member_type || null} onChange={(v) => set('member_type')(v)} error={errors.member_type} />
 
         {!isFaculty && (
           <>
-            <Field label="Branch" error={errors.branch}>
+            <Field label={tx('welcome.branch')} error={errors.branch}>
               {(p) => (
                 <Select {...p} value={form.branch} onChange={(e) => set('branch')(e.target.value)}>
-                  <option value="">Choose your branch</option>
+                  <option value="">{tx('welcome.chooseBranch')}</option>
                   {BRANCHES.map((b) => (
                     <option key={b}>{b}</option>
                   ))}
@@ -127,20 +130,20 @@ export function WelcomePage() {
               )}
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label={isStudent ? 'Passing-out year (expected)' : 'Passing-out year'} error={errors.grad_year}>
+              <Field label={isStudent ? tx('welcome.gradStudent') : tx('welcome.grad')} error={errors.grad_year}>
                 {(p) => (
                   <Select {...p} value={form.grad_year} onChange={(e) => set('grad_year')(e.target.value)}>
-                    <option value="">Year</option>
+                    <option value="">{tx('welcome.year')}</option>
                     {gradYears.map((y) => (
                       <option key={y}>{y}</option>
                     ))}
                   </Select>
                 )}
               </Field>
-              <Field label="Joining year" optional>
+              <Field label={tx('welcome.joinYear')} optional>
                 {(p) => (
                   <Select {...p} value={form.join_year} onChange={(e) => set('join_year')(e.target.value)}>
-                    <option value="">Year</option>
+                    <option value="">{tx('welcome.year')}</option>
                     {gradYears.map((y) => (
                       <option key={y}>{y}</option>
                     ))}
@@ -151,11 +154,11 @@ export function WelcomePage() {
           </>
         )}
 
-        <Field label="City you live in" error={errors.city}>
-          {(p) => <Input {...p} autoComplete="address-level2" placeholder="e.g. Pune" value={form.city} onChange={(e) => set('city')(e.target.value)} />}
+        <Field label={tx('welcome.city')} error={errors.city}>
+          {(p) => <Input {...p} autoComplete="address-level2" placeholder={tx('welcome.cityPh')} value={form.city} onChange={(e) => set('city')(e.target.value)} />}
         </Field>
 
-        <Field label="Mobile number" error={errors.phone} hint="Private. Only you and the event organisers can see it.">
+        <Field label={tx('welcome.phone')} error={errors.phone} hint={tx('welcome.phoneHint')}>
           {(p) => (
             <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="+91 98765 43210" value={form.phone} onChange={(e) => set('phone')(e.target.value)} />
           )}
@@ -163,7 +166,7 @@ export function WelcomePage() {
 
         {update.error && <Notice tone="danger" title={friendlyError(update.error)} />}
         <Button type="submit" size="lg" block loading={update.isPending}>
-          Continue
+          {tx('common.continue')}
         </Button>
       </form>
     </div>

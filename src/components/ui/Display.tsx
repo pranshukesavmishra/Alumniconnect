@@ -1,6 +1,7 @@
 import { cn } from '../../lib/cn'
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from 'lucide-react'
 import type { HTMLAttributes, ReactNode } from 'react'
+import { useT } from '../../i18n'
 
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('rounded-3xl border border-border/80 bg-surface shadow-card', className)} {...rest} />
@@ -62,8 +63,9 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 export function PageSkeleton() {
+  const tx = useT()
   return (
-    <div className="space-y-4 p-4" aria-busy="true" aria-label="Loading">
+    <div className="space-y-4 p-4" aria-busy="true" aria-label={tx('common.loading')}>
       <Skeleton className="h-8 w-2/3" />
       <Skeleton className="h-40 w-full" />
       <Skeleton className="h-20 w-full" />
