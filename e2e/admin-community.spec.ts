@@ -49,10 +49,10 @@ test('admin approves a proposed circle, features a member and sets a batch size'
 
   // batch size: the invite screen shows progress against it
   await boss.page.getByLabel('Passing-out year').selectOption(year)
-  await boss.page.getByLabel('Branch').selectOption('Computer Science & Engineering')
+  await boss.page.getByLabel('Branch').selectOption('B.E. in Computer Science & Engineering')
   await boss.page.getByLabel('Students').fill('100')
   await boss.page.getByRole('button', { name: 'Save batch size' }).click()
-  await expect(boss.page.getByText(`Batch ${year} · Computer Science & Engineering`)).toBeVisible()
+  await expect(boss.page.getByText(`Batch ${year} · B.E. in Computer Science & Engineering`)).toBeVisible()
   await asha.page.goto('/invite')
   await expect(asha.page.getByText(/on board · \d+%/)).toBeVisible()
 

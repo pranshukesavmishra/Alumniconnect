@@ -137,7 +137,7 @@ test('members: filter, saved view, bulk verify, export, notes, timeline, import,
   await page.getByRole('button', { name: 'Add 1 member' }).click()
   await expect(page.getByTestId('import-progress')).toContainText('1 of 1 done')
   await expect.poll(() => sql(`select count(*) from auth.users where email = '${newEmail}'`)).toBe('1')
-  expect(sql(`select p.grad_year || '/' || p.branch || '/' || p.verification from profiles p join auth.users u on u.id = p.id where u.email = '${newEmail}'`)).toBe('2004/Computer Science & Engineering/verified')
+  expect(sql(`select p.grad_year || '/' || p.branch || '/' || p.verification from profiles p join auth.users u on u.id = p.id where u.email = '${newEmail}'`)).toBe('2004/B.E. in Computer Science & Engineering/verified')
   expect(auditCount(`action = 'create_member' and actor = '${boss.id}' and details->>'email' = '${newEmail}'`)).toBe(1)
 
   // ---- duplicates: the twins are suggested; merging shows what moves, then moves it
