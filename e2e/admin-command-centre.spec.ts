@@ -53,6 +53,8 @@ test('admin home: attention queue, search and roles work end to end, and each ro
   await page.locator('[data-queue="members"]').click()
   await expect(page).toHaveURL(/\/admin\/members\?filter=pending/)
   await expect(page.getByLabel('Filter')).toHaveValue('pending')
+  // oldest first: a brand-new person is on a later page when the shared test database has many pending members, so search for them
+  await page.getByLabel('Search members').fill(`Quillwaiter ${tag}`)
   await expect(page.getByText(`Quillwaiter ${tag}`).first()).toBeVisible()
   sql(`update profiles set verification = 'verified' where id = '${waiting.id}'`)
   await page.goto('/admin')

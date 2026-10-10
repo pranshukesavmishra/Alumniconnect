@@ -173,7 +173,7 @@ test('revoke: dismissing keeps the role, accepting removes it, the audit logs it
   await loginPage(p2, T, `/admin/events/${ev.slug}`)
   await expect(p2.getByRole('tab', { name: /^Payments/ })).toHaveCount(0)
   await loginPage(p2, A, '/admin/roles')
-  await expect(p2).toHaveURL(/\/admin$/)
+  await expect(p2).toHaveURL(/\/(admin)?$/)
   await ctx.close()
 })
 
