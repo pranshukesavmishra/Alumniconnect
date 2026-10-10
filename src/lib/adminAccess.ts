@@ -38,13 +38,13 @@ export const PERMISSIONS: readonly Permission[] = [
   { key: 'community_batches', group: 'Community', label: 'Batch sizes', description: 'Set how many people each batch has.' },
   { key: 'gallery_manage', group: 'Photos', label: 'College gallery', description: 'Curate the college gallery: add, edit, feature and remove photos, albums and chips, and review member suggestions.' },
   { key: 'photos_moderate', group: 'Photos', label: 'Event photos', description: 'Approve, hide, delete and reorder event photos, choose who may upload, open photo votes and download an event photo ZIP.' },
+  { key: 'analytics', group: 'Insight', label: 'Analytics', description: 'Growth and activity numbers.' },
+  { key: 'audit', group: 'Insight', label: 'Activity log', description: 'Read and download the log of everything admins did.' },
+  { key: 'health', group: 'Insight', label: 'Health and backups', description: 'Backup status, errors, storage, site health.' },
   { key: 'funds_manage', group: 'Funds', label: 'Campaigns and funds', description: 'Create, edit, publish and pause fund appeals, items, milestones, updates, the "where the money went" log and the fund settings.' },
   { key: 'funds_verify', group: 'Funds', label: 'Verify donations', description: 'Verify or reject donations, record cash and bank gifts, record refunds. Sees donor names even for anonymous gifts.' },
   { key: 'funds_reports', group: 'Funds', label: 'Fund reports', description: 'Fund totals by campaign, batch, department, month and donor, and CSV downloads.' },
   { key: 'sponsors_manage', group: 'Funds', label: 'Sponsors', description: 'Sponsor packages, the sponsor pipeline (leads to delivered), the sponsor wall, proposals and agreements.' },
-  { key: 'analytics', group: 'Insight', label: 'Analytics', description: 'Growth and activity numbers.' },
-  { key: 'audit', group: 'Insight', label: 'Activity log', description: 'Read and download the log of everything admins did.' },
-  { key: 'health', group: 'Insight', label: 'Health and backups', description: 'Backup status, errors, storage, site health.' },
   { key: 'admins', group: 'Admins', label: 'See who the admins are', description: 'See the list of admins and owners (changing it is for super admins only).' },
 ]
 
