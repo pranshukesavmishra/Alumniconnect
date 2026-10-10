@@ -1034,12 +1034,11 @@ begin
 end $$;
 
 -- ------------------------------------------------------------------ the old event payment path must also refuse a UTR a donor already used
-select pg_temp.patch('submit_upi_payment', $$    raise exception 'This UPI reference has already been used';
-  end if;$$, $$    raise exception 'This UPI reference has already been used';
+-- single-line anchor (whitespace safe): the original "if exists (...) then raise ...; end if;" keeps its closing "end if;" for our extra check
+select pg_temp.patch('submit_upi_payment', $$raise exception 'This UPI reference has already been used';$$, $$raise exception 'This UPI reference has already been used';
   end if;
   if exists (select 1 from public.giving_donations g where g.utr = v_utr and g.status <> 'rejected') then
-    raise exception 'This UPI reference has already been used';
-  end if;$$);
+    raise exception 'This UPI reference has already been used';$$);
 
 -- ------------------------------------------------------------------ cron (when available)
 do $$
