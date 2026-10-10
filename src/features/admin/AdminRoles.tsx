@@ -47,7 +47,7 @@ export function AdminRoles() {
       <PageHeader title="Roles" subtitle="Who can do what" back="/admin" />
       <Page className="space-y-6">
         <Notice tone="info" title="Owners, admins and event roles">
-          <strong>Super admins</strong> own the app and choose exactly what each <strong>admin</strong> may do. <strong>Moderators</strong> handle reports across the community. <strong>Treasurers</strong>, <strong>content managers</strong> and <strong>check-in volunteers</strong> are chosen per event and only see that event. The database enforces this, not just the screens. Every change is written to the activity log.
+          <strong>Owners</strong> run the app for good and choose exactly what each <strong>admin</strong> may do. <strong>Moderators</strong> handle reports across the community. <strong>Treasurers</strong>, <strong>content managers</strong> and <strong>check-in volunteers</strong> are chosen per event and only see that event. The database enforces this, not just the screens. Every change is written to the activity log.
         </Notice>
 
         {can('admins') && <AdminsAndOwners />}

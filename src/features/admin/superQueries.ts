@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { RoleTemplate, ScopeKind } from '../../lib/adminAccess'
 import { supabase } from '../../lib/supabase'
 
 export interface AdminListEntry {
@@ -8,6 +9,13 @@ export interface AdminListEntry {
   grad_year: number | null
   branch: string | null
   is_super: boolean
+  /** a permanent owner (cannot be changed or removed by anyone from the app) */
+  is_owner: boolean
+  /** 'Owner', 'Full admin', a role name or 'Custom' */
+  role_label: string
+  role_key: string | null
+  scope_kind: ScopeKind
+  scope_value: string | null
   /** a super admin, or an admin without a limited grant */
   full: boolean
   permission_count: number
@@ -36,7 +44,20 @@ export function useAdminList(enabled: boolean) {
   })
 }
 
-/** Super admins only. Each call is idempotent on the server: doing it twice changes nothing. */
+export function useRoleTemplates(enabled: boolean) {
+  return useQuery({
+    queryKey: ['admin-role-templates'],
+    enabled,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_role_templates')
+      if (error) throw error
+      return data as unknown as RoleTemplate[]
+    },
+  })
+}
+
+/** Super admins only. Idempotent on the server: doing it twice changes nothing. There is no call that makes or removes an owner. */
 export function useAdminAccessMutations() {
   const qc = useQueryClient()
   const done = () => {
@@ -44,26 +65,13 @@ export function useAdminAccessMutations() {
   }
   return {
     setAdmin: useMutation({
-      mutationFn: async (input: { userId: string; enabled: boolean; permissions: string[] | null; note?: string }) => {
-        const { data, error } = await supabase.rpc('admin_set_admin', { p_user: input.userId, p_enabled: input.enabled, p_permissions: input.permissions, p_note: input.note?.trim() || null })
+      mutationFn: async (input: { userId: string; enabled: boolean; permissions: string[] | null; note?: string; template?: string | null; scopeKind?: ScopeKind | null; scopeValue?: string | null }) => {
+        const { data, error } = await supabase.rpc('admin_set_admin', {
+          p_user: input.userId, p_enabled: input.enabled, p_permissions: input.permissions, p_note: input.note?.trim() || null,
+          p_template: input.template ?? null, p_scope_kind: input.scopeKind ?? null, p_scope_value: input.scopeValue ?? null,
+        })
         if (error) throw error
         return data as unknown as { changed: boolean }
-      },
-      onSuccess: done,
-    }),
-    setSuper: useMutation({
-      mutationFn: async (input: { userId: string; enabled: boolean }) => {
-        const { data, error } = await supabase.rpc('admin_set_super_admin', { p_user: input.userId, p_enabled: input.enabled })
-        if (error) throw error
-        return data as unknown as { changed: boolean }
-      },
-      onSuccess: done,
-    }),
-    transfer: useMutation({
-      mutationFn: async (input: { toUser: string; stepDown: boolean }) => {
-        const { data, error } = await supabase.rpc('admin_transfer_ownership', { p_to_user: input.toUser, p_step_down: input.stepDown })
-        if (error) throw error
-        return data as unknown as { changed: boolean; stepped_down: boolean }
       },
       onSuccess: done,
     }),
