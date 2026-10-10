@@ -20,12 +20,12 @@ export function PhotoAdminPanel({ event, caps, onView }: { event: EventRow; caps
   const qc = useQueryClient()
   const summary = usePhotoSummary(event.id)
   const vote = useCurrentVote(event.id)
-  const [mode, setMode] = useState<'immediate' | 'approval'>(caps.member_uploads)
+  const [mode, setMode] = useState<'immediate' | 'approval' | 'off'>(caps.member_uploads)
   const [zip, setZip] = useState<{ done: number; total: number } | null>(null)
   const s = summary.data
   const link = uploadLink(event.slug)
 
-  async function changeMode(m: 'immediate' | 'approval') {
+  async function changeMode(m: 'immediate' | 'approval' | 'off') {
     const before = mode
     setMode(m)
     const { error } = await supabase.rpc('admin_set_photo_settings', { p_event: event.id, p_member_uploads: m })
@@ -42,7 +42,7 @@ export function PhotoAdminPanel({ event, caps, onView }: { event: EventRow; caps
     try {
       const all = []
       for (let off = 0; ; off += 200) {
-        const page = await fetchPhotos(event.id, { scope: 'approved', order: 'new' }, off, 200)
+        const page = await fetchPhotos(event.id, { scope: 'approved', order: 'new', media: 'photo' }, off, 200)
         all.push(...page)
         if (page.length < 200) break
       }
@@ -103,6 +103,7 @@ export function PhotoAdminPanel({ event, caps, onView }: { event: EventRow; caps
         options={[
           { value: 'immediate', label: tx('photos.modeImmediate'), hint: tx('photos.modeImmediateHint') },
           { value: 'approval', label: tx('photos.modeApproval'), hint: tx('photos.modeApprovalHint') },
+          { value: 'off', label: tx('photos.modeOff'), hint: tx('photos.modeOffHint') },
         ]}
       />
 

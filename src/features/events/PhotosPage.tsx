@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { BadgeCheck, Check, CheckSquare, Clock, EyeOff, Heart, ImagePlus, Images, Settings2, Stamp, Trash2, UserSearch, Vote } from 'lucide-react'
+import { BadgeCheck, Check, CheckSquare, Clock, EyeOff, Heart, ImagePlus, Images, Play, Settings2, Stamp, Trash2, UserSearch, Vote } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -13,7 +13,8 @@ import { MEET_SLUG } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../i18n'
-import { fetchPhotos, photoError, photoQueryKey, thumbUrl, usePhotoCaps, usePhotoPages, type PhotoFilter, type PhotoRow, type PhotoScope } from '../photos/api'
+import { formatDuration } from '../photos/video'
+import { fetchPhotos, isVideo, photoError, photoQueryKey, thumbUrl, usePhotoCaps, usePhotoPages, type PhotoFilter, type PhotoRow, type PhotoScope } from '../photos/api'
 import { GalleryAddSheet } from '../photos/PhotoSheets'
 import { PhotoAdminPanel } from '../photos/PhotoAdminPanel'
 import { PhotoLightbox } from '../photos/PhotoLightbox'
@@ -34,8 +35,13 @@ function Thumb({ p, selecting, order, onOpen }: { p: PhotoRow; selecting: boolea
         {p.status === 'pending' && <span className="grid size-6 place-items-center rounded-full bg-warning text-on-primary" title={tx('photos.pendingBadge')}><Clock className="size-4" aria-hidden /></span>}
         {p.is_hidden && <span className="grid size-6 place-items-center rounded-full bg-danger text-on-danger" title={tx('photos.hiddenBadge')}><EyeOff className="size-4" aria-hidden /></span>}
       </span>
+      {isVideo(p) && (
+        <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-0.5 text-xs font-semibold text-white" data-testid="video-badge">
+          <Play className="size-3 fill-current" aria-hidden />{formatDuration(p.duration_ms)}
+        </span>
+      )}
       {p.hearts > 0 && <span className="absolute bottom-1 right-1 flex items-center gap-0.5 rounded-full bg-black/60 px-1.5 py-0.5 text-xs text-white"><Heart className="size-3 fill-current" aria-hidden />{p.hearts}</span>}
-      {p.report_count > 0 && <span className="absolute bottom-1 left-1 rounded-full bg-danger px-1.5 py-0.5 text-xs font-bold text-on-danger">{p.report_count}</span>}
+      {p.report_count > 0 && <span className="absolute left-1 top-8 rounded-full bg-danger px-1.5 py-0.5 text-xs font-bold text-on-danger">{p.report_count}</span>}
       {selecting && <span className={clsx('absolute right-1 top-1 grid size-7 place-items-center rounded-full border-2 text-xs font-bold', order > 0 ? 'border-primary bg-primary text-on-primary' : 'border-white bg-black/30 text-white')}>{order > 0 ? order : ''}</span>}
     </button>
   )
@@ -52,6 +58,7 @@ export function PhotosPage() {
   const kind = sp.get('kind') === 'throwback' ? 'throwback' : 'event'
   const source = (['official', 'member'].includes(sp.get('source') ?? '') ? sp.get('source') : 'all') as Source
   const batch = Number(sp.get('batch')) || null
+  const media = (['photo', 'video'].includes(sp.get('media') ?? '') ? sp.get('media') : null) as 'photo' | 'video' | null
   const [managing, setManaging] = useState(false)
   const [selecting, setSelecting] = useState(false)
   const [sel, setSel] = useState<string[]>([])
@@ -66,7 +73,7 @@ export function PhotosPage() {
   }
 
   const manager = !!caps.data?.official
-  const filter: PhotoFilter = { scope, kind: scope === 'approved' || scope === 'tagged' || scope === 'mine' ? kind : null, source: source === 'all' ? null : source, batch }
+  const filter: PhotoFilter = { scope, kind: scope === 'approved' || scope === 'tagged' || scope === 'mine' ? kind : null, source: source === 'all' ? null : source, media, batch }
   const photos = usePhotoPages(event?.id, filter, !!caps.data?.view)
   const list = useMemo(() => photos.data?.pages.flat() ?? [], [photos.data])
   const openId = sp.get('photo')
@@ -83,7 +90,7 @@ export function PhotosPage() {
     n.delete('photo')
     setSp(n, { replace: true })
   }
-  useEffect(() => setSel([]), [scope, kind, source, batch])
+  useEffect(() => setSel([]), [scope, kind, source, batch, media])
 
   if (isLoading || caps.isLoading) return <PageSkeleton />
   if (!event) return <EmptyState title={tx('photos.noEvent')} />
@@ -113,7 +120,7 @@ export function PhotosPage() {
       const chosen = list.filter((p) => sel.includes(p.id))
       const { error } = await supabase.from('event_photos').delete().in('id', sel)
       if (error) return toast.error(photoError(error))
-      void supabase.storage.from('event-photos').remove(chosen.flatMap((p) => [p.storage_path, p.thumb_path]))
+      void supabase.storage.from('event-photos').remove(chosen.filter((p) => !isVideo(p)).flatMap((p) => [p.storage_path, p.thumb_path]).concat(chosen.filter(isVideo).map((p) => p.thumb_path)))
       toast.success(tx('photos.deletedN', { count: chosen.length }))
     } else if (action === 'first') {
       const { error } = await supabase.rpc('admin_reorder_photos', { p_event: event!.id, p_ids: sel })
@@ -145,6 +152,7 @@ export function PhotosPage() {
       />
       <Page className={clsx('space-y-4', selecting && 'pb-32')}>
         {caps.data && !manager && caps.data.member_uploads === 'approval' && <Notice tone="info">{tx('photos.memberApprovalNote')}</Notice>}
+        {caps.data && !manager && caps.data.member_uploads === 'off' && <Notice tone="info">{tx('photos.uploadsOffNote')}</Notice>}
         <PhotoVoteCard eventId={event.id} manager={manager} />
 
         {manager && (
@@ -170,6 +178,11 @@ export function PhotosPage() {
             <div role="tablist" aria-label={tx('photos.kindLabel')} className="grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1">
               {([['event', tx('photos.kindEvent')], ['throwback', tx('photos.kindThen')]] as const).map(([k, label]) => (
                 <button key={k} role="tab" aria-selected={kind === k} onClick={() => set('kind', k === 'event' ? null : k)} className={clsx('min-h-10 rounded-full text-sm font-semibold', kind === k ? 'bg-surface text-primary shadow-sm' : 'text-muted')}>{label}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label={tx('photos.mediaFilter')}>
+              {([[null, tx('photos.mediaAll')], ['photo', tx('photos.mediaPhotos')], ['video', tx('photos.mediaVideos')]] as const).map(([m, label]) => (
+                <button key={m ?? 'all'} type="button" aria-pressed={media === m} onClick={() => set('media', m)} className={clsx('min-h-11 rounded-full border px-4 text-sm font-semibold', media === m ? 'border-primary bg-primary-soft text-primary' : 'border-border bg-surface text-muted')}>{label}</button>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -217,7 +230,7 @@ export function PhotosPage() {
             {scope === 'pending' && <Button size="sm" icon={<Check className="size-4" />} disabled={!sel.length} onClick={() => bulk('approve')}>{tx('photos.approve')}</Button>}
             {scope !== 'hidden' ? <Button size="sm" variant="secondary" icon={<EyeOff className="size-4" />} disabled={!sel.length} onClick={() => bulk('hide')}>{tx('photos.hide')}</Button> : <Button size="sm" variant="secondary" disabled={!sel.length} onClick={() => bulk('unhide')}>{tx('photos.unhide')}</Button>}
             <Button size="sm" variant="secondary" disabled={!sel.length} onClick={() => bulk('first')}>{tx('photos.showFirst')}</Button>
-            <Button size="sm" variant="secondary" icon={<Vote className="size-4" />} disabled={sel.length < 2 || sel.length > 24} onClick={() => setVoteSheet(true)}>{tx('photos.startVote')}</Button>
+            <Button size="sm" variant="secondary" icon={<Vote className="size-4" />} disabled={sel.length < 2 || sel.length > 24 || list.some((p) => sel.includes(p.id) && isVideo(p))} onClick={() => setVoteSheet(true)}>{tx('photos.startVote')}</Button>
             {caps.data?.gallery && <Button size="sm" variant="secondary" icon={<Images className="size-4" />} disabled={!sel.length} onClick={() => setGallery(true)}>{tx('gallery.addToGallery')}</Button>}
             <Button size="sm" variant="danger-ghost" icon={<Trash2 className="size-4" />} disabled={!sel.length} onClick={() => bulk('delete')}>{tx('photos.delete')}</Button>
           </div>

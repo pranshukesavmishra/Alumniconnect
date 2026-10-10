@@ -90,11 +90,18 @@ export async function startResumableUpload(opts: { name: string; parent: string;
   return location
 }
 
-export async function fileInfo(fileId: string): Promise<{ parents: string[]; appProperties: Record<string, string> }> {
-  const f = await api<{ parents?: string[]; appProperties?: Record<string, string> }>(
-    `${API}/files/${encodeURIComponent(fileId)}?fields=parents,appProperties&supportsAllDrives=true`,
+export async function fileInfo(fileId: string): Promise<{ parents: string[]; appProperties: Record<string, string>; size: number | null }> {
+  const f = await api<{ parents?: string[]; appProperties?: Record<string, string>; size?: string }>(
+    `${API}/files/${encodeURIComponent(fileId)}?fields=parents,appProperties,size&supportsAllDrives=true`,
   )
-  return { parents: f.parents ?? [], appProperties: f.appProperties ?? {} }
+  return { parents: f.parents ?? [], appProperties: f.appProperties ?? {}, size: f.size ? Number(f.size) : null }
+}
+
+/** The bytes of a file the app created, optionally a byte range (the response is passed on as is: 200, 206 or 416). */
+export async function driveMedia(fileId: string, range: string | null): Promise<Response> {
+  return await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${await accessToken()}`, ...(range ? { Range: range } : {}) },
+  })
 }
 
 /** Uploads a small text file (e.g. a CSV backup) in one request. */

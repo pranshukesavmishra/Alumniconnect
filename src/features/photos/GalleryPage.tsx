@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Folders, ImagePlus, Inbox, Link2, Pencil, Star, Tags, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Folders, ImagePlus, Inbox, Link2, Pencil, Play, Star, Tags, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -15,6 +15,8 @@ import { useAdminAccess } from '../admin/access'
 import { useMyProfile } from '../auth/AuthProvider'
 import { albumTitle, chipLabel, fetchGalleryPhoto, galleryTitle, galleryUrl, useGalleryAlbums, useGalleryCategories, useGalleryPhotos, useGallerySuggestions, useOnThisDay, type GalleryPhoto } from './api'
 import { BeforeAfter } from './BeforeAfter'
+import { DriveVideo } from './DriveVideo'
+import { formatDuration } from './video'
 import { AlbumsSheet, ChipsSheet, GalleryEditSheet, GalleryUploadSheet, SuggestionsSheet } from './GalleryAdmin'
 
 function usePairBases(photos: GalleryPhoto[]) {
@@ -95,7 +97,7 @@ export function GalleryPage() {
           <div className="flex flex-wrap gap-2" role="toolbar" aria-label={tx('gallery.manage')}>
             <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-on-primary hover:bg-primary-hover">
               <ImagePlus className="size-4" aria-hidden />{tx('gallery.addPhotos')}
-              <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) setFiles(Array.from(e.target.files)); e.target.value = '' }} />
+              <input type="file" accept="image/*,video/*,.mov,.mp4,.m4v,.webm" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) setFiles(Array.from(e.target.files)); e.target.value = '' }} />
             </label>
             <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setSheet('chips')}>{tx('gallery.chipsTitle')}</Button>
             <Button size="sm" variant="secondary" icon={<Folders className="size-4" />} onClick={() => setSheet('albums')}>{tx('gallery.albumsTitle')}</Button>
@@ -131,6 +133,7 @@ export function GalleryPage() {
                 <li key={p.id} className="shrink-0">
                   <button type="button" onClick={() => set('photo', p.id)} className="relative block size-32 overflow-hidden rounded-2xl bg-surface-2">
                     <img src={galleryUrl(p.thumb_path)} alt={p.alt_text ?? galleryTitle(p, lang) ?? ''} loading="lazy" className="size-full object-cover" />
+                    {p.media_kind === 'video' && <PlayBadge ms={p.duration_ms} />}
                     {p.taken_on && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white">{p.taken_on.slice(0, 4)}</span>}
                   </button>
                 </li>
@@ -172,6 +175,7 @@ export function GalleryPage() {
               return (
                 <button key={p.id} type="button" onClick={() => set('photo', p.id)} aria-label={galleryTitle(p, lang) ?? p.alt_text ?? tx('photos.photo')} data-gallery-id={p.id} className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-surface-2">
                   <img src={galleryUrl(p.thumb_path)} alt={p.alt_text ?? galleryTitle(p, lang) ?? ''} loading="lazy" className="size-full object-cover transition-transform group-hover:scale-[1.03]" />
+                  {p.media_kind === 'video' && <PlayBadge ms={p.duration_ms} />}
                   {p.is_featured && <span className="absolute left-1.5 top-1.5 grid size-6 place-items-center rounded-full bg-accent text-black" title={tx('gallery.featuredBadge')}><Star className="size-3.5 fill-current" aria-hidden /></span>}
                 </button>
               )
@@ -223,7 +227,13 @@ function GalleryViewer({ photo, base, index, count, onIndex, onClose, curator, o
   return (
     <div role="dialog" aria-modal="true" aria-label={title ?? tx('photos.photo')} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 p-3" data-gallery-id={photo.id}>
       <div className="flex w-full max-w-3xl flex-1 items-center justify-center overflow-hidden">
-        {base ? <BeforeAfter className="w-full" before={galleryUrl(base.storage_path)} after={galleryUrl(photo.storage_path)} alt={photo.alt_text ?? title ?? ''} /> : <img src={galleryUrl(photo.storage_path)} alt={photo.alt_text ?? title ?? ''} className="max-h-full max-w-full object-contain" />}
+        {photo.media_kind === 'video' ? (
+          photo.drive_file_id ? (
+            <DriveVideo kind="gallery" id={photo.id} poster={galleryUrl(photo.thumb_path)} className="max-h-full max-w-full rounded-lg bg-black" label={photo.alt_text ?? title ?? tx('photos.video')} />
+          ) : (
+            <p className="text-center text-sm text-white" role="status">{tx('photos.videoUnfinished')}</p>
+          )
+        ) : base ? <BeforeAfter className="w-full" before={galleryUrl(base.storage_path)} after={galleryUrl(photo.storage_path)} alt={photo.alt_text ?? title ?? ''} /> : <img src={galleryUrl(photo.storage_path)} alt={photo.alt_text ?? title ?? ''} className="max-h-full max-w-full object-contain" />}
       </div>
       <div className="absolute inset-x-0 top-0 flex justify-between p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <button type="button" className={btn} onClick={onClose} aria-label={tx('common.close')}><X className="size-6" /></button>
@@ -240,6 +250,14 @@ function GalleryViewer({ photo, base, index, count, onIndex, onClose, curator, o
         {photo.event && <Link to={`/events/${photo.event.slug}/photos`} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent" data-testid="from-event">{tx('gallery.fromEvent', { event: photo.event.title })}<ChevronRight className="size-4" aria-hidden /></Link>}
       </div>
     </div>
+  )
+}
+
+function PlayBadge({ ms }: { ms: number | null }) {
+  return (
+    <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-xs font-semibold text-white" data-testid="video-badge">
+      <Play className="size-3 fill-current" aria-hidden />{formatDuration(ms)}
+    </span>
   )
 }
 

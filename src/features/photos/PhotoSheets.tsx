@@ -9,7 +9,7 @@ import { Sheet } from '../../components/ui/Sheet'
 import { useT } from '../../i18n'
 import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
-import { addEventPhotoToGallery, chipLabel, photoError, photoQueryKey, thumbUrl, useGalleryAlbums, useGalleryCategories, albumTitle, type PhotoRow } from './api'
+import { addEventPhotoToGallery, addEventVideoToGallery, isVideo, chipLabel, photoError, photoQueryKey, thumbUrl, useGalleryAlbums, useGalleryCategories, albumTitle, type PhotoRow } from './api'
 import { useLang } from '../../i18n'
 
 interface TagRow {
@@ -225,7 +225,7 @@ export function GalleryAddSheet({ photos, open, onClose, suggestionId, onDone }:
     setProgress(0)
     for (const p of photos) {
       try {
-        await addEventPhotoToGallery(p, {
+        await (isVideo(p) ? addEventVideoToGallery : addEventPhotoToGallery)(p, {
           title: title || p.caption || undefined, category_id: category || null, album_id: album || null, is_featured: featured, taken_on: taken || null,
           suggestion_id: suggestionId ?? null,
         })

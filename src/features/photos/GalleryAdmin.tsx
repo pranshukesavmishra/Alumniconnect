@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, ImagePlus, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { Badge, EmptyState, Skeleton } from '../../components/ui/Display'
@@ -8,8 +8,28 @@ import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Fo
 import { Sheet } from '../../components/ui/Sheet'
 import { useLang, useT } from '../../i18n'
 import { supabase } from '../../lib/supabase'
-import { addToGallery, albumTitle, chipLabel, galleryUrl, photoError, useGalleryAlbums, useGalleryCategories, useGallerySuggestions, type GalleryPhoto, type PhotoRow } from './api'
+import { addGalleryVideoRow, addToGallery, albumTitle, chipLabel, galleryUrl, photoError, useGalleryAlbums, useGalleryCategories, useGallerySuggestions, type GalleryPhoto, type PhotoRow } from './api'
 import { GalleryAddSheet } from './PhotoSheets'
+import { sendVideoToDrive, UploadAborted } from './driveUpload'
+import { MAX_VIDEO_BYTES, MB, isVideoFile, readVideoInfo, videoMime, videoProblem } from './video'
+import { FatalUpload } from './PhotoUpload'
+
+/** One video into the gallery: the poster and the row first, then the file to Drive in chunks. A failure takes the half-made row away again. */
+async function addGalleryVideo(f: File, meta: Parameters<typeof addToGallery>[1], onProgress: (pct: number) => void, signal: AbortSignal): Promise<void> {
+  const mime = videoMime(f)
+  const problem = videoProblem(f)
+  if (!mime || problem === 'format') throw new FatalUpload('photos.errVideoFormat')
+  if (problem === 'empty') throw new FatalUpload('photos.errVideoEmpty')
+  if (problem === 'tooBig') throw new FatalUpload('photos.errVideoBig', { mb: MAX_VIDEO_BYTES / MB })
+  const info = await readVideoInfo(f)
+  const row = await addGalleryVideoRow(info.poster.blob, info.poster.ext, { ...meta, mime_type: mime, size_bytes: f.size, duration_ms: info.duration_ms, width: info.width, height: info.height })
+  try {
+    await sendVideoToDrive({ target: { kind: 'gallery', id: row.id }, file: f, mime, signal, onProgress: (s, t) => onProgress((s / t) * 100) })
+  } catch (e) {
+    await row.remove().catch(() => {})
+    throw e
+  }
+}
 
 const refreshGallery = (qc: ReturnType<typeof useQueryClient>) => {
   for (const k of ['gallery-photos', 'gallery-categories', 'gallery-albums', 'gallery-featured', 'gallery-on-this-day', 'gallery-suggestions']) void qc.invalidateQueries({ queryKey: [k] })
@@ -28,17 +48,25 @@ export function GalleryUploadSheet({ files, onClose }: { files: File[]; onClose:
   const [featured, setFeatured] = useState(false)
   const [taken, setTaken] = useState('')
   const [done, setDone] = useState<number | null>(null)
+  const [pct, setPct] = useState<number | null>(null)
+  const abort = useRef<AbortController | null>(null)
   async function go() {
     let n = 0
     let last: unknown = null
     setDone(0)
     for (const f of files) {
+      const meta = { title: files.length === 1 ? title : undefined, category_id: category || null, album_id: album || null, is_featured: featured, taken_on: taken || null }
       try {
-        await addToGallery(f, { title: files.length === 1 ? title : undefined, category_id: category || null, album_id: album || null, is_featured: featured, taken_on: taken || null })
+        if (isVideoFile(f)) {
+          abort.current = new AbortController()
+          setPct(0)
+          await addGalleryVideo(f, meta, setPct, abort.current.signal)
+        } else await addToGallery(f, meta)
         n++
       } catch (e) {
-        last = e
+        last = e instanceof FatalUpload ? new Error(e.message) : e instanceof UploadAborted ? new Error(tx('photos.cancelled')) : e
       }
+      setPct(null)
       setDone(n)
     }
     setDone(null)
@@ -71,6 +99,13 @@ export function GalleryUploadSheet({ files, onClose }: { files: File[]; onClose:
         {files.length === 1 && <Field label={tx('gallery.titleLabel')} optional>{(p) => <Input {...p} value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />}</Field>}
         <Field label={tx('gallery.takenOn')} optional hint={tx('gallery.takenOnHint')}>{(p) => <Input {...p} type="date" value={taken} onChange={(e) => setTaken(e.target.value)} />}</Field>
         <Checkbox checked={featured} onChange={setFeatured}>{tx('gallery.featureIt')}</Checkbox>
+        {pct !== null && (
+          <div className="space-y-1" data-testid="gallery-video-progress">
+            <div className="flex items-center justify-between text-sm"><span>{tx('gallery.sendingVideo')}</span><span className="tabular-nums text-muted">{Math.round(pct)}%</span></div>
+            <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pct}%` }} /></div>
+            <Button size="sm" variant="secondary" onClick={() => abort.current?.abort()}>{tx('photos.cancelOne')}</Button>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button block variant="secondary" disabled={done !== null} onClick={onClose}>{tx('common.cancel')}</Button>
           <Button block loading={done !== null} icon={<ImagePlus className="size-4" />} onClick={go}>{done !== null ? tx('gallery.addingN', { done, total: files.length }) : tx('gallery.addToGallery')}</Button>
@@ -307,7 +342,7 @@ export function SuggestionsSheet({ onClose }: { onClose: () => void }) {
                   <p className="truncate text-xs text-muted">{s.event_title}</p>
                   {s.note && <p className="line-clamp-2 text-sm">{s.note}</p>}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button size="sm" onClick={() => setAdding({ id: s.id, photo: { id: s.photo_id, event_id: s.event_id, storage_path: s.storage_path, thumb_path: s.thumb_path, caption: s.caption, alt_text: null } as PhotoRow })}>{tx('gallery.addToGallery')}</Button>
+                    <Button size="sm" onClick={() => setAdding({ id: s.id, photo: { id: s.photo_id, event_id: s.event_id, storage_path: s.storage_path, thumb_path: s.thumb_path, caption: s.caption, alt_text: null, media_kind: s.media_kind, width: s.width, height: s.height } as PhotoRow })}>{tx('gallery.addToGallery')}</Button>
                     <Button size="sm" variant="secondary" onClick={() => decline(s.id)}>{tx('gallery.decline')}</Button>
                   </div>
                 </div>

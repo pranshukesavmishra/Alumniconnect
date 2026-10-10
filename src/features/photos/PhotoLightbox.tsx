@@ -8,7 +8,9 @@ import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { useLang, useT } from '../../i18n'
 import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
-import { captionOf, photoError, photoUrl, type PhotoCaps, type PhotoRow } from './api'
+import { captionOf, isVideo, photoError, photoUrl, thumbUrl, type PhotoCaps, type PhotoRow } from './api'
+import { DriveVideo } from './DriveVideo'
+import { formatDuration, mediaUrl } from './video'
 import { EditPhotoSheet, GalleryAddSheet, ReportSheet, SuggestSheet, TagSheet } from './PhotoSheets'
 
 const btn = 'grid size-12 place-items-center rounded-full bg-black/50 text-white hover:bg-black/70'
@@ -66,6 +68,15 @@ export function PhotoLightbox({ photos, index, onIndex, onClose, caps, onChanged
   }
 
   async function download() {
+    if (isVideo(p)) {
+      const { data } = await supabase.auth.getSession()
+      const a = document.createElement('a')
+      a.href = mediaUrl('event', p.id, data.session?.access_token, { download: true })
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      return
+    }
     try {
       const res = await fetch(photoUrl(p))
       const blob = await res.blob()
@@ -100,7 +111,7 @@ export function PhotoLightbox({ photos, index, onIndex, onClose, caps, onChanged
     if (!window.confirm(tx('photos.confirmDelete'))) return
     const { error } = await supabase.from('event_photos').delete().eq('id', p.id)
     if (error) return toast.error(photoError(error))
-    void supabase.storage.from('event-photos').remove([p.storage_path, p.thumb_path])
+    void supabase.storage.from('event-photos').remove(isVideo(p) ? [p.thumb_path] : [p.storage_path, p.thumb_path])
     toast.success(tx('photos.deleted'))
     refresh()
     onClose()
@@ -118,10 +129,24 @@ export function PhotoLightbox({ photos, index, onIndex, onClose, caps, onChanged
   const caption = captionOf(p, lang)
   return (
     <div role="dialog" aria-modal="true" aria-label={tx('photos.photo')} className="fixed inset-0 z-50 flex items-center justify-center bg-black/95" data-photo-id={p.id}>
-      <img src={photoUrl(p)} alt={p.alt_text ?? caption ?? ''} className="max-h-full max-w-full object-contain" />
+      {isVideo(p) ? (
+        <div className="flex size-full items-center justify-center px-3 pb-44 pt-20">
+          {p.playable ? (
+            <DriveVideo kind="event" id={p.id} poster={thumbUrl(p)} className="max-h-full max-w-full rounded-lg bg-black" label={p.alt_text ?? caption ?? tx('photos.video')} />
+          ) : (
+            <div className="space-y-2 text-center text-white">
+              <img src={thumbUrl(p)} alt="" className="mx-auto max-h-48 rounded-lg opacity-60" />
+              <p className="text-sm" role="status">{tx('photos.videoUnfinished')}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <img src={photoUrl(p)} alt={p.alt_text ?? caption ?? ''} className="max-h-full max-w-full object-contain" />
+      )}
       <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
         <button type="button" className={btn} onClick={onClose} aria-label={tx('common.close')}><X className="size-6" /></button>
         <div className="flex items-center gap-2">
+          {isVideo(p) && p.duration_ms ? <Badge tone="neutral">{formatDuration(p.duration_ms)}</Badge> : null}
           <Badge tone={p.source === 'official' ? 'primary' : 'neutral'}>{p.source === 'official' ? tx('photos.official') : tx('photos.fromMembers')}</Badge>
           {p.status === 'pending' && <Badge tone="warning">{tx('photos.pendingBadge')}</Badge>}
           {p.is_hidden && <Badge tone="danger">{tx('photos.hiddenBadge')}</Badge>}
