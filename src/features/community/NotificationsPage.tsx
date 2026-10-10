@@ -57,6 +57,24 @@ function describe(n: Notification, tx: (key: MsgKey, params?: Params) => string)
       return { text: tx('notif.galleryDeclined'), to: '/gallery' }
     case 'invite_joined':
       return { text: tx('notif.invite', { who }), to: `/people/${n.actor?.id}` }
+    case 'donation_verified':
+      return { text: tx('notif.give.verified', { what: body.split('|')[0] ?? '' }), to: '/give/mine' }
+    case 'donation_rejected':
+      return { text: tx('notif.give.rejected', { note: body }), to: '/give/mine' }
+    case 'donation_refunded':
+      return { text: tx('notif.give.refunded', { note: body }), to: '/give/mine' }
+    case 'giving_milestone':
+      return { text: tx('notif.give.milestone', { what: body }), to: '/give' }
+    case 'giving_ending':
+      return { text: tx('notif.give.ending', { what: body }), to: '/give' }
+    case 'giving_new':
+      return { text: tx('notif.give.new', { what: body }), to: '/give' }
+    case 'giving_update':
+      return { text: tx('notif.give.update', { what: body }), to: '/give' }
+    case 'pledge_reminder':
+      return { text: tx('notif.give.pledge', { what: body }), to: '/give' }
+    case 'sponsor_followup':
+      return { text: tx('notif.give.followup', { what: body }), to: `/admin/funds/sponsor/${n.target_id}` }
     default:
       return { text: n.body ?? tx('notif.default'), to: '/' }
   }

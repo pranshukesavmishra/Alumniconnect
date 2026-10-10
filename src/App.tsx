@@ -61,6 +61,15 @@ const NearbyPage = lazy(() => import('./features/location/NearbyPage').then((m) 
 const TripsPage = lazy(() => import('./features/location/TripsPage').then((m) => ({ default: m.TripsPage })))
 const CityPage = lazy(() => import('./features/location/CityPage').then((m) => ({ default: m.CityPage })))
 const AdminBadges = lazy(() => import('./features/admin/AdminBadges').then((m) => ({ default: m.AdminBadges })))
+const GivingHub = lazy(() => import('./features/giving/GivingHub').then((m) => ({ default: m.GivingHub })))
+const CampaignPage = lazy(() => import('./features/giving/CampaignPage').then((m) => ({ default: m.CampaignPage })))
+const MyGivingPage = lazy(() => import('./features/giving/MyGiving').then((m) => ({ default: m.MyGivingPage })))
+const TransparencyPage = lazy(() => import('./features/giving/Transparency').then((m) => ({ default: m.TransparencyPage })))
+const ReceiptPage = lazy(() => import('./features/giving/ReceiptPage').then((m) => ({ default: m.ReceiptPage })))
+const AdminFunds = lazy(() => import('./features/giving/admin/AdminFunds').then((m) => ({ default: m.AdminFunds })))
+const CampaignEditor = lazy(() => import('./features/giving/admin/CampaignEditor').then((m) => ({ default: m.CampaignEditor })))
+const SponsorDetail = lazy(() => import('./features/giving/admin/SponsorDetail').then((m) => ({ default: m.SponsorDetail })))
+const SponsorPrint = lazy(() => import('./features/giving/admin/SponsorPrint').then((m) => ({ default: m.SponsorPrint })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -211,6 +220,15 @@ export function App() {
             <Route path="admin/reports" element={m(<AdminModeration />)} />
             <Route path="admin/analytics" element={m(<RequirePerm any={['analytics']} what="Analytics"><AdminAnalytics /></RequirePerm>)} />
             <Route path="admin/community" element={m(<AdminCommunity />)} />
+            <Route path="give" element={m(<GivingHub />)} />
+            <Route path="give/mine" element={m(<MyGivingPage />)} />
+            <Route path="give/where-it-went" element={m(<TransparencyPage />)} />
+            <Route path="give/receipt/:id" element={m(<ReceiptPage />)} />
+            <Route path="give/:slug" element={m(<CampaignPage />)} />
+            <Route path="admin/funds" element={m(<RequirePerm any={['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage']} what="Funds"><AdminFunds /></RequirePerm>)} />
+            <Route path="admin/funds/campaign/:id" element={m(<RequirePerm any={['funds_manage']} what="Fund appeals"><CampaignEditor /></RequirePerm>)} />
+            <Route path="admin/funds/sponsor/:id" element={m(<RequirePerm any={['sponsors_manage']} what="Sponsors"><SponsorDetail /></RequirePerm>)} />
+            <Route path="admin/funds/sponsor/:id/print" element={m(<RequirePerm any={['sponsors_manage', 'funds_verify']} what="Sponsor documents"><SponsorPrint /></RequirePerm>)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
             <Route path="admin/events/:slug/badges" element={m(<AdminBadges />)} />

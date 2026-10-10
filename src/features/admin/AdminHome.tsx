@@ -1,4 +1,4 @@
-import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, HeartHandshake, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -81,6 +81,7 @@ export function AdminHome() {
         )}
         <div className="grid gap-3 sm:grid-cols-2">
           {can('members_view') && <TileLink to="/admin/members" icon={<Users className="size-5" aria-hidden />} title="Members" blurb="Edit profiles, verify, import" />}
+          {canAny(['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage']) && <TileLink to="/admin/funds" icon={<HeartHandshake className="size-5" aria-hidden />} title="Funds" blurb="Appeals, donations, sponsors, expenses, reports" />}
           {can('analytics') && <TileLink to="/admin/analytics" icon={<BarChart3 className="size-5" aria-hidden />} title="Analytics" blurb="Growth, batches, engagement" />}
           {can('community_*') && <TileLink to="/admin/community" icon={<Network className="size-5" aria-hidden />} title="Community" blurb="Approve circles, spotlight, batch sizes" />}
           {seesReports && can('moderation_*') && (

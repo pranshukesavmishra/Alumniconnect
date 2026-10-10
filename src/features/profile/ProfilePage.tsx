@@ -1,4 +1,4 @@
-import { BadgeCheck, Briefcase, Globe, GraduationCap, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
+import { BadgeCheck, Briefcase, Globe, GraduationCap, HeartHandshake, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
@@ -112,6 +112,9 @@ export function ProfilePage({ self }: { self?: boolean }) {
                 </ButtonLink>
                 <ButtonLink to="/me/import" variant="secondary" icon={<LinkedInIcon className="size-4" />}>
                   {tx('home.importLinkedin')}
+                </ButtonLink>
+                <ButtonLink to="/give" variant="secondary" icon={<HeartHandshake className="size-4" />}>
+                  {tx('give.giveBack')}
                 </ButtonLink>
               </>
             ) : (
