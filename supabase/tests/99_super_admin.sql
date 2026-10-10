@@ -1,4 +1,4 @@
--- Super admins and permission-scoped admins: last-super protection, who may grant, step-down, ownership transfer, legacy admins stay full,
+-- Super admins and permission-scoped admins: PERMANENT owners (the lock), who may grant, legacy admins stay full,
 -- grants are audited and notify, clients cannot write the flags or the grants table. Rolls back.
 \set ON_ERROR_STOP 1
 begin;
@@ -43,6 +43,7 @@ do $$ begin
   exception when check_violation then null; end;
 end $$;
 update public.profiles set is_super_admin = true where id = '9a000000-0000-0000-0000-0000000000a1';   -- the owners' recovery snippet
+insert into public.protected_owners (user_id) values ('9a000000-0000-0000-0000-0000000000a1');            -- ... and the lock that goes with it
 insert into public.admin_grants (user_id, permissions, granted_by) values
   ('9a000000-0000-0000-0000-0000000000b1', array['members_view'], '9a000000-0000-0000-0000-0000000000a1'),
   ('9a000000-0000-0000-0000-0000000000b2', array['events_team', 'moderation_hide'], '9a000000-0000-0000-0000-0000000000a1');
@@ -93,8 +94,8 @@ do $$ begin
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', true, array['members_view'])$q$) like '42501%', 'legacy admin cannot make admins';
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a3', false)$q$) like '42501%', 'or remove admin access';
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a3', true, null)$q$) like '42501%', 'not even their own';
-  assert public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000a3', true)$q$) like '42501%', 'cannot make themselves super';
-  assert public.t9s_fails($q$select public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000a3', true)$q$) like '42501%', 'cannot take ownership';
+  assert to_regprocedure('public.admin_set_super_admin(uuid,boolean)') is null and to_regprocedure('public.admin_transfer_ownership(uuid,boolean)') is null,
+    'there is no way to make a super admin or transfer ownership any more';
   assert public.t9s_fails($q$select public.admin_grant_role('9a000000-0000-0000-0000-0000000000c1', 'admin')$q$) like '42501%', 'the old role door is closed';
   assert public.t9s_fails($q$select public.admin_set_member('9a000000-0000-0000-0000-0000000000c1', true, null)$q$) like '42501%', 'and the member-flag door';
   assert public.t9s_fails($q$update public.profiles set is_admin = true where id = '9a000000-0000-0000-0000-0000000000c1'$q$) like '42501%', 'no direct admin flag';
@@ -122,7 +123,6 @@ select pg_temp.login('9a000000-0000-0000-0000-0000000000c1');
 set local role authenticated;
 do $$ begin
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', true)$q$) like '42501%', 'a member cannot make themselves admin';
-  assert public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000c1', true)$q$) like '42501%', 'or super';
   assert (select count(*) from public.admin_grants) = 0, 'a member sees no grants';
 end $$;
 reset role;
@@ -146,14 +146,20 @@ do $$ begin
 end $$;
 reset role;
 
--- ---------------------------------------------------------------- the last super admin cannot go
+-- ---------------------------------------------------------------- the owner lock, as the database owner (the strongest normal role)
 do $$ begin
-  begin update public.profiles set is_super_admin = false where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'last super removed';
-  exception when others then assert sqlerrm like '%at least one super admin%', sqlerrm; end;
-  begin delete from public.profiles where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'last super deleted';
-  exception when others then assert sqlerrm like '%at least one super admin%', sqlerrm; end;
-  begin delete from auth.users where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'last super account deleted';
-  exception when others then assert sqlerrm like '%at least one super admin%', sqlerrm; end;
+  begin update public.profiles set is_super_admin = false where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner demoted';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin update public.profiles set is_admin = false where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner admin flag removed';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin update public.profiles set verification = 'pending' where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner un-verified';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin update public.profiles set verification = 'rejected' where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner rejected';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin delete from public.profiles where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner profile deleted';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin delete from auth.users where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'owner account deleted';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
 end $$;
 
 -- ---------------------------------------------------------------- a super admin gives, changes and removes admin access
@@ -162,12 +168,10 @@ set local role authenticated;
 do $$
 declare r jsonb;
 begin
-  assert public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like 'P0001%last%' or
-         public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like '%at least one super admin%', 'the only super cannot step down';
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', true, array['not_a_permission'])$q$) like '%Unknown permission%', 'unknown keys are refused';
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', true, '{}')$q$) like '%at least one%', 'an empty list is refused';
-  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like '%super admin%', 'a super admin is not removed as an admin, not even by themselves';
-  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', true, array['members_view'])$q$) like '%super admin%', 'a super admin cannot be limited';
+  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like '%Ownership is locked%', 'an owner is not removed as an admin, not even by themselves';
+  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', true, array['members_view'])$q$) like '%Ownership is locked%', 'an owner cannot be limited';
   assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000ff', true, array['members_view'])$q$) like '%no longer exists%', 'unknown member';
 
   r := public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', true, array['moderation_reports', 'moderation_hide', 'moderation_hide'], 'Moderator for batch 2001');
@@ -251,81 +255,68 @@ do $$ begin
 end $$;
 reset role;
 
--- ---------------------------------------------------------------- making and removing super admins, stepping down
-select pg_temp.login('9a000000-0000-0000-0000-0000000000a1');
-set local role authenticated;
-do $$
-declare r jsonb;
-begin
-  r := public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000c1', true);
-  assert (r ->> 'changed')::boolean, 'Nina is super';
-  assert (select is_super_admin and is_admin from public.profiles where id = '9a000000-0000-0000-0000-0000000000c1'), 'super implies admin';
-  assert (select count(*) from public.admin_audit where action = 'super_admin_granted' and target_id = '9a000000-0000-0000-0000-0000000000c1') = 1, 'logged';
-  assert public.t9s_notes('9a000000-0000-0000-0000-0000000000c1', '%super admin%') >= 1, 'told';
-  r := public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000c1', true);
-  assert not (r ->> 'changed')::boolean, 'idempotent';
-  assert (select count(*) from public.admin_audit where action = 'super_admin_granted' and target_id = '9a000000-0000-0000-0000-0000000000c1') = 1, 'no second log line';
-  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000c1', false)$q$) like '%super admin%', 'a super admin is not removed as an admin';
-  -- with a second super, the first may step down (and stays a full admin)
-  r := public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000a1', false);
-  assert (r ->> 'changed')::boolean, 'stepped down';
-  assert (select is_admin and not is_super_admin from public.profiles where id = '9a000000-0000-0000-0000-0000000000a1'), 'still a full admin';
-end $$;
-reset role;
+-- ---------------------------------------------------------------- an owner is permanent against every door
 select pg_temp.login('9a000000-0000-0000-0000-0000000000a1');
 set local role authenticated;
 do $$ begin
-  assert public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000c1', true)$q$) like '42501%', 'the stepped-down owner cannot act as super any more';
-  assert public._admin_can('members_view'), 'but keeps full admin';
+  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like '%Ownership is locked%', 'owner cannot remove their own admin access';
+  assert public.t9s_fails($q$select public.admin_set_member('9a000000-0000-0000-0000-0000000000a1', false, null)$q$) like '%Ownership is locked%' , 'admin_set_member refuses to demote an owner';
+  assert public.t9s_fails($q$select public.admin_set_member('9a000000-0000-0000-0000-0000000000a1', null, 'rejected')$q$) like '%Ownership is locked%', 'or reject one';
+  assert public.t9s_fails($q$update public.profiles set is_super_admin = false where id = '9a000000-0000-0000-0000-0000000000a1'$q$) like '42501%', 'nor flip the flag through the API';
+  assert public.t9s_fails($q$select public.admin_bulk_set_verification(array['9a000000-0000-0000-0000-0000000000a1']::uuid[], 'rejected')$q$) like '%Ownership is locked%', 'nor bulk-reject';
 end $$;
 reset role;
--- the remaining super cannot remove themselves either
-select pg_temp.login('9a000000-0000-0000-0000-0000000000c1');
+-- another admin cannot touch an owner either (full admin a3, super-with-everything excluded)
+select pg_temp.login('9a000000-0000-0000-0000-0000000000a3');
 set local role authenticated;
 do $$ begin
-  assert public.t9s_fails($q$select public.admin_set_super_admin('9a000000-0000-0000-0000-0000000000c1', false)$q$) like '%at least one super admin%', 'the last super stays';
-  assert public.t9s_fails($q$select public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000c1', true)$q$) like '%another person%', 'cannot transfer to yourself';
-  assert public.t9s_fails($q$select public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000ff', true)$q$) like '%no longer exists%', 'unknown person';
+  assert public.t9s_fails($q$select public.admin_set_member('9a000000-0000-0000-0000-0000000000a1', false, null)$q$) like '%Ownership is locked%' , 'a full admin cannot demote an owner';
+  assert public.t9s_fails($q$select public.admin_set_member('9a000000-0000-0000-0000-0000000000a1', null, 'rejected')$q$) like '%Ownership is locked%', 'or reject one';
+  assert public.t9s_fails($q$select public.admin_bulk_set_verification(array['9a000000-0000-0000-0000-0000000000a1']::uuid[], 'pending')$q$) like '%Ownership is locked%', 'or un-verify in bulk';
+  assert public.t9s_fails($q$select public.admin_update_member('9a000000-0000-0000-0000-0000000000a1', '{"full_name":"Hacked"}'::jsonb, null)$q$) like '%Ownership is locked%', 'or edit an owner';
+  assert public.t9s_fails($q$select public.admin_merge_members('9a000000-0000-0000-0000-0000000000c1', '9a000000-0000-0000-0000-0000000000a1')$q$) like '%Ownership is locked%', 'or merge an owner away';
+  assert public.t9s_fails($q$select public.admin_set_admin('9a000000-0000-0000-0000-0000000000a1', false)$q$) like '42501%', 'or remove their admin access';
 end $$;
 reset role;
-
--- ---------------------------------------------------------------- transfer ownership
-select pg_temp.login('9a000000-0000-0000-0000-0000000000c1');
-set local role authenticated;
-do $$
-declare r jsonb;
-begin
-  -- keep both
-  r := public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000a1', false);
-  assert (r ->> 'changed')::boolean and not (r ->> 'stepped_down')::boolean, 'shared ownership';
-  assert (select count(*) from public.profiles where is_super_admin) = 2, 'two owners';
-  assert (select count(*) from public.admin_audit where action = 'ownership_transferred' and target_id = '9a000000-0000-0000-0000-0000000000a1') = 1, 'logged';
-  assert public.t9s_notes('9a000000-0000-0000-0000-0000000000a1', '%super admin%') >= 1, 'new owner told';
-  r := public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000a1', false);
-  assert not (r ->> 'changed')::boolean, 'again: nothing changes';
-  assert (select count(*) from public.admin_audit where action = 'ownership_transferred') = 1, 'one log line';
-  -- hand over and step down in one go, to a limited admin
-  r := public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000b1', true);
-  assert (r ->> 'changed')::boolean and (r ->> 'stepped_down')::boolean, 'handed over';
-  assert (select is_super_admin and is_admin from public.profiles where id = '9a000000-0000-0000-0000-0000000000b1'), 'the new owner is super';
-  assert not exists (select 1 from public.admin_grants where user_id = '9a000000-0000-0000-0000-0000000000b1'), 'their limited grant is gone (all access)';
-  assert (select not is_super_admin and is_admin from public.profiles where id = '9a000000-0000-0000-0000-0000000000c1'), 'the old owner stepped down, still admin';
-  assert (select count(*) from public.profiles where is_super_admin) = 2, 'two owners remain (a1 and the new one)';
+-- the grants table: owners never get a limiting row, and cannot lose one
+do $$ begin
+  begin insert into public.admin_grants (user_id, permissions) values ('9a000000-0000-0000-0000-0000000000a1', '{members_view}'); assert false, 'owner limited';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
 end $$;
-reset role;
--- an owner who handed over can no longer act as one
-select pg_temp.login('9a000000-0000-0000-0000-0000000000c1');
+-- the list of owners cannot change
+do $$ begin
+  begin delete from public.protected_owners; assert false, 'owner list deleted';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin update public.protected_owners set added_at = now(); assert false, 'owner list updated';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+  begin truncate public.protected_owners; assert false, 'owner list truncated';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
+end $$;
+-- members and anon cannot even read it
 set local role authenticated;
 do $$ begin
-  assert public.t9s_fails($q$select public.admin_transfer_ownership('9a000000-0000-0000-0000-0000000000c2', true)$q$) like '42501%', 'a stepped-down owner cannot transfer again';
+  assert public.t9s_fails($q$select * from public.protected_owners$q$) like '42501%', 'authenticated cannot read protected_owners';
+  assert public.t9s_fails($q$insert into public.protected_owners (user_id) values ('9a000000-0000-0000-0000-0000000000c1')$q$) like '42501%', 'or add to it';
 end $$;
 reset role;
-
--- ---------------------------------------------------------------- admins removed by the SQL snippet still leave an owner behind
+set local role anon;
+do $$ begin assert public.t9s_fails($q$select * from public.protected_owners$q$) like '42501%', 'anon neither'; end $$;
+reset role;
+-- a deliberate break-glass (what docs/ADMIN_ACCESS.md describes) works for the postgres role only, step by step
 do $$ begin
-  update public.profiles set is_super_admin = false where id = '9a000000-0000-0000-0000-0000000000a1';
-  begin update public.profiles set is_super_admin = false where id = '9a000000-0000-0000-0000-0000000000b1'; assert false, 'last owner removed';
-  exception when others then assert sqlerrm like '%at least one super admin%', sqlerrm; end;
+  drop trigger protected_owners_no_change on public.protected_owners;
+  drop trigger protected_owners_no_truncate on public.protected_owners;
+  drop trigger profiles_00_protect_owner on public.profiles;
+  drop trigger admin_grants_protect_owner on public.admin_grants;
+  delete from public.protected_owners where user_id = '9a000000-0000-0000-0000-0000000000a1';
+  perform public._restore_owner_locks();
+  assert (select count(*) from pg_trigger where tgname in ('protected_owners_no_change', 'protected_owners_no_truncate', 'profiles_00_protect_owner', 'admin_grants_protect_owner')) = 4,
+    'the restore step brings every lock back';
+  insert into public.protected_owners (user_id) values ('9a000000-0000-0000-0000-0000000000a1');
+end $$;
+do $$ begin
+  begin update public.profiles set verification = 'pending' where id = '9a000000-0000-0000-0000-0000000000a1'; assert false, 'locked again';
+  exception when others then assert sqlerrm like '%Ownership is locked%', sqlerrm; end;
 end $$;
 
 select 'ALL SUPER ADMIN TESTS PASSED';
