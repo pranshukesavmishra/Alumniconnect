@@ -20,6 +20,19 @@ drop policy if exists "glimpse curators delete" on storage.objects;
 create policy "glimpse curators delete" on storage.objects for delete to authenticated
   using (bucket_id = 'glimpses' and (storage.foldername(name))[1] = 'glimpses' and public._admin_can('gallery_manage'));
 
+-- Removing a file through the storage API first looks the file up as the person, so a delete policy alone does nothing: these let the
+-- people who may delete a file see it. (The buckets are public, so reading by address needs no policy; these only matter for the lookup.)
+drop policy if exists "glimpse curators see their files" on storage.objects;
+create policy "glimpse curators see their files" on storage.objects for select to authenticated
+  using (bucket_id = 'glimpses' and public._admin_can('gallery_manage'));
+drop policy if exists "gallery curators see their files" on storage.objects;
+create policy "gallery curators see their files" on storage.objects for select to authenticated
+  using (bucket_id = 'gallery' and public._admin_can('gallery_manage'));
+drop policy if exists "owners see their event photo files" on storage.objects;
+create policy "owners see their event photo files" on storage.objects for select to authenticated
+  using (bucket_id = 'event-photos' and ((storage.foldername(name))[1] = auth.uid()::text
+    or public._admin_can_any(array['events_edit', 'moderation_hide', 'photos_moderate'])));
+
 -- ------------------------------------------------------------------ table
 create table if not exists public.glimpses (
   id uuid primary key default gen_random_uuid(),
