@@ -102,6 +102,7 @@ export function SignInPage() {
             <div>
               <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
               <p className="text-sm text-hero-text">{tx('brand.college')}</p>
+              <p className="text-xs text-hero-text/70">{tx('brand.formerly')}</p>
             </div>
           </div>
           <h2 className="mt-8 text-[32px] font-extrabold leading-[1.1] tracking-tight md:text-5xl">{tx('auth.tagline1')}<br />{tx('auth.tagline2')}</h2>

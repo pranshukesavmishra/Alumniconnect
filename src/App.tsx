@@ -11,7 +11,7 @@ import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
 import { MeetPage } from './features/events/MeetPage'
 import { HomePage } from './features/home/HomePage'
-import { InstallPage, NotFoundPage, PrivacyPage, TermsPage } from './features/home/StaticPages'
+import { InstallPage, NotFoundPage, AboutPage, PrivacyPage, TermsPage } from './features/home/StaticPages'
 import { WelcomePage } from './features/onboarding/WelcomePage'
 import { isConfigured, supabase } from './lib/supabase'
 
@@ -232,6 +232,7 @@ export function App() {
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
             <Route path="admin/events/:slug/badges" element={m(<AdminBadges />)} />
+            <Route path="about" element={<AboutPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="install" element={<InstallPage />} />

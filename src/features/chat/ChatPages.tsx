@@ -568,7 +568,7 @@ export function ChatThreadPage() {
     const blockedRequest = chat.kind === 'dm' && chat.is_request && chat.started_by !== uid
     return {
       canReact: !deleted && !blockedRequest,
-      canReply: !deleted && chat.can_post && !blockedRequest,
+      canReply: !deleted && (chat.can_post || chat.can_reply) && !blockedRequest,
       canEdit: mine && !deleted && ['text', 'image', 'file'].includes(m.kind) && Date.now() - new Date(m.created_at).getTime() < EDIT_WINDOW_MS - 30_000,
       canDelete: !deleted && (mine || (chat.kind === 'group' && chat.is_group_admin)),
       adminDelete: !mine,
@@ -749,8 +749,8 @@ export function ChatThreadPage() {
                 <Button block loading={accept.isPending} onClick={() => accept.mutate(undefined, { onError: (e) => toast.error(friendlyError(e)) })}>{tx('chat.accept')}</Button>
               </div>
             </div>
-          ) : chat && !chat.can_post ? (
-            isGroup && !chat.joined && chat.group_kind !== 'batch' && chat.group_kind !== 'year' ? (
+          ) : chat && !chat.can_post && !(chat.can_reply && replyTo) ? (
+            isGroup && !chat.joined && !['batch', 'year', 'official', 'department'].includes(chat.group_kind ?? '') ? (
               <Button
                 block
                 loading={join.isPending}
@@ -762,9 +762,9 @@ export function ChatThreadPage() {
               </Button>
             ) : (
               <p className="flex min-h-12 items-center justify-center gap-2 text-center text-sm text-muted">
-                {chat.group_kind === 'channel' ? (
+                {chat.group_kind === 'channel' || chat.post_mode === 'staff_only' ? (
                   <>
-                    <Megaphone className="size-4" aria-hidden /> {tx('chat.adminsOnly')}
+                    <Megaphone className="size-4" aria-hidden /> {chat.can_reply ? tx('chat.staffOnlyReply') : tx('chat.adminsOnly')}
                   </>
                 ) : (
                   tx('chat.cantSend')

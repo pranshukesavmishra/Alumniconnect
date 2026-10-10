@@ -18,7 +18,7 @@ export interface ChatSummary {
   other_id: string | null
   group_id: string | null
   group_slug: string | null
-  group_kind: 'batch' | 'year' | 'circle' | 'channel' | 'meetup' | null
+  group_kind: 'batch' | 'year' | 'circle' | 'channel' | 'meetup' | 'official' | 'department' | null
   joined: boolean
   is_group_admin: boolean
   is_request: boolean
@@ -34,6 +34,8 @@ export interface ChatSummary {
   pinned_message: string | null
   can_post: boolean
   slow_mode_seconds: number
+  post_mode: 'everyone' | 'staff_only'
+  can_reply: boolean
 }
 
 const SELECT =

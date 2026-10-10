@@ -13,6 +13,7 @@ import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
 import { NoAccess, useAdminAccess } from './access'
+import { AdminOfficialGroups } from './AdminOfficialGroups'
 
 interface Circle {
   id: string
@@ -45,6 +46,7 @@ export function AdminCommunity() {
     <div>
       <PageHeader title="Community" subtitle="Circles, spotlight and batch sizes" back="/admin" />
       <Page className="space-y-8">
+        {can('community_circles') && <AdminOfficialGroups />}
         {can('community_circles') && <PendingCircles />}
         {can('community_spotlight') && <SpotlightEditor />}
         {can('community_batches') && <BatchSizes />}

@@ -1,86 +1,62 @@
 import clsx from 'clsx'
-import { CalendarHeart, Home, MessagesSquare, ShieldCheck, UserRound, Users } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { CalendarHeart, Home, Menu, MessagesSquare, Users, type LucideIcon } from 'lucide-react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useMatch } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
 import { useAutoPhoto } from '../../features/profile/useAutoPhoto'
-import { useMySiteRoles, useMyStaffEvents } from '../../features/events/queries'
 import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
 import { Avatar } from '../ui/Display'
 import { useT, type MsgKey } from '../../i18n'
+import { MenuSheet, SidebarMenu } from './MenuNav'
+
+export { useIsOrganiser } from './useMenuCtx'
 
 interface Tab {
   to: string
   label: MsgKey
-  icon: typeof Home
+  icon: LucideIcon
   end?: boolean
 }
 
-function useTabs(): Tab[] {
-  const tabs: Tab[] = [
-    { to: '/', label: 'nav.home', icon: Home, end: true },
-    { to: '/groups', label: 'nav.groups', icon: Users },
-    { to: '/meet', label: 'nav.meet', icon: CalendarHeart },
-    { to: '/chat', label: 'nav.chat', icon: MessagesSquare },
-    { to: '/me', label: 'nav.me', icon: UserRound },
-  ]
-  return tabs
-}
-
-/** Organisers get an extra entry: in the sidebar on desktop, on the Me page on phones (5 tabs max). */
-export function useIsOrganiser() {
-  const { data: profile } = useMyProfile()
-  const { data: staff } = useMyStaffEvents()
-  const { data: site } = useMySiteRoles()
-  return !!profile?.is_admin || !!staff?.length || !!site?.length
-}
+// The phone bar keeps four places and a Menu button; everything else lives in the registry (menu.ts).
+const TABS: Tab[] = [
+  { to: '/', label: 'nav.home', icon: Home, end: true },
+  { to: '/groups', label: 'nav.groups', icon: Users },
+  { to: '/meet', label: 'nav.meet', icon: CalendarHeart },
+  { to: '/chat', label: 'nav.chat', icon: MessagesSquare },
+]
 
 export function AppShell() {
   useAutoPhoto()
   const tx = useT()
-  const tabs = useTabs()
   const { data: profile } = useMyProfile()
-  const organiser = useIsOrganiser()
   const unread = useUnreadChats()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuBtn = useRef<HTMLButtonElement>(null)
+  const closeMenu = () => {
+    setMenuOpen(false)
+    requestAnimationFrame(() => menuBtn.current?.focus({ preventScroll: true }))
+  }
   useInboxLive()
   // Focused screens (an open chat, the registration form, the check-in scanner) use the whole height: no bottom tabs.
   const inChat = useMatch('/chat/:id')
   const inRegister = useMatch('/meet/register')
   const inCheckIn = useMatch('/admin/events/:slug/check-in')
   const focused = !!(inChat || inRegister || inCheckIn)
-  const desktopTabs = organiser ? [...tabs, { to: '/admin', label: 'nav.organise', icon: ShieldCheck } as Tab] : tabs
   return (
     <div className="min-h-dvh md:flex">
-      {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-4 py-6 backdrop-blur md:flex">
-        <Link to="/" className="mb-8 flex items-center gap-3 px-2">
+      {/* desktop sidebar: every destination, grouped */}
+      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-3 py-5 backdrop-blur md:flex">
+        <Link to="/" className="mb-5 flex items-center gap-3 px-3">
           <img src="/jec-logo.png" alt="" className="h-10 w-auto drop-shadow-sm" />
           <span className="leading-tight">
             <span className="block text-[17px] font-bold tracking-tight">JEC Alumni</span>
             <span className="block text-xs font-medium text-muted">Jabalpur Engineering College</span>
           </span>
         </Link>
-        <nav className="space-y-1" aria-label={tx('nav.main')}>
-          {desktopTabs.map((t) => (
-            <NavLink
-              key={t.to}
-              to={t.to}
-              end={t.end}
-              className={({ isActive }) =>
-                clsx(
-                  'flex min-h-12 items-center gap-3 rounded-2xl px-4 font-semibold transition-colors',
-                  isActive ? 'bg-primary text-on-primary shadow-[0_8px_20px_-10px_var(--primary)]' : 'text-muted hover:bg-surface-2 hover:text-text',
-                )
-              }
-            >
-              <t.icon className="size-5" aria-hidden />
-              {tx(t.label)}
-              {t.to === '/chat' && unread > 0 && <span className="ml-auto rounded-full bg-accent px-2 text-xs font-bold leading-5 text-[#2b1d00]">{unread}</span>}
-            </NavLink>
-          ))}
-        </nav>
+        <SidebarMenu />
         {profile && (
-          <Link to="/me" className="mt-auto flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card hover:bg-surface-2">
+          <Link to="/me" className="mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card hover:bg-surface-2" data-testid="sidebar-user">
             <Avatar src={profile.avatar_url} name={profile.full_name} size={40} />
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold">{profile.full_name || tx('nav.yourProfile')}</span>
@@ -98,7 +74,7 @@ export function AppShell() {
       {!focused && (
         <nav aria-label={tx('nav.main')} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
           <ul className="pointer-events-auto mx-auto flex max-w-md gap-1 rounded-[1.75rem] border border-border/70 bg-surface/85 p-1.5 shadow-pop backdrop-blur-xl">
-            {tabs.map((t) => (
+            {TABS.map((t) => (
               <li key={t.to} className="flex-1">
                 <NavLink
                   to={t.to}
@@ -122,9 +98,28 @@ export function AppShell() {
                 </NavLink>
               </li>
             ))}
+            <li className="flex-1">
+              <button
+                ref={menuBtn}
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={menuOpen}
+                className={clsx(
+                  'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 rounded-[1.25rem] text-[11px] font-semibold transition-colors',
+                  menuOpen ? 'bg-primary text-on-primary' : 'text-muted active:bg-surface-2',
+                )}
+              >
+                <span className="grid h-6 place-items-center">
+                  <Menu className="size-[22px]" aria-hidden />
+                </span>
+                {tx('menu.title')}
+              </button>
+            </li>
           </ul>
         </nav>
       )}
+      <MenuSheet open={menuOpen} onClose={closeMenu} />
     </div>
   )
 }

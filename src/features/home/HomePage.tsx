@@ -22,6 +22,7 @@ import { Composer } from '../community/Composer'
 import { FeedList } from '../community/FeedList'
 import { useGroups, useNotifications } from '../community/queries'
 import { LocationPromptCard } from '../location/LocationSharing'
+import { useVisibleMenu } from '../../components/layout/useMenuCtx'
 
 function greeting(): MsgKey {
   const h = Number(new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()))
@@ -71,6 +72,27 @@ function Landing() {
         </div>
       </div>
     </div>
+  )
+}
+
+/** A row of shortcuts picked from the menu registry (the entries marked quick). */
+function QuickActions() {
+  const tx = useT()
+  const items = useVisibleMenu().flatMap((s) => s.items).filter((i) => i.quick && i.to)
+  if (!items.length) return null
+  return (
+    <section aria-label={tx('menu.quick')}>
+      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {items.map((i) => (
+          <li key={i.id}>
+            <Link to={i.to!} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-surface px-1 py-2 text-center text-xs font-semibold hover:border-primary/40">
+              <i.icon className="size-5 text-primary" aria-hidden />
+              <span className="line-clamp-2 leading-tight">{tx(i.label)}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -140,6 +162,8 @@ export function HomePage() {
           </div>
         </Link>
       )}
+
+      <QuickActions />
 
       {comp.next && (
         <Card className="p-4">
