@@ -289,7 +289,7 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
           <span className="inline-flex items-center gap-1.5"><Stamp className="size-4" aria-hidden />{tx('photos.officialUploadBody')}</span>
         </Notice>
       ) : (
-        <Notice tone="info">{caps.member_uploads === 'approval' ? tx('photos.memberApprovalNote') : tx('photos.memberImmediateNote')}</Notice>
+        <Notice tone="info">{caps.member_uploads === 'approval' ? tx('photos.memberApprovalNote') : caps.member_uploads === 'off' ? tx('photos.uploadsOffNote') : tx('photos.memberImmediateNote')}</Notice>
       )}
 
       <div role="tablist" aria-label={tx('photos.kindLabel')} className="grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1">

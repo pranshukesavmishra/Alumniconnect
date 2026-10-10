@@ -28,19 +28,19 @@ export function useGlimpseAutoplay(): boolean {
 }
 
 /** True while the element is on screen and the tab is in front. */
-function useActive(ref: React.RefObject<HTMLElement | null>): boolean {
+function useActive(el: HTMLElement | null): boolean {
   const [inView, setInView] = useState(false)
   const [tabVisible, setTabVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
   useEffect(() => {
-    const el = ref.current
-    if (!el || typeof IntersectionObserver === 'undefined') {
+    if (!el) return
+    if (typeof IntersectionObserver === 'undefined') {
       setInView(true)
       return
     }
     const io = new IntersectionObserver(([e]) => setInView(!!e?.isIntersecting), { threshold: 0.35 })
     io.observe(el)
     return () => io.disconnect()
-  }, [ref])
+  }, [el])
   useEffect(() => {
     const on = () => setTabVisible(document.visibilityState !== 'hidden')
     document.addEventListener('visibilitychange', on)
@@ -58,7 +58,7 @@ export function GlimpseCarousel({ className }: { className?: string }) {
   const tx = useT()
   const { lang } = useLang()
   const { data: items } = useLiveGlimpses()
-  const root = useRef<HTMLElement | null>(null)
+  const [root, setRoot] = useState<HTMLElement | null>(null)
   const video = useRef<HTMLVideoElement | null>(null)
   const active = useActive(root)
   const autoplay = useGlimpseAutoplay()
@@ -85,7 +85,7 @@ export function GlimpseCarousel({ className }: { className?: string }) {
   const btn = 'grid size-11 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/65'
 
   return (
-    <section ref={root} aria-roledescription="carousel" aria-label={tx('glimpse.title')} className={clsx('relative overflow-hidden rounded-3xl bg-black shadow-pop', className)} data-testid="glimpse-carousel">
+    <section ref={setRoot} aria-roledescription="carousel" aria-label={tx('glimpse.title')} className={clsx('relative overflow-hidden rounded-3xl bg-black shadow-pop', className)} data-testid="glimpse-carousel">
       <div className="relative aspect-video w-full">
         {playing ? (
           <DriveVideo

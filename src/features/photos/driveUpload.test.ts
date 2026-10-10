@@ -96,7 +96,7 @@ describe('resumableUpload', () => {
   it('retries server errors (5xx) but not client errors', async () => {
     let n = 0
     const t: ChunkTransport = {
-      async put(_u, body, h) {
+      async put(_u, _b, h) {
         if (/^bytes \*\//.test(h['Content-Range']!)) return { status: 308, range: null, body: '' }
         n++
         return n < 3 ? { status: 503, range: null, body: '' } : { status: 200, range: null, body: JSON.stringify({ id: 'OKFILE12345' }) }

@@ -314,6 +314,7 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
 test('past meets: a draft Alumni Meet 2025 placeholder, admin creates a meet, everyone reads it, members see and add photos and videos, Hindi, menu and links', async ({ browser }) => {
   test.setTimeout(240_000)
   const tag = `pm${ts}`.slice(0, 12)
+  sql("delete from past_meets where slug <> 'alumni-meet-2025'") // earlier runs of this test
   const boss = await makeUser(`${tag}boss`, { admin: true, name: `Boss ${tag}` })
   const member = await makeUser(`${tag}m`, { name: `Mina ${tag}` })
 
@@ -403,7 +404,7 @@ test('past meets: a draft Alumni Meet 2025 placeholder, admin creates a meet, ev
   const up = await open(browser, boss, `/events/${sql(`select slug from events where id = '${eventId}'`)}/photos/upload`)
   await mockDrive(up.page, { origin: ORIGIN, onFinish: (b) => sql(`update event_photos set drive_file_id = '${String(b.file_id)}' where id = '${String(b.photo_id)}'`) })
   await up.go()
-  await up.page.locator('input[type=file]').setInputFiles([{ name: 'a.png', mimeType: 'image/png', buffer: png(200, 20, 20) }, fixture('clip.webm')])
+  await up.page.locator('input[type=file]').setInputFiles([{ name: 'a.png', mimeType: 'image/png', buffer: png(200, 20, 20) }, { name: 'c.webm', mimeType: 'video/webm', buffer: WEBM }])
   await expect(up.page.getByTestId('upload-progress')).toContainText('Finished: 2 of 2', { timeout: 60_000 })
   await up.ctx.close()
   expect(sql(`select count(*) from event_photos where event_id = '${eventId}' and source = 'official' and status = 'approved'`)).toBe('2')
