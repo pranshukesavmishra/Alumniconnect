@@ -9,17 +9,6 @@ import { useT } from '../../i18n'
 import { isActive, searchMenu, type MenuItem, type MenuSection } from './menu'
 import { useVisibleMenu } from './useMenuCtx'
 
-const COLLAPSED_KEY = 'menu-collapsed'
-
-function readCollapsed(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]')
-    return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []
-  } catch {
-    return []
-  }
-}
-
 /** One destination: a link (current page highlighted, aria-current) or the sign-out button. */
 function MenuRow({ item, active, big, onDone }: { item: MenuItem; active: boolean; big?: boolean; onDone?: () => void }) {
   const tx = useT()
@@ -60,26 +49,25 @@ function MenuRow({ item, active, big, onDone }: { item: MenuItem; active: boolea
 }
 
 /** The grouped list with a search box, shared by the desktop sidebar and the phone sheet. */
-function MenuList({ big, onDone, autoFocusSearch, collapsible }: { big?: boolean; onDone?: () => void; autoFocusSearch?: boolean; collapsible?: boolean }) {
+function MenuList({ big, onDone }: { big?: boolean; onDone?: () => void }) {
   const tx = useT()
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const all = useVisibleMenu()
   const [q, setQ] = useState('')
-  const [collapsed, setCollapsed] = useState<string[]>(readCollapsed)
+  // one section open at a time (accordion); the one holding the current page starts open
+  const [openId, setOpenId] = useState<string | null>(() => all.find((s) => s.id !== 'home' && s.items.some((i) => isActive(i, pathname)))?.id ?? null)
+  // landing on a page opens the section that holds it
+  useEffect(() => {
+    const id = all.find((s) => s.id !== 'home' && s.items.some((i) => isActive(i, pathname)))?.id
+    if (id) setOpenId(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
   const sections: MenuSection[] = useMemo(() => searchMenu(all, q, tx), [all, q, tx])
   const searching = q.trim().length > 0
 
   function toggle(id: string) {
-    setCollapsed((cur) => {
-      const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]
-      try {
-        localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next))
-      } catch {
-        /* storage may be unavailable */
-      }
-      return next
-    })
+    setOpenId((cur) => (cur === id ? null : id))
   }
 
   function onSearchKey(e: ReactKeyboardEvent<HTMLInputElement>) {
@@ -101,7 +89,6 @@ function MenuList({ big, onDone, autoFocusSearch, collapsible }: { big?: boolean
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onSearchKey}
-          autoFocus={autoFocusSearch}
           aria-label={tx('menu.search')}
           placeholder={tx('menu.jump')}
           enterKeyHint="go"
@@ -109,34 +96,38 @@ function MenuList({ big, onDone, autoFocusSearch, collapsible }: { big?: boolean
           className="min-h-11 w-full rounded-full border border-border bg-surface pl-10 pr-4 text-[15px] placeholder:text-muted"
         />
       </div>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pb-4" data-testid="menu-sections">
+      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain pb-4" data-testid="menu-sections">
         {sections.length === 0 && <p className="px-3 py-6 text-center text-muted">{tx('menu.noMatch', { q })}</p>}
         {sections.map((s) => {
-          const open = !collapsible || searching || !collapsed.includes(s.id) || s.id === 'home'
+          const open = searching || s.id === 'home' || openId === s.id
           const headId = `menu-h-${s.id}-${big ? 'm' : 'd'}`
           return (
             <section key={s.id} aria-labelledby={s.id === 'home' ? undefined : headId} aria-label={s.id === 'home' ? tx(s.label) : undefined} data-menu-group={s.id}>
-              {s.id !== 'home' &&
-                (collapsible ? (
-                  <h2 className="px-1">
-                    <button
-                      type="button"
-                      id={headId}
-                      aria-expanded={open}
-                      onClick={() => toggle(s.id)}
-                      className="flex min-h-9 w-full items-center justify-between rounded-xl px-2 text-xs font-bold uppercase tracking-wider text-muted hover:bg-surface-2"
-                    >
-                      <span>{tx(s.label)}</span>
-                      <ChevronDown className={clsx('size-4 transition-transform', !open && '-rotate-90')} aria-hidden />
-                    </button>
-                  </h2>
-                ) : (
-                  <h2 id={headId} className="px-3 pb-1 text-xs font-bold uppercase tracking-wider text-muted">
-                    {tx(s.label)}
-                  </h2>
-                ))}
+              {s.id !== 'home' && !searching && (
+                <h2>
+                  <button
+                    type="button"
+                    id={headId}
+                    aria-expanded={open}
+                    onClick={() => toggle(s.id)}
+                    className={clsx(
+                      'flex w-full items-center justify-between rounded-2xl px-3 text-left font-bold transition-colors hover:bg-surface-2',
+                      big ? 'min-h-14 text-[16px]' : 'min-h-11 text-[15px]',
+                      open && 'bg-surface-2',
+                    )}
+                  >
+                    <span>{tx(s.label)}</span>
+                    <ChevronDown className={clsx('size-5 text-muted transition-transform', !open && '-rotate-90')} aria-hidden />
+                  </button>
+                </h2>
+              )}
+              {s.id !== 'home' && searching && (
+                <h2 id={headId} className="px-3 pb-1 text-xs font-bold uppercase tracking-wider text-muted">
+                  {tx(s.label)}
+                </h2>
+              )}
               {open && (
-                <ul className="space-y-0.5">
+                <ul className={clsx('space-y-0.5', s.id !== 'home' && !searching && 'mt-1 border-l-2 border-border/70 pl-2 ml-4')}>
                   {s.items.map((i) => (
                     <li key={i.id}>
                       <MenuRow item={i} active={isActive(i, pathname)} big={big} onDone={onDone} />
@@ -157,7 +148,7 @@ export function SidebarMenu() {
   const tx = useT()
   return (
     <nav aria-label={tx('nav.main')} className="flex min-h-0 flex-1 flex-col" data-testid="sidebar-menu">
-      <MenuList collapsible />
+      <MenuList />
     </nav>
   )
 }
@@ -221,7 +212,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
 
   if (!open) return null
   return createPortal(
-    <div ref={panel} role="dialog" aria-modal="true" aria-label={tx('menu.title')} data-testid="menu-sheet" className="fixed inset-0 z-50 flex flex-col bg-bg pt-safe animate-[sheet-in_160ms_ease-out] md:hidden">
+    <div ref={panel} role="dialog" aria-modal="true" aria-label={tx('menu.title')} data-testid="menu-sheet" className="fixed inset-0 z-50 flex flex-col bg-bg pt-safe animate-[drawer-in_180ms_ease-out] md:hidden">
       <div className="mx-auto flex w-full max-w-md shrink-0 items-center gap-2 px-4 py-2">
         <h1 className="flex-1 text-[22px] font-bold tracking-tight">{tx('menu.title')}</h1>
         <button type="button" onClick={onClose} aria-label={tx('menu.close')} className="grid size-11 place-items-center rounded-full hover:bg-surface-2">
@@ -229,7 +220,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </button>
       </div>
       <div className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
-        <MenuList big autoFocusSearch onDone={() => {
+        <MenuList big onDone={() => {
             followed.current = true
             onClose()
           }} />

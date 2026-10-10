@@ -44,7 +44,7 @@ export function AppShell() {
   const inCheckIn = useMatch('/admin/events/:slug/check-in')
   const focused = !!(inChat || inRegister || inCheckIn)
   return (
-    <div className="min-h-dvh md:flex">
+    <div className={clsx('min-h-dvh md:flex', !focused && 'has-topbar')}>
       {/* desktop sidebar: every destination, grouped */}
       <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-3 py-5 backdrop-blur md:flex">
         <Link to="/" className="mb-5 flex items-center gap-3 px-3">
@@ -66,6 +66,28 @@ export function AppShell() {
         )}
       </aside>
 
+      {/* phone top bar: the menu opens from the top-left, where people look for it */}
+      {!focused && (
+        <div className="sticky top-0 z-30 border-b border-border/60 bg-bg/90 pt-safe backdrop-blur-xl md:hidden" data-testid="topbar">
+          <div className="mx-auto flex h-12 max-w-3xl items-center gap-1 px-2">
+            <button
+              ref={menuBtn}
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={menuOpen}
+              aria-label={tx('menu.title')}
+              className="grid size-11 place-items-center rounded-full text-text hover:bg-surface-2 active:bg-surface-2"
+            >
+              <Menu className="size-6" aria-hidden />
+            </button>
+            <Link to="/" className="flex min-w-0 items-center gap-2">
+              <img src="/jec-logo.png" alt="" className="h-7 w-auto" />
+              <span className="truncate text-[16px] font-bold tracking-tight">JEC Alumni Connect</span>
+            </Link>
+          </div>
+        </div>
+      )}
       <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(6rem+env(safe-area-inset-bottom))]')}>
         <Outlet />
       </main>
@@ -98,24 +120,6 @@ export function AppShell() {
                 </NavLink>
               </li>
             ))}
-            <li className="flex-1">
-              <button
-                ref={menuBtn}
-                type="button"
-                onClick={() => setMenuOpen(true)}
-                aria-haspopup="dialog"
-                aria-expanded={menuOpen}
-                className={clsx(
-                  'flex min-h-14 w-full flex-col items-center justify-center gap-0.5 rounded-[1.25rem] text-[11px] font-semibold transition-colors',
-                  menuOpen ? 'bg-primary text-on-primary' : 'text-muted active:bg-surface-2',
-                )}
-              >
-                <span className="grid h-6 place-items-center">
-                  <Menu className="size-[22px]" aria-hidden />
-                </span>
-                {tx('menu.title')}
-              </button>
-            </li>
           </ul>
         </nav>
       )}

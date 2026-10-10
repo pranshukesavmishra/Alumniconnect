@@ -22,11 +22,21 @@ test('desktop sidebar: grouped sections, jump box, collapse, and Organise only f
   const a = await member(browser, `nav.${run}@example.com`, `Navi ${run}`, { width: 1280, height: 800 }, { mobile: false })
   const side = a.page.getByTestId('sidebar-menu')
   await expect(side).toBeVisible()
-  for (const name of ['Community', 'Events & memories', 'Opportunities', 'Me']) await expect(side.getByRole('heading', { name, exact: true })).toBeVisible()
-  await expect(side.getByRole('heading', { name: 'Organise' })).toHaveCount(0)
-  for (const name of ['Home', 'Groups', 'Find JECians', 'Nearby JECians', 'Chat', 'Meet 2026', 'Jobs', 'Mentorship', 'Businesses', 'Ask JEC', 'My profile']) {
-    await expect(side.getByRole('link', { name })).toBeVisible()
+  for (const name of ['Community', 'Events & memories', 'Opportunities', 'Me']) await expect(side.getByRole('button', { name, exact: true })).toBeVisible()
+  await expect(side.getByRole('button', { name: 'Organise' })).toHaveCount(0)
+  // sections open one at a time
+  const open: Record<string, string[]> = {
+    Community: ['Groups', 'Find JECians', 'Nearby JECians', 'Chat'],
+    'Events & memories': ['Meet 2026'],
+    Opportunities: ['Jobs', 'Mentorship', 'Businesses', 'Ask JEC'],
+    Me: ['My profile'],
   }
+  await expect(side.getByRole('link', { name: 'Home' })).toBeVisible()
+  for (const [section, links] of Object.entries(open)) {
+    await side.getByRole('button', { name: section, exact: true }).click()
+    for (const name of links) await expect(side.getByRole('link', { name }).first()).toBeVisible()
+  }
+  await expect(side.getByRole('link', { name: 'Groups' })).toHaveCount(0)
   await expect(side.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
   await expect(a.page.getByTestId('sidebar-user')).toContainText(`Navi ${run}`)
 
@@ -41,10 +51,10 @@ test('desktop sidebar: grouped sections, jump box, collapse, and Organise only f
   await expect(side.getByText('Nothing matches')).toBeVisible()
   await side.getByLabel('Search the menu').fill('')
 
-  // collapsible, and remembered
+  // accordion: opening one closes the other
   await side.getByRole('button', { name: 'Community', exact: true }).click()
-  await expect(side.getByRole('link', { name: 'Groups' })).toHaveCount(0)
-  await a.page.reload()
+  await expect(side.getByRole('link', { name: 'Groups' })).toBeVisible()
+  await side.getByRole('button', { name: 'Opportunities', exact: true }).click()
   await expect(side.getByRole('link', { name: 'Groups' })).toHaveCount(0)
   await side.getByRole('button', { name: 'Community', exact: true }).click()
   await expect(side.getByRole('link', { name: 'Groups' })).toBeVisible()
@@ -54,7 +64,8 @@ test('desktop sidebar: grouped sections, jump box, collapse, and Organise only f
   sql(`update profiles set is_admin = true where id = '${id}'`)
   sql(`insert into admin_grants (user_id, permissions) values ('${id}', array['analytics']) on conflict (user_id) do update set permissions = excluded.permissions`)
   await a.page.reload()
-  await expect(side.getByRole('heading', { name: 'Organise' })).toBeVisible()
+  await expect(side.getByRole('button', { name: 'Organise', exact: true })).toBeVisible()
+  await side.getByRole('button', { name: 'Organise', exact: true }).click()
   await expect(side.getByRole('link', { name: 'Analytics' })).toBeVisible()
   await expect(side.getByRole('link', { name: 'Members' })).toHaveCount(0)
   await expect(side.getByRole('link', { name: 'Health' })).toHaveCount(0)
@@ -68,23 +79,33 @@ test('desktop sidebar: grouped sections, jump box, collapse, and Organise only f
   await a.ctx.close()
 })
 
-test('phone: bottom bar of five, Menu sheet opens, searches, navigates, closes with Esc and Back; no sideways scroll', async ({ browser }) => {
+test('phone: bottom bar of four, top-left Menu, Menu sheet opens, searches, navigates, closes with Esc and Back; no sideways scroll', async ({ browser }) => {
   const a = await member(browser, `nav2.${run}@example.com`, `Navtwo ${run}`)
   const bar = a.page.getByRole('navigation', { name: 'Main' })
   for (const name of ['Home', 'Groups', 'Meet 2026', 'Chat']) await expect(bar.getByRole('link', { name })).toBeVisible()
-  const menuBtn = bar.getByRole('button', { name: 'Menu' })
+  const menuBtn = a.page.getByTestId('topbar').getByRole('button', { name: 'Menu' })
   await expect(menuBtn).toBeVisible()
-  await expect(bar.getByRole('listitem')).toHaveCount(5)
+  await expect(bar.getByRole('button', { name: 'Menu' })).toHaveCount(0)
+  expect((await menuBtn.boundingBox())!.x).toBeLessThan(60)
+  await expect(bar.getByRole('listitem')).toHaveCount(4)
 
   await menuBtn.click()
   const sheet = a.page.getByRole('dialog', { name: 'Menu' })
   await expect(sheet).toBeVisible()
-  await expect(sheet.getByLabel('Search the menu')).toBeFocused()
-  for (const name of ['Community', 'Events & memories', 'Opportunities', 'Me']) await expect(sheet.getByRole('heading', { name, exact: true })).toBeVisible()
-  await expect(sheet.getByRole('heading', { name: 'Organise' })).toHaveCount(0)
+  await expect(sheet.getByLabel('Search the menu')).not.toBeFocused() // opening must not raise the keyboard
+  for (const name of ['Community', 'Events & memories', 'Opportunities', 'Me']) await expect(sheet.getByRole('button', { name, exact: true })).toBeVisible()
+  await expect(sheet.getByRole('button', { name: 'Organise' })).toHaveCount(0)
+  // hierarchical: a section's items show only when it is opened, one section at a time
+  await expect(sheet.getByRole('link', { name: 'Jobs' })).toHaveCount(0)
+  await sheet.getByRole('button', { name: 'Opportunities', exact: true }).click()
+  await expect(sheet.getByRole('link', { name: 'Jobs' })).toBeVisible()
+  await sheet.getByRole('button', { name: 'Community', exact: true }).click()
+  await expect(sheet.getByRole('link', { name: 'Jobs' })).toHaveCount(0)
+  await sheet.getByRole('button', { name: 'Me', exact: true }).click()
   await expect(sheet.getByRole('button', { name: 'Sign out' })).toBeVisible()
   expect(await noHScroll(a.page)).toBe(true)
   // big touch targets
+  await sheet.getByRole('button', { name: 'Community', exact: true }).click()
   const box = await sheet.getByRole('link', { name: 'Groups' }).boundingBox()
   expect(box!.height).toBeGreaterThanOrEqual(44)
 
@@ -138,7 +159,7 @@ test('phone: bottom bar of five, Menu sheet opens, searches, navigates, closes w
       await expect(a.page.getByRole('navigation', { name: 'Main' })).toBeVisible()
       expect(await noHScroll(a.page), `${path} at ${width}`).toBe(true)
     }
-    await a.page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Menu' }).click()
+    await a.page.getByTestId('topbar').getByRole('button', { name: 'Menu' }).click()
     await expect(a.page.getByRole('dialog', { name: 'Menu' })).toBeVisible()
     expect(await noHScroll(a.page), `menu at ${width}`).toBe(true)
     await a.page.keyboard.press('Escape')

@@ -178,3 +178,10 @@
 @media (prefers-reduced-motion: reduce) {
   [class*='animate-[fadeIn'] { animation: none !important; }
 }
+
+@keyframes drawer-in { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* phone: the global top bar already handles the notch, so page headers stack right under it */
+@media (max-width: 767px) {
+  .has-topbar main .pt-safe { padding-top: 0; }
+  .has-topbar main header.sticky { top: calc(3rem + env(safe-area-inset-top)); }
+}
