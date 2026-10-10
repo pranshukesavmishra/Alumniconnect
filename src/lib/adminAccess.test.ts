@@ -51,7 +51,7 @@ describe('presets and summaries', () => {
   it('summarises in plain words', () => {
     expect(summarize(null)).toMatch(/^Full admin/)
     expect(summarize([])).toBe('Nothing selected')
-    expect(summarize(['analytics', 'audit'])).toBe('2 of 30 permissions: Analytics, Activity log')
+    expect(summarize(['analytics', 'audit'])).toBe('2 of 32 permissions: Analytics, Activity log')
     expect(missing(['analytics'])).toHaveLength(PERMISSION_KEYS.length - 1)
     expect(missing(null)).toEqual([])
   })

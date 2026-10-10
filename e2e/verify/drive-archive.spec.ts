@@ -64,7 +64,7 @@ test('admin creates the Drive folder; a member photo original lands in Drive and
     await signInWithEmail(page, memberEmail)
     await onboard(page, `Drive Member ${run}`, '2006')
     sql(`update public.profiles set verification = 'verified' where id = (select id from auth.users where email = '${memberEmail}')`)
-    await page.goto('/meet/photos')
+    await page.goto('/meet/photos/upload')
     await expect(page.getByRole('tab', { name: 'Then (college days)' })).toBeVisible()
     await page.locator('input[type=file]').first().setInputFiles(ORIGINAL)
     await expect(page.getByText(/photo.? added/)).toBeVisible({ timeout: 60_000 })

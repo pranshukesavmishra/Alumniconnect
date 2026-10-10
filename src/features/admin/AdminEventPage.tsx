@@ -18,13 +18,14 @@ import { AdminPayments } from './AdminPayments'
 import { AdminPeople } from './AdminPeople'
 import { AdminSettings } from './AdminSettings'
 import { AdminProgramme } from './AdminProgramme'
+import { PhotoAdminTab } from '../photos/PhotoAdminTab'
 import { AdminResponses } from './AdminResponses'
 import { AdminTeam } from './AdminTeam'
 import { AdminWaitlist } from './AdminWaitlist'
 import { fundTotals, ticketRevenue } from './responses'
 import { useAdminData, useAdminEvent, useEventCaps, type AdminData } from './queries'
 
-type Tab = 'overview' | 'payments' | 'people' | 'responses' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'settings' | 'team'
+type Tab = 'overview' | 'payments' | 'people' | 'responses' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'photos' | 'settings' | 'team'
 
 export function AdminEventPage() {
   const { slug = '' } = useParams()
@@ -66,6 +67,7 @@ export function AdminEventPage() {
     caps.ledger && { id: 'finance' as const, label: 'Finance' },
     caps.registrations && { id: 'waitlist' as const, label: 'Waitlist' },
     caps.checkin && { id: 'dayof' as const, label: 'Day-of' },
+    caps.programme && { id: 'photos' as const, label: 'Photos' },
     (caps.editEvent || caps.tickets || caps.settings) && { id: 'settings' as const, label: 'Settings' },
     caps.team && { id: 'team' as const, label: 'Team' },
   ] as (TabDef | false)[]).filter((t): t is TabDef => !!t)
@@ -103,7 +105,7 @@ export function AdminEventPage() {
       </div>
       <Page wide className="space-y-4">
         {admin.error && <Notice tone="danger" title={friendlyError(admin.error)} />}
-        {tab !== 'settings' && tab !== 'team' && tab !== 'programme' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && (
+        {tab !== 'settings' && tab !== 'team' && tab !== 'programme' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && tab !== 'photos' && (
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" icon={<RefreshCw className={clsx('size-4', admin.isFetching && 'animate-spin')} />} onClick={() => admin.refetch()}>
               Refresh
@@ -120,6 +122,7 @@ export function AdminEventPage() {
         {tab === 'waitlist' && <AdminWaitlist event={data.event} />}
         {tab === 'dayof' && <AdminDayOf event={data.event} manager={manager} />}
         {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
+        {tab === 'photos' && <PhotoAdminTab event={data.event} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} eventTitle={data.event.title} />}
       </Page>
     </div>

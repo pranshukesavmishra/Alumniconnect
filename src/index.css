@@ -170,3 +170,11 @@
   body.print-badges, body.print-badges #root, body.print-badges main { background: #fff !important; }
   @page { size: A4; margin: 8mm; }
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*='animate-[fadeIn'] { animation: none !important; }
+}

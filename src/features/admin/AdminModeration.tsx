@@ -15,7 +15,7 @@ import { useAdminAccess } from './access'
 import { useModerationCaps } from './queries'
 
 interface ReportRow {
-  target_type: 'post' | 'comment' | 'message' | 'profile' | 'job' | 'help' | 'business'
+  target_type: 'post' | 'comment' | 'message' | 'profile' | 'job' | 'help' | 'business' | 'photo'
   target_id: string
   report_count: number
   last_reported: string
@@ -27,7 +27,7 @@ interface ReportRow {
   place: string | null
 }
 
-const KIND_LABEL: Record<ReportRow['target_type'], string> = { post: 'Post', comment: 'Comment', message: 'Chat message', profile: 'Profile', job: 'Job posting', help: 'Help request', business: 'Business listing' }
+const KIND_LABEL: Record<ReportRow['target_type'], string> = { post: 'Post', comment: 'Comment', message: 'Chat message', profile: 'Profile', job: 'Job posting', help: 'Help request', business: 'Business listing', photo: 'Event photo' }
 
 /** Every open report on one screen: read what was reported, then remove/hide it or dismiss the report. */
 export function useReports(status: 'open' | 'actioned' | 'dismissed', enabled = true) {
@@ -137,7 +137,7 @@ export function AdminModeration() {
                       </Button>
                     </div>
                   )}
-                  {status === 'actioned' && caps.hide && r.removed && ['post', 'comment', 'job', 'help', 'business'].includes(r.target_type) && (
+                  {status === 'actioned' && caps.hide && r.removed && ['post', 'comment', 'job', 'help', 'business', 'photo'].includes(r.target_type) && (
                     <Button
                       variant="secondary"
                       loading={act.isPending && act.variables?.r === r && act.variables.action === 'restore'}

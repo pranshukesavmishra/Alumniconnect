@@ -46,13 +46,15 @@ The screens only hide what you cannot use. Anyone who opens a screen they have n
 | `community_circles` | Approve circles, manage groups and channels |
 | `community_spotlight` | Choose the members in the spotlight |
 | `community_batches` | Set batch sizes |
+| `photos_moderate` | Event photos: approve, hide, delete and reorder them, choose whether member photos show at once or need approval, open a best-photo vote, download an event photo ZIP (logged). Also lets the person hide and dismiss reports about photos |
+| `gallery_manage` | The college gallery: add photos (from an event's photos or by upload), edit, feature, pair "Then & Now", remove, manage albums and filter chips, approve or decline member suggestions |
 | `analytics` | Growth and activity numbers |
 | `audit` | Read and download the activity log |
 | `health` | Backups, errors, storage, site health |
 | `admins` | See the list of admins and owners (changing it is for super admins only) |
 
 Ready-made sets when you make an admin: **Full admin**, **Finance & events**, **Content & community**, **Moderation only**,
-**Members & verification**, or **Custom** (tick exactly what you want). The "Review" step lists what they will and will not be able to do.
+**Members & verification**, **Photos & gallery**, or **Custom** (tick exactly what you want). The "Review" step lists what they will and will not be able to do.
 
 Notes on how the pieces fit:
 - Seeing a member's phone number needs `members_view`; changing it needs `members_edit` (and the member editor itself opens from the members list, so give both together).

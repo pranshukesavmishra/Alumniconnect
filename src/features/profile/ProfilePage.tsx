@@ -156,6 +156,8 @@ export function ProfilePage({ self }: { self?: boolean }) {
               { to: '/businesses', label: 'Businesses', hint: 'Support JECian-owned', icon: '🏪' },
               { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
               { to: '/people', label: tx('home.findJecians'), hint: tx('profile.findHint'), icon: '🔎' },
+              { to: '/gallery', label: tx('profile.gallery'), hint: tx('profile.galleryHint'), icon: '🖼️' },
+              { to: '/meet/photos?view=tagged', label: tx('profile.findPhotos'), hint: tx('profile.findPhotosHint'), icon: '📸' },
               { to: '/nearby', label: tx('nearby.title'), hint: tx('nearby.entryHint'), icon: '📍' },
               { to: '/trips', label: tx('trips.title'), hint: tx('trips.subtitle'), icon: '✈️' },
               { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },

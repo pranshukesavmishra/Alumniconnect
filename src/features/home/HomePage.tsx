@@ -12,6 +12,7 @@ import { daysUntil, formatDateRange } from '../../lib/format'
 import type { Profile } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { useEvent, useMyRegistration } from '../events/queries'
+import { GalleryStrips } from '../photos/GalleryStrips'
 import { StatusBadge } from '../events/StatusBadge'
 import { supabase } from '../../lib/supabase'
 import { useT, type MsgKey } from '../../i18n'
@@ -158,6 +159,7 @@ export function HomePage() {
         <>
           <LocationPromptCard />
           <Spotlight />
+          <GalleryStrips verified />
           <LatestJobs />
           <Birthdays />
           <Composer groups={groups} />

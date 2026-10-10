@@ -63,6 +63,12 @@ insert into public.event_messages (id, event_id, title, body, audience, status, 
   ('93000000-0000-0000-0000-0000000000a6', '93000000-0000-0000-0000-0000000000e2', 'Title here', 'Body text goes here', '{}', 'scheduled', now() + interval '1 day', '93000000-0000-0000-0000-0000000000a1');
 insert into public.event_photos (id, event_id, uploaded_by, storage_path, thumb_path) values
   ('93000000-0000-0000-0000-0000000000a7', '93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c1/p.jpg', '93000000-0000-0000-0000-0000000000c1/t.jpg');
+insert into public.event_photos (id, event_id, uploaded_by, storage_path, thumb_path) values
+  ('93000000-0000-0000-0000-0000000000af', '93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c2', '93000000-0000-0000-0000-0000000000c2/p.jpg', '93000000-0000-0000-0000-0000000000c2/t.jpg'),
+  ('93000000-0000-0000-0000-0000000000ae', '93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c3', '93000000-0000-0000-0000-0000000000c3/p.jpg', '93000000-0000-0000-0000-0000000000c3/t.jpg');
+insert into public.gallery_suggestions (photo_id, suggested_by, note) values ('93000000-0000-0000-0000-0000000000af', '93000000-0000-0000-0000-0000000000c2', 'nice');
+insert into public.photo_votes (id, event_id, title, closes_at) values ('93000000-0000-0000-0000-0000000000ad', '93000000-0000-0000-0000-0000000000e1', 'Best photo', now() + interval '1 day');
+insert into public.photo_vote_candidates (vote_id, photo_id) values ('93000000-0000-0000-0000-0000000000ad', '93000000-0000-0000-0000-0000000000a7'), ('93000000-0000-0000-0000-0000000000ad', '93000000-0000-0000-0000-0000000000af');
 insert into public.groups (id, kind, slug, name, is_approved) values ('93000000-0000-0000-0000-0000000000a8', 'circle', 'm93-circle', 'M93 Circle', false);
 insert into public.posts (id, author_id, body) values ('93000000-0000-0000-0000-0000000000a9', '93000000-0000-0000-0000-0000000000c1', 'A post');
 insert into public.chats (id, kind, dm_a, dm_b) values ('93000000-0000-0000-0000-0000000000d9', 'dm', '93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2');
@@ -141,7 +147,7 @@ insert into public.t93_cases values
   ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a6')$q$, 'a', 'messages_send'),
   ('post_announcement', $q$select public.post_announcement('93000000-0000-0000-0000-0000000000e1', 'Title', 'Body text', false)$q$, 'ac', 'messages_announcements'),
   ('event_announcement_audience', $q$select public.event_announcement_audience('93000000-0000-0000-0000-0000000000e1')$q$, 'ac', 'messages_announcements'),
-  ('moderate_photo', $q$select public.moderate_photo('93000000-0000-0000-0000-0000000000a7', true)$q$, 'ac', 'events_edit,moderation_hide'),
+  ('moderate_photo', $q$select public.moderate_photo('93000000-0000-0000-0000-0000000000a7', true)$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
   -- moderation: moderators and admins
   ('admin_reports', $q$select * from public.admin_reports('open')$q$, 'am', 'moderation_reports'),
   ('admin_dismiss_reports', $q$select public.admin_dismiss_reports('post', '93000000-0000-0000-0000-0000000000a9')$q$, 'am', 'moderation_reports'),
@@ -169,7 +175,27 @@ insert into public.t93_cases values
   ('check_in', $q$select public.check_in('93000000-0000-0000-0000-0000000000e2', 'JEC-M93002', false)$q$, 'a', 'events_checkin,events_registrations'),
   ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e1', 'Mem')$q$, 'atcv', 'events_checkin,events_registrations'),
   ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e2', 'Mem')$q$, 'a', 'events_checkin,events_registrations'),
-  ('event_arrivals', $q$select * from public.event_arrivals('93000000-0000-0000-0000-0000000000e1')$q$, 'atcv', 'events_checkin,events_registrations');
+  ('event_arrivals', $q$select * from public.event_arrivals('93000000-0000-0000-0000-0000000000e1')$q$, 'atcv', 'events_checkin,events_registrations'),
+  -- photos: the event's photo managers (admins with a photo permission, the content manager) and the college gallery curators
+  ('admin_set_photo_settings', $q$select public.admin_set_photo_settings('93000000-0000-0000-0000-0000000000e1', 'approval')$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_set_photo_settings', $q$select public.admin_set_photo_settings('93000000-0000-0000-0000-0000000000e2', 'approval')$q$, 'a', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_review_photos', $q$select public.admin_review_photos('93000000-0000-0000-0000-0000000000e1', array['93000000-0000-0000-0000-0000000000a7']::uuid[], 'hide')$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_reorder_photos', $q$select public.admin_reorder_photos('93000000-0000-0000-0000-0000000000e1', array['93000000-0000-0000-0000-0000000000a7']::uuid[])$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_edit_photo', $q$select public.admin_edit_photo('93000000-0000-0000-0000-0000000000af', 'cap', null, null)$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_log_photo_export', $q$select public.admin_log_photo_export('93000000-0000-0000-0000-0000000000e1', 3)$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_open_photo_vote', $q$select public.admin_open_photo_vote('93000000-0000-0000-0000-0000000000e1', 'Best photo ever', array['93000000-0000-0000-0000-0000000000af', '93000000-0000-0000-0000-0000000000ae']::uuid[], 24)$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_close_photo_vote', $q$select public.admin_close_photo_vote('93000000-0000-0000-0000-0000000000ad')$q$, 'ac', 'events_edit,moderation_hide,photos_moderate'),
+  ('admin_gallery_add', $q$select public.admin_gallery_add('{"storage_path":"gallery/nope.webp","thumb_path":"gallery/nope_t.webp"}'::jsonb)$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_update', $q$select public.admin_gallery_update(gen_random_uuid(), '{}'::jsonb)$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_remove', $q$select public.admin_gallery_remove(gen_random_uuid())$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_save_category', $q$select public.admin_gallery_save_category(null, 'Matrix chip', null)$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_reorder_categories', $q$select public.admin_gallery_reorder_categories(array[]::uuid[])$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_delete_category', $q$select public.admin_gallery_delete_category(gen_random_uuid())$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_save_album', $q$select public.admin_gallery_save_album(null, 'Matrix album', null, null)$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_delete_album', $q$select public.admin_gallery_delete_album(gen_random_uuid())$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_suggestions', $q$select * from public.admin_gallery_suggestions()$q$, 'a', 'gallery_manage'),
+  ('admin_gallery_decline_suggestion', $q$select public.admin_gallery_decline_suggestion(gen_random_uuid())$q$, 'a', 'gallery_manage');
+
 
 -- callers: anon, a plain member, each event role, a moderator, a legacy full admin (no grants row), a super admin, and one limited admin per permission
 create table public.t93_actors (label text, uid text, perm text);
@@ -391,6 +417,7 @@ insert into public.t93_rls values
   ('select * from public.event_messages', 'messages_send', false),
   ('select * from public.profile_private where id = ''93000000-0000-0000-0000-0000000000c1''', 'members_view', false),
   ('select * from public.reports', 'moderation_reports', false),
+  ('select * from public.gallery_suggestions', 'gallery_manage', false),
   ('select * from public.events where id = ''93000000-0000-0000-0000-0000000000e3''', pg_temp.fam('events_') || ',' || pg_temp.fam('money_') || ',' || pg_temp.fam('messages_'), false),
   ('select * from public.posts where id = ''93000000-0000-0000-0000-0000000000aa''', 'moderation_hide', false),
   ('select * from public.groups where id = ''93000000-0000-0000-0000-0000000000a8''', 'community_circles,' || pg_temp.fam('moderation_'), false),
@@ -441,7 +468,7 @@ begin
   assert bad = '', 'someone could write admin flags or grants:' || bad;
   -- limited admins see their own grant row and nobody else's; a super admin sees all of them
   assert pg_temp.seen('93100000-0000-0000-0000-000000000010'::uuid, 'select * from public.admin_grants') = 1, 'a limited admin reads only their own grant';
-  assert pg_temp.seen('93000000-0000-0000-0000-0000000000a2'::uuid, 'select * from public.admin_grants') = 30, 'a super admin reads every grant';
+  assert pg_temp.seen('93000000-0000-0000-0000-0000000000a2'::uuid, 'select * from public.admin_grants') = (select count(*) from public.admin_grants), 'a super admin reads every grant';
   assert pg_temp.seen('93000000-0000-0000-0000-0000000000c1'::uuid, 'select * from public.admin_grants') = 0, 'a member reads none';
 end $$;
 

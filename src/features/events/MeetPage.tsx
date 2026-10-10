@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, MapPin, Phone, Pin, Ticket } from 'lucide-react'
+import { CalendarDays, Clock, Images, MapPin, Phone, Pin, Ticket } from 'lucide-react'
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -94,6 +94,14 @@ export function MeetPage() {
         )}
 
         {!active && open && !waiting && !!session && <WaitlistCard eventId={event.id} />}
+
+        <Link to="/meet/photos" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+          <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><Images className="size-5" aria-hidden /></span>
+          <span className="min-w-0">
+            <span className="block font-semibold">{tx('meet.photosButton')}</span>
+            <span className="block truncate text-sm text-muted">{tx('meet.photosHint')}</span>
+          </span>
+        </Link>
 
         {!!announcements.data?.length && (
           <section aria-label="Announcements" className="space-y-2">

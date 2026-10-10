@@ -43,6 +43,18 @@ function describe(n: Notification, tx: (key: MsgKey, params?: Params) => string)
       return { text: tx('notif.nearbyTrip', { who, city: body }), to: '/nearby' }
     case 'admin_access':
       return { text: n.body ?? 'Your admin access changed', to: '/admin' }
+    case 'photo_tag':
+      return { text: tx('notif.photoTag', { who, event: body }), to: `/photo/${n.target_id}` }
+    case 'photo_approved':
+      return { text: tx('notif.photoApproved'), to: `/photo/${n.target_id}` }
+    case 'photo_winner':
+      return { text: tx('notif.photoWinner', { title: body }), to: `/photo/${n.target_id}` }
+    case 'photo_vote_result':
+      return { text: tx('notif.photoVoteResult', { title: body }), to: `/photo/${n.target_id}` }
+    case 'gallery_approved':
+      return { text: tx('notif.galleryApproved'), to: `/gallery?photo=${n.target_id}` }
+    case 'gallery_declined':
+      return { text: tx('notif.galleryDeclined'), to: '/gallery' }
     case 'invite_joined':
       return { text: tx('notif.invite', { who }), to: `/people/${n.actor?.id}` }
     default:

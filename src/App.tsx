@@ -19,6 +19,10 @@ import { isConfigured, supabase } from './lib/supabase'
 const RegisterPage = lazy(() => import('./features/events/RegisterPage').then((m) => ({ default: m.RegisterPage })))
 const MyRegistrationPage = lazy(() => import('./features/events/MyRegistrationPage').then((m) => ({ default: m.MyRegistrationPage })))
 const PhotosPage = lazy(() => import('./features/events/PhotosPage').then((m) => ({ default: m.PhotosPage })))
+const PhotoUploadPage = lazy(() => import('./features/events/PhotosPage').then((m) => ({ default: m.PhotoUploadPage })))
+const PhotoSlideshow = lazy(() => import('./features/photos/PhotoSlideshow').then((m) => ({ default: m.PhotoSlideshow })))
+const PhotoLink = lazy(() => import('./features/photos/PhotoLink').then((m) => ({ default: m.PhotoLink })))
+const GalleryPage = lazy(() => import('./features/photos/GalleryPage').then((m) => ({ default: m.GalleryPage })))
 const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const EditProfilePage = lazy(() => import('./features/profile/EditProfilePage').then((m) => ({ default: m.EditProfilePage })))
 const LinkedInImportPage = lazy(() => import('./features/profile/LinkedInImportPage').then((m) => ({ default: m.LinkedInImportPage })))
@@ -162,6 +166,13 @@ export function App() {
             <Route path="meet/register" element={m(<RegisterPage />)} />
             <Route path="meet/my" element={m(<MyRegistrationPage />)} />
             <Route path="meet/photos" element={m(<PhotosPage />)} />
+            <Route path="meet/photos/upload" element={m(<PhotoUploadPage />)} />
+            <Route path="meet/photos/slideshow" element={m(<PhotoSlideshow />)} />
+            <Route path="events/:slug/photos" element={m(<PhotosPage />)} />
+            <Route path="events/:slug/photos/upload" element={m(<PhotoUploadPage />)} />
+            <Route path="events/:slug/photos/slideshow" element={m(<PhotoSlideshow />)} />
+            <Route path="photo/:id" element={m(<PhotoLink />)} />
+            <Route path="gallery" element={m(<GalleryPage />)} />
             <Route path="groups" element={m(<GroupsPage />)} />
             <Route path="groups/:slug" element={m(<GroupPage />)} />
             <Route path="chat" element={m(<ChatListPage />)} />

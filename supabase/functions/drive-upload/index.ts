@@ -9,7 +9,7 @@ import { asService, asUser, currentUser, eq } from '../_shared/db.ts'
 import { createFolder, driveConfigured, ensureFolder, fileInfo, startResumableUpload } from '../_shared/google.ts'
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts'
 
-const MAX_BYTES = 40 * 1024 * 1024
+const MAX_BYTES = 25 * 1024 * 1024
 const MIME = /^image\/(jpeg|png|webp|heic|heif)$/
 
 Deno.serve(async (req) => {
@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
   if (body.action === 'create_root') return createRoot(req, user.id, body.event_id)
 
   if (!body.photo_id || !/^[0-9a-f-]{36}$/.test(body.photo_id)) return json(req, { error: 'Photo not found' }, 404)
-  const [photo] = await asUser(auth).select<{ id: string; event_id: string; uploaded_by: string; kind: string }>(
-    'event_photos', `select=id,event_id,uploaded_by,kind&id=${eq(body.photo_id)}`)
+  const [photo] = await asUser(auth).select<{ id: string; event_id: string; uploaded_by: string; kind: string; source: string | null }>(
+    'event_photos', `select=id,event_id,uploaded_by,kind,source&id=${eq(body.photo_id)}`)
   if (!photo || photo.uploaded_by !== user.id) return json(req, { error: 'Photo not found' }, 404)
 
   const admin = asService()
@@ -46,8 +46,9 @@ Deno.serve(async (req) => {
       const origin = req.headers.get('Origin')
       if (!isAllowedOrigin(origin)) return json(req, { error: 'Origin not allowed' }, 403)
       if (!body.mime_type || !MIME.test(body.mime_type)) return json(req, { error: 'Only photos can be archived' }, 400)
-      if (!body.size || body.size <= 0 || body.size > MAX_BYTES) return json(req, { error: 'Photo too large (max 40 MB)' }, 400)
-      const sub = await ensureFolder(photo.kind === 'throwback' ? 'Then (college days)' : 'Now (at the meet)', event.drive_folder_id)
+      if (!body.size || body.size <= 0 || body.size > MAX_BYTES) return json(req, { error: 'Photo too large (max 25 MB)' }, 400)
+      // the committee's photographer uploads go to their own folder; members' photos keep the old two
+      const sub = await ensureFolder(photo.source === 'official' ? 'Official photos' : photo.kind === 'throwback' ? 'Then (college days)' : 'Now (at the meet)', event.drive_folder_id)
       const [profile] = await admin.select<{ full_name: string; grad_year: number | null }>('profiles', `select=full_name,grad_year&id=${eq(user.id)}`)
       const who = `${profile?.full_name ?? 'Member'}${profile?.grad_year ? ` ${profile.grad_year}` : ''}`.replace(/[\\/:*?"<>|]/g, '')
       const ext = body.mime_type.split('/')[1]!.replace('jpeg', 'jpg')
