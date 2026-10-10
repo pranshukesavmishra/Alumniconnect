@@ -23,7 +23,7 @@ describe('menu registry', () => {
   })
 
   it('shows a visitor only the public entries', () => {
-    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'privacy', 'terms'])
+    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'about', 'privacy', 'terms'])
   })
 
   it('hides community entries from unverified members but keeps profile and settings', () => {
