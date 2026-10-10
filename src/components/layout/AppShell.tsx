@@ -3,6 +3,7 @@ import { CalendarHeart, Home, MessagesSquare, ShieldCheck, UserRound, Users } fr
 import type { ReactNode } from 'react'
 import { Link, NavLink, Outlet, useMatch } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
+import { useAutoPhoto } from '../../features/profile/useAutoPhoto'
 import { useMySiteRoles, useMyStaffEvents } from '../../features/events/queries'
 import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
 import { Avatar } from '../ui/Display'
@@ -35,6 +36,7 @@ export function useIsOrganiser() {
 }
 
 export function AppShell() {
+  useAutoPhoto()
   const tx = useT()
   const tabs = useTabs()
   const { data: profile } = useMyProfile()

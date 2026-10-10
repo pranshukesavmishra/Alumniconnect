@@ -289,7 +289,8 @@ test('waiting list: join when full, auto-offer on a cancellation, manual offer, 
   const own = await w1.db.from('event_waitlist').select('user_id').eq('event_id', ev.id)
   expect(own.data?.map((r) => r.user_id)).toEqual([w1.id])
 
-  // transfer a ticket to another member from the registration card
+  // transfer a ticket to another member from the registration card (two places are held by offers, so make room for the buyer)
+  sql(`update events set capacity = 4 where id = '${ev.id}'`)
   const buyer = await makeUser(`${tag}buy`, { name: `Buyer ${tag}` })
   const bought = await register(buyer, ev, true)
   const heir = await makeUser(`${tag}heir`, { name: `Zheir ${tag}` })
