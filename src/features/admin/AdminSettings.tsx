@@ -97,7 +97,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     if (!/^[a-z0-9-]{3,60}$/.test(f.slug)) errs.push('Web address name: use lowercase letters, numbers and dashes.')
     if (!f.title.trim()) errs.push('Title is required.')
     const pe = phoneError(f.contact_phone)
-    if (pe) errs.push(`Phone for questions: ${pe}`)
+    if (pe) errs.push(pe)
     if (f.upi_id && !isValidUpiId(f.upi_id)) errs.push('UPI ID looks wrong (expected something like name@okicici).')
     if (f.upi_id && !f.upi_payee_name.trim()) errs.push('Enter the payee name exactly as UPI apps show it.')
     for (const [k, label] of [['capacity', 'Max people'], ['eligible_from_year', 'Batches from'], ['eligible_to_year', 'Batches to']] as const) {
