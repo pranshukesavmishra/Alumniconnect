@@ -2,6 +2,7 @@
 // Style: respectful "आप", plain spoken Hindi, brand names (JEC, Alumni Connect, Alumni Meet) stay in English,
 // numbers/dates/codes stay in Western digits 0-9. Hindi treats 0 and 1 as singular (`_one`).
 import type { en } from './en'
+import { mediaHi } from './mediaHi'
 
 export const hi = {
   // registration form
@@ -1302,4 +1303,5 @@ export const hi = {
   'menu.org.health': 'स्वास्थ्य',
   'menu.org.activity': 'गतिविधि लॉग',
   'chat.staffOnlyReply': 'यहाँ केवल स्टाफ पोस्ट कर सकता है। जवाब देने के लिए किसी संदेश को देर तक दबाएँ।',
+  ...mediaHi,
 } as const satisfies Record<keyof typeof en, string>

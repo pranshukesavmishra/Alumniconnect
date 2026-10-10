@@ -23,7 +23,21 @@ describe('menu registry', () => {
   })
 
   it('shows a visitor only the public entries', () => {
-    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'about', 'privacy', 'terms'])
+    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'past-meets', 'about', 'privacy', 'terms'])
+  })
+
+  it('lists Past meets under Events & memories for everyone, signed in or not, and Content only for gallery curators', () => {
+    const events = (c: MenuCtx) => visibleMenu(c).find((x) => x.id === 'events')!.items.map((i) => i.id)
+    expect(events({ ...member, signedIn: false, verified: false })).toContain('past-meets')
+    expect(events(member)).toEqual(['meet', 'reunion-photos', 'gallery', 'programme', 'past-meets'])
+    const item = MENU.find((i) => i.id === 'past-meets')!
+    expect(item.to).toBe('/meets')
+    expect(isActive(item, '/meets/alumni-meet-2025')).toBe(true)
+    expect(isActive(item, '/meet')).toBe(false)
+    expect(ids({ ...member, access: limited(['gallery_manage']), organiser: true })).toContain('org-content')
+    expect(ids({ ...member, access: limited(['photos_moderate']), organiser: true })).not.toContain('org-content')
+    expect(ids(member)).not.toContain('org-content')
+    expect(MENU.find((i) => i.id === 'org-content')!.to).toBe('/admin/content')
   })
 
   it('hides community entries from unverified members but keeps profile and settings', () => {

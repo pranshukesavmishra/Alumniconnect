@@ -1,5 +1,6 @@
 // English: the source of truth for every message. hi.ts must define exactly the same keys.
 // Plural messages use `key_one` / `key_other` and are called as t('key', { count }).
+import { mediaEn } from './mediaEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1283,4 +1284,5 @@ export const en = {
   'menu.org.health': 'Health',
   'menu.org.activity': 'Activity log',
   'chat.staffOnlyReply': 'Only staff can post here. Long-press a message to reply.',
+  ...mediaEn,
 } as const satisfies Record<string, string>
