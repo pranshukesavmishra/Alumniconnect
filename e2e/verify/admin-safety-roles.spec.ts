@@ -190,7 +190,7 @@ test('the last admin and yourself are protected in the database, whatever the sc
   // yourself: an ordinary admin has no door at all, a super admin cannot use it on themselves
   const self = await boss.db.rpc('admin_revoke_role', { p_user: boss.id, p_role: 'admin', p_event: null, p_note: null })
   expect(self.error?.message).toContain('super admin only')
-  expect((await sup.db.rpc('admin_set_admin', { p_user: sup.id, p_enabled: false, p_permissions: null, p_note: null })).error?.message).toContain('super admin')
+  expect((await sup.db.rpc('admin_set_admin', { p_user: sup.id, p_enabled: false, p_permissions: null, p_note: null })).error?.message).toContain('Ownership is locked')
   expect(sql(`select is_admin from profiles where id = '${boss.id}'`)).toBe('t')
   // the last admin: even a direct update by the table owner is refused (one -c string = one transaction, so the first update is rolled back too)
   let message = ''

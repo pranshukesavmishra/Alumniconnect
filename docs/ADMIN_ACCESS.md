@@ -5,11 +5,11 @@ they need, can be changed later, and nobody can lock the association out.
 
 | Who | What they can do | Who can make them |
 |---|---|---|
-| **Super admin** (owner) | Everything. Also: make and remove admins, choose what each admin may do, make other super admins, hand over ownership. | Another super admin, or the one-time SQL snippet below |
-| **Full admin** | Everything an admin can do, including permissions added in future. Cannot make or remove admins or super admins. | A super admin |
-| **Limited admin** | Only the permissions a super admin ticked for them (list below). | A super admin |
-| **Moderator** (site role) | Reports, hiding content, slow mode, city meetups, across the community. | An admin with a moderation permission, or a super admin |
-| **Treasurer / Content manager / Check-in volunteer** (event roles) | Money / messages and programme / scanning tickets, **for one event only**. | An admin with the "Event teams" permission, or a super admin |
+| **Owner** (super admin) | Everything, forever. Makes admins and chooses their roles. **Owners are permanent**: nobody can remove, demote, un-verify, restrict or delete an owner, not even the owner themself. There is no "transfer ownership" and no "make another owner" in the app. | Set once in the database (see "Adding an owner") |
+| **Full admin** | Everything an admin can do, including permissions added in future. Cannot make or remove admins. | An owner |
+| **Role admin** (Treasurer, Event manager, Moderator, Department head, ...) | Only what the role allows (see "Roles"), for everyone or for one department or batch. | An owner |
+| **Moderator** (site role) | Reports, hiding content, slow mode, city meetups, across the community. | An admin with a moderation permission, or an owner |
+| **Treasurer / Content manager / Check-in volunteer** (event roles) | Money / messages and programme / scanning tickets, **for one event only**. | An admin with the "Event teams" permission, or an owner |
 
 Admins that existed before limited admins were introduced are **full admins**: nothing changed for them.
 
@@ -53,8 +53,29 @@ The screens only hide what you cannot use. Anyone who opens a screen they have n
 | `health` | Backups, errors, storage, site health |
 | `admins` | See the list of admins and owners (changing it is for super admins only) |
 
-Ready-made sets when you make an admin: **Full admin**, **Finance & events**, **Content & community**, **Moderation only**,
-**Members & verification**, **Photos & gallery**, or **Custom** (tick exactly what you want). The "Review" step lists what they will and will not be able to do.
+## Roles (templates) and scope
+
+When you make an admin you pick a **role**. A role is a ready-made set of the permissions above with a one-line explanation. You can still tick extra or fewer permissions (*Customise permissions*), or pick **Custom**.
+
+| Role | What it is for | Permissions | Scope |
+|---|---|---|---|
+| Full admin | Everything an admin can do, including future permissions | all | everyone |
+| Treasurer | Payments, refunds, finance ledger, money exports (and funds, once the Give Back module is installed) | `money_*`, `funds_*` | everyone |
+| Event manager | Runs events end to end | `events_*`, `photos_moderate` | everyone |
+| Registration desk | Works the door | `events_checkin`, `events_registrations` | everyone |
+| Communications officer | Announcements and messages to registrants | `messages_*` | everyone |
+| Moderator | Reports, hiding content, slow mode, meetups | `moderation_*` | everyone |
+| Community manager | Circles, groups, spotlight, batch sizes | `community_*` | everyone |
+| Photographer / gallery curator | Event photos and the college gallery | `photos_moderate`, `gallery_manage` | everyone |
+| Funds and sponsorship manager | Fundraising and sponsors (hidden until the Give Back module adds `funds_*` / `sponsors_*` permissions) | `funds_*`, `sponsors_*` | everyone |
+| Membership officer | The member list | `members_view/edit/verify/import/export` | everyone |
+| Auditor / viewer | Read-only insight | `analytics`, `audit`, `health` | everyone |
+| Department head | Sees and verifies only the members of one department; runs that department's groups and announcements | `members_view`, `members_verify` | **one department** (a branch name) |
+| Batch representative | Sees only the members of one batch year; runs that batch's groups | `members_view` | **one batch year** |
+
+The roles live in the table `admin_role_templates` (a family such as `money_*` expands to every matching permission, so a role grows when a permission is added). The "Registration desk" role has no read-only registrations permission to use: it holds `events_registrations`, which also allows editing registrations.
+
+**Scope is enforced by the database.** An admin whose scope is a department or a batch only ever sees or changes members inside it: the member list and ids, search, a member's timeline, "view as member", a member's e-mail, verifying (one by one or in bulk: one outsider in a bulk selection refuses the whole selection), the "needs your attention" counts, and the members' private details (phone) and notes. Whole-list tools (export, import, merge, duplicates, saved views) are for admins of everyone. Registrations and payments are not part of a scoped member role. A department head or batch rep also administers the groups whose department or batch matches their scope.
 
 Notes on how the pieces fit:
 - Seeing a member's phone number needs `members_view`; changing it needs `members_edit` (and the member editor itself opens from the members list, so give both together).
@@ -62,54 +83,95 @@ Notes on how the pieces fit:
 - `events_team` (and the moderation permissions, which let someone give the Moderator role) are powerful: an event role such as treasurer carries more than a limited admin's own list. Nobody can give a role to themselves except a super admin, but be careful whom you trust with these.
 - What other admins can see of the admin list: names and the Super badge. Only super admins see each person's permission list, who granted it, when, and the note.
 
-## Everyday tasks (super admins)
+## Everyday tasks (owners)
 
 Open **Organise → Roles → Admins and owners**.
 
-- **Make an admin**: *Make admin* → find the member (they must have signed in once) → pick a preset or Custom → *Review* → confirm. They get a notification.
-- **Change what an admin may do**: *Edit permissions* on their row. The change applies on their very next screen.
+- **Make an admin**: *Make admin* → find the member (they must have signed in once) → pick a **role** (each card explains it) → if the role is for one department or batch, choose which → optionally *Customise permissions* → *Review* → confirm. They get a notification.
+- **Change someone's role**: *Change role* on their row. It applies on their very next screen.
 - **Remove admin access**: *Remove admin access* → confirm. They lose every admin screen at once and are told.
-- **Make another super admin**: *Make super admin* → type the phrase shown → confirm.
-- **Remove someone's super admin status**: *Remove super admin status*. They stay a full admin. You cannot remove the last super admin.
-- Every one of these is written to the activity log (**Organise → Activity log → Roles**) with who did it, to whom, and the permissions before and after.
+- Owners show as **Owner · permanent** with a lock and have no buttons. Every change is written to the activity log (**Organise → Activity log → Roles**) with who did it, to whom, the role, the scope and the permissions before and after.
 
-## Handing over to a new committee
+## The owner lock
 
-1. The incoming person signs in once. Check they appear under **Organise → Members**.
-2. **Admins and owners → Transfer ownership**. Choose them.
-3. Choose **Add them as an owner** while you work together, or **Hand over and step down** when you are leaving. Stepping down keeps you a *full admin*.
-4. Type `TRANSFER OWNERSHIP` and confirm. They are told straight away.
-5. As the new owner, remove the old committee's admin access (*Remove admin access*), and make the new committee's admins with the presets above.
-6. Keep **two** super admins at all times. The app refuses to remove the last one.
+The owner accounts are the profiles that are super admins, listed in `public.protected_owners` (filled by a migration from the profiles that were super admins at the time, never from e-mail addresses in code). The database enforces, for every role including the database owner:
 
-## If no super admin can sign in (recovery)
+- an owner's `is_super_admin` / `is_admin` can never be set to false, and their verification can never leave `verified` (so they cannot be rejected, un-verified or restricted);
+- an owner's profile can never be deleted, so deleting the user in the Supabase dashboard (or any account-deletion flow) fails;
+- an owner's `admin_grants` row cannot be inserted, changed or deleted (owners always hold every permission);
+- `protected_owners` cannot be updated, deleted or truncated, and is invisible to the app;
+- `admin_set_admin`, `admin_set_member`, `admin_bulk_set_verification`, `admin_update_member` (by anyone but the owner themself) and `admin_merge_members` refuse an owner with the message "Ownership is locked".
 
-The app cannot lock you out: a super admin cannot be removed while they are the last one. If both owners lose their accounts
-anyway, anyone with access to the Supabase project can restore access from the **SQL Editor**. Replace the placeholder with the
-email the person signs in with (it must belong to somebody who has signed in to the app at least once):
+The older "at least one super admin" rule remains as a second safeguard. The functions `admin_set_super_admin` and `admin_transfer_ownership` no longer exist.
+
+## Adding an owner
+
+Owners are never made from the app. A person who has signed in once is made an owner by someone with access to the Supabase **SQL Editor** (replace the e-mail):
 
 ```sql
--- make this person a super admin
+begin;
 update public.profiles
    set is_admin = true, is_super_admin = true, verification = 'verified'
  where id = (select id from auth.users where email = 'new-owner@example.com');
+insert into public.protected_owners (user_id)
+  select id from auth.users where email = 'new-owner@example.com';
+commit;
 
--- check who the super admins are
-select p.full_name, u.email
-  from public.profiles p join auth.users u on u.id = p.id
- where p.is_super_admin;
+-- check who the owners are
+select p.full_name, u.email from public.protected_owners o
+  join public.profiles p on p.id = o.user_id join auth.users u on u.id = o.user_id;
 ```
 
-To see who holds which permissions: `select p.full_name, g.permissions from public.admin_grants g join public.profiles p on p.id = g.user_id;`
-(an admin with no row there is a full admin).
+From that moment they are permanent too.
 
-The SQL Editor runs as the database owner, so these statements are the one way around the screens; they are not written to the
-activity log by the app, so note in your committee records that you ran them.
+## Removing an owner (emergency only)
+
+> **WARNING. DO NOT DO THIS CASUALLY.** An owner is permanent on purpose. This is the break-glass procedure for the rare case that an owner account is compromised or an owner truly must go (for example someone who has left under dispute). It needs the `postgres` role in the Supabase SQL Editor, it switches off the protection for everyone while it runs, and nothing in the app records it. Do it with a second committee member watching, write down who, why and when, and finish **every** step, including the last one that puts the lock back. Never leave the triggers dropped.
+
+Run these steps in one SQL Editor session, in order. Replace `<OWNER-ID>` with the owner's id (`select id from auth.users where email = '...'`). Do **not** do this for the only owner without first adding another owner (the old "at least one super admin" rule will refuse otherwise).
+
+```sql
+begin;
+
+-- STEP 1: take the locks off (drops the five triggers that protect owners)
+drop trigger protected_owners_no_change   on public.protected_owners;
+drop trigger protected_owners_no_truncate on public.protected_owners;
+drop trigger profiles_00_protect_owner    on public.profiles;
+drop trigger admin_grants_protect_owner   on public.admin_grants;
+
+-- STEP 2: take the person off the list of permanent owners
+delete from public.protected_owners where user_id = '<OWNER-ID>';
+
+-- STEP 3: do what is needed. Pick ONE:
+--   (a) demote but keep as a member:
+update public.profiles set is_super_admin = false, is_admin = false where id = '<OWNER-ID>';
+--   (b) or delete the account completely (this deletes their profile and everything of theirs):
+-- delete from auth.users where id = '<OWNER-ID>';
+
+-- STEP 4: put every lock back (recreates the triggers; safe to run again)
+select public._restore_owner_locks();
+
+-- STEP 5: confirm four lock triggers exist and the right owners remain
+select tgname from pg_trigger where tgname in
+  ('protected_owners_no_change','protected_owners_no_truncate','profiles_00_protect_owner','admin_grants_protect_owner');
+select p.full_name from public.protected_owners o join public.profiles p on p.id = o.user_id;
+
+commit;
+```
+
+If anything errors, the `begin`/`commit` makes the whole thing roll back and nothing changes. Keep the record of who ran it, when and why.
+
+## If no owner can sign in (recovery)
+
+Owners cannot be removed, so this happens only when they lose their sign-in (e-mail account lost). Do not remove them: have them recover the e-mail account, or add a **new** owner with the snippet under "Adding an owner" and, if the old account must go, follow "Removing an owner (emergency only)".
+
+To see who holds which permissions: `select p.full_name, g.template_key, g.scope_kind, g.scope_value, g.permissions from public.admin_grants g join public.profiles p on p.id = g.user_id;` (an admin with no row there is a full admin).
 
 ## For developers
 
 - `public._admin_can('<permission>')` is the single check (true for super admins, true for admins without a limited grant, true when the key is in `admin_grants.permissions`). A trailing `*` asks about a family (`'events_*'`).
 - `public.admin_permission_catalog()` is the only list of valid keys; `src/lib/adminAccess.ts` mirrors it for the UI (an end-to-end test compares them).
 - Event-scoped checks are `public.has_event_cap(cap, event)`: "has the admin permission for this capability, or holds the matching event role".
-- `profiles.is_super_admin` and `public.admin_grants` are never writable from the client; only `admin_set_admin`, `admin_set_super_admin` and `admin_transfer_ownership` (SECURITY DEFINER, super admins only) change them.
-- Tests: `supabase/tests/99_safety_matrix.sql` calls every admin function as one limited admin per permission; `supabase/tests/99_super_admin.sql` covers the super-admin rules; `e2e/verify/admin-super.spec.ts` drives the screens.
+- `profiles.is_super_admin` and `public.admin_grants` are never writable from the client; only `admin_set_admin(user, enabled, permissions, note, template, scope_kind, scope_value)` (SECURITY DEFINER, owners only) changes the grants. Nothing in the app changes `is_super_admin`.
+- Scope helpers: `_scope_is_all()`, `_scope_ok(branch, grad_year)`, `_scope_ok_member(id)`, `_require_scope(id)`, `_require_scope_all()`. Any new member-facing admin function must call one of them (and refuse owners if it writes to a profile).
+- Tests: `supabase/tests/99_safety_matrix.sql` calls every admin function as one limited admin per permission; `supabase/tests/99_super_admin.sql` proves the owner lock; `supabase/tests/99_roles_scope.sql` covers templates and scope; `e2e/verify/admin-super.spec.ts` drives the screens.
