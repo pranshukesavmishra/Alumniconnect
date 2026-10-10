@@ -1289,7 +1289,7 @@ export const en = {
   'phone.countryAria': 'Country code: {country}, +{dial}. Change',
   'phone.errRequired': 'Please enter a mobile number.',
   'phone.errFormat': 'Choose the country and type the number without the country code.',
-  'phone.errDigits': 'A {country} number has {n} digits after +{dial}. Please check it.',
-  'phone.errRange': 'A {country} number has {min} to {max} digits after +{dial}. Please check it.',
+  'phone.errDigits': 'Numbers in {country} have {n} digits after +{dial}. Please check yours.',
+  'phone.errRange': 'Numbers in {country} have {min} to {max} digits after +{dial}. Please check yours.',
   'phone.errStartIn': 'An Indian mobile number has 10 digits and starts with 6, 7, 8 or 9.',
 } as const satisfies Record<string, string>
