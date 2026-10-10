@@ -8,10 +8,12 @@ import { Button } from '../../components/ui/Button'
 import { Badge, Card, KeyValue, Notice } from '../../components/ui/Display'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { LinkedInIcon } from '../../components/ui/Icons'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { useT } from '../../i18n'
 import { BRANCHES, CURRENT_YEAR, FUND_PRESETS, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { formatPaise } from '../../lib/money'
+import { formatPhone, normalizePhone } from '../../lib/phone'
 import type { CustomAnswer, EventQuestion, Experience, Profile } from '../../lib/types'
 import { useUpdateProfile, type ProfileUpdate } from '../profile/queries'
 import { useAddExperiences } from './queries'
@@ -109,7 +111,7 @@ export function ProfileCard({
         </div>
         <dl className="mt-1 divide-y divide-border">
           <KeyValue label={tx('rr.email')}>{email || '—'}</KeyValue>
-          <KeyValue label={tx('rr.mobile')}>{phone || '—'}</KeyValue>
+          <KeyValue label={tx('rr.mobile')}>{formatPhone(phone) || '—'}</KeyValue>
           <KeyValue label={tx('rr.batchBranch')}>{[profile.grad_year, profile.branch].filter(Boolean).join(' · ') || '—'}</KeyValue>
           <KeyValue label={tx('rr.cityCountry')}>{[profile.city, profile.country].filter(Boolean).join(', ') || '—'}</KeyValue>
           {reunion && <KeyValue label={tx('rr.currentRole')}>{[role.designation, role.company].filter(Boolean).join(tx('rr.at')) || '—'}</KeyValue>}
@@ -145,6 +147,7 @@ export function ProfileCard({
 function MissingDetailsForm({ profile, phone, experiences, missing }: { profile: Profile; phone: string | null; experiences: Experience[]; missing: ProfileField[] }) {
   const tx = useT()
   const update = useUpdateProfile()
+  const phoneError = usePhoneError()
   const role = currentRole(profile, experiences)
   const [f, setF] = useState({
     full_name: profile.full_name ?? '',
@@ -163,7 +166,10 @@ function MissingDetailsForm({ profile, phone, experiences, missing }: { profile:
   async function save() {
     const e: Partial<Record<ProfileField, string>> = {}
     if (has('full_name') && !f.full_name.trim()) e.full_name = tx('rr.errRequired')
-    if (has('phone') && !/^\+?[0-9 ]{10,16}$/.test(f.phone.trim())) e.phone = tx('rr.errPhone')
+    if (has('phone')) {
+      const pe = phoneError(f.phone, true)
+      if (pe) e.phone = pe
+    }
     if (has('grad_year') && !f.grad_year) e.grad_year = tx('rr.errRequired')
     if (has('branch') && !f.branch) e.branch = tx('rr.errRequired')
     if (has('city') && !f.city.trim()) e.city = tx('rr.errRequired')
@@ -181,7 +187,7 @@ function MissingDetailsForm({ profile, phone, experiences, missing }: { profile:
     if (has('designation')) p.current_title = f.designation.trim()
     if (has('company')) p.current_company = f.company.trim()
     try {
-      await update.mutateAsync({ profile: p, ...(has('phone') ? { phone: f.phone.trim() } : {}) })
+      await update.mutateAsync({ profile: p, ...(has('phone') ? { phone: normalizePhone(f.phone) } : {}) })
       toast.success(tx('rr.profileSaved'))
     } catch (err) {
       toast.error(friendlyError(err))
@@ -197,7 +203,7 @@ function MissingDetailsForm({ profile, phone, experiences, missing }: { profile:
       {has('full_name') && <Field label={tx('rr.fullName')} error={errors.full_name}>{(p) => <Input {...p} autoComplete="name" maxLength={120} value={f.full_name} onChange={set('full_name')} />}</Field>}
       {has('phone') && (
         <Field label={tx('rr.mobile')} error={errors.phone} hint={tx('rr.mobileHint')}>
-          {(p) => <Input {...p} type="tel" inputMode="tel" autoComplete="tel" maxLength={16} value={f.phone} onChange={set('phone')} />}
+          {(p) => <PhoneInput {...p} value={f.phone} onChange={(v) => setF((s) => ({ ...s, phone: v }))} />}
         </Field>
       )}
       {(has('grad_year') || has('branch')) && (
