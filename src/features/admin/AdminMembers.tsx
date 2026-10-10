@@ -8,9 +8,11 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Textarea } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { cn } from '../../lib/cn'
 import { BRANCHES, CURRENT_YEAR, MEMBER_TYPES, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { normalizePhone } from '../../lib/phone'
 import { formatDateTime } from '../../lib/format'
 import { cleanFilter, describeFilter, extraFilterCount, filterFromParams, filterToParams, PRESET_VIEWS, sameFilter, toRpcFilter, type MemberFilter, type MemberSort, type MemberStatus } from '../../lib/memberFilters'
 import { supabase } from '../../lib/supabase'
@@ -506,6 +508,7 @@ function FiltersSheet({ open, onClose, filter, views, onApply }: { open: boolean
 
 function MemberEditor({ id, isSelf, canEdit, canVerify, isSuper, onClose }: { id: string; isSelf: boolean; canEdit: boolean; canVerify: boolean; isSuper: boolean; onClose: () => void }) {
   const qc = useQueryClient()
+  const phoneError = usePhoneError()
   const { data, isLoading } = useQuery({
     queryKey: ['admin-member', id],
     queryFn: async () => {
@@ -541,10 +544,12 @@ function MemberEditor({ id, isSelf, canEdit, canVerify, isSuper, onClose }: { id
 
   async function save() {
     if (!f) return
+    const pe = phoneError(f.phone)
+    if (pe) return toast.error(pe)
     setBusy(true)
     const { phone, skills, ...rest } = f
     const fields = { ...rest, skills: (skills ?? '').split(',').map((x) => x.trim()).filter(Boolean) }
-    const { error } = await supabase.rpc('admin_update_member', { p_id: id, p_fields: fields, p_phone: phone ?? '' })
+    const { error } = await supabase.rpc('admin_update_member', { p_id: id, p_fields: fields, p_phone: normalizePhone(phone) })
     setBusy(false)
     if (error) return toast.error(friendlyError(error))
     toast.success('Profile updated')
@@ -648,7 +653,7 @@ function MemberEditor({ id, isSelf, canEdit, canVerify, isSuper, onClose }: { id
             </div>
             <Field label="City">{(x) => <Input {...x} value={f.city} onChange={set('city')} />}</Field>
             <Field label="Country">{(x) => <Input {...x} value={f.country} onChange={set('country')} />}</Field>
-            <Field label="Mobile (private)">{(x) => <Input {...x} type="tel" value={f.phone} onChange={set('phone')} />}</Field>
+            <Field label="Mobile (private)">{(x) => <PhoneInput {...x} value={f.phone ?? ''} onChange={(v) => setF((s) => ({ ...s!, phone: v }))} />}</Field>
             <EmailRow id={id} />
             <Field label="Headline">{(x) => <Input {...x} value={f.headline} onChange={set('headline')} maxLength={160} />}</Field>
             <Field label="About">{(x) => <Textarea {...x} value={f.about} onChange={set('about')} maxLength={2000} />}</Field>
@@ -762,6 +767,7 @@ function EmailRow({ id }: { id: string }) {
 
 /** Add a member who hasn't signed up yet. They claim the profile by signing in with the same email. */
 function AddMemberSheet({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
+  const phoneError = usePhoneError()
   const empty = { full_name: '', email: '', member_type: 'alumnus', branch: '', grad_year: '', city: '', current_title: '', current_company: '', phone: '', verified: true }
   const [f, setF] = useState(empty)
   const [busy, setBusy] = useState(false)
@@ -781,8 +787,10 @@ function AddMemberSheet({ open, onClose, onCreated }: { open: boolean; onClose: 
     setError(null)
     if (f.full_name.trim().length < 2) return setError('Please enter the member’s full name.')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) return setError('Please enter a valid email address.')
+    const pe = phoneError(f.phone)
+    if (pe) return setError(pe)
     setBusy(true)
-    const { data, error: err } = await supabase.functions.invoke('admin-create-member', { body: f })
+    const { data, error: err } = await supabase.functions.invoke('admin-create-member', { body: { ...f, phone: normalizePhone(f.phone) } })
     setBusy(false)
     if (err) {
       const body = await (err as { context?: Response }).context?.json?.().catch(() => null)
@@ -823,7 +831,7 @@ function AddMemberSheet({ open, onClose, onCreated }: { open: boolean; onClose: 
           <Field label="Company" optional>{(x) => <Input {...x} value={f.current_company} onChange={set('current_company')} />}</Field>
         </div>
         <Field label="City" optional>{(x) => <Input {...x} value={f.city} onChange={set('city')} />}</Field>
-        <Field label="Mobile (private)" optional>{(x) => <Input {...x} type="tel" value={f.phone} onChange={set('phone')} />}</Field>
+        <Field label="Mobile (private)" optional>{(x) => <PhoneInput {...x} value={f.phone} onChange={(v) => setF((s) => ({ ...s, phone: v }))} />}</Field>
         <label className="flex min-h-11 items-center gap-3">
           <input type="checkbox" checked={f.verified} onChange={(e) => setF({ ...f, verified: e.target.checked })} className="size-5 accent-[var(--primary)]" />
           <span>Mark as a verified JECian</span>

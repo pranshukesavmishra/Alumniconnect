@@ -9,6 +9,7 @@ import { asText, ist, safe, saveCsv, stamp } from './export'
 import { loggedExport } from './exportLog'
 import type { AdminData } from './queries'
 import { fundTotals, foodTally, live, perDay, pickupGroups, questionSummaries, responseRow, teamLists, ticketRevenue, tshirtTally, type Tally } from './responses'
+import { formatPhone, telHref } from '../../lib/phone'
 
 const TEAM_NAMES: Record<string, string> = {
   core: 'Core Team',
@@ -60,8 +61,8 @@ function Who({ r, extra }: { r: Registration; extra?: ReactNode }) {
         {extra && <span className="block text-muted">{extra}</span>}
       </span>
       {r.phone && (
-        <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={`tel:${r.phone.replace(/\s/g, '')}`}>
-          <Phone className="size-3.5" aria-hidden /> {r.phone}
+        <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={telHref(r.phone)}>
+          <Phone className="size-3.5" aria-hidden /> {formatPhone(r.phone)}
         </a>
       )}
     </li>
@@ -342,7 +343,7 @@ export function AdminResponses({ event, data }: { event: EventRow; data: AdminDa
         ) : (
           <List>
             {emergency.map((r) => (
-              <Who key={r.id} r={r} extra={[r.emergency_name && `Emergency: ${r.emergency_name} ${r.emergency_phone ?? ''}`, r.medical_notes && `Needs: ${r.medical_notes}`].filter(Boolean).join(' · ')} />
+              <Who key={r.id} r={r} extra={[r.emergency_name && `Emergency: ${r.emergency_name} ${formatPhone(r.emergency_phone)}`, r.medical_notes && `Needs: ${r.medical_notes}`].filter(Boolean).join(' · ')} />
             ))}
           </List>
         )}

@@ -5,13 +5,14 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { EmptyState, PageSkeleton } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { friendlyError } from '../../lib/errors'
 import { normalizeWebUrl } from '../../lib/linkedin/common'
+import { normalizePhone } from '../../lib/phone'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { BUSINESS_CATEGORIES, useBusiness, useSaveBusiness, type BusinessFields } from './queries'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
-const PHONE = /^\+?[0-9 ]{8,16}$/
 
 const EMPTY: BusinessFields = { name: '', category: '', city: '', description: '', offer: '', website_url: '', phone: '', whatsapp: false, email: '' }
 
@@ -48,6 +49,7 @@ export function AddBusinessPage() {
 }
 
 function BusinessForm({ editId, initial }: { editId?: string; initial: BusinessFields }) {
+  const phoneError = usePhoneError()
   const navigate = useNavigate()
   const save = useSaveBusiness(editId)
   const [f, setF] = useState<BusinessFields>(initial)
@@ -67,8 +69,9 @@ function BusinessForm({ editId, initial }: { editId?: string; initial: BusinessF
       url = normalizeWebUrl(f.website_url) ?? ''
       if (!url) errs.website_url = 'Please enter a valid web address.'
     }
-    const phone = f.phone.trim()
-    if (phone && !PHONE.test(phone)) errs.phone = 'Enter a phone number with 8 to 16 digits, like +91 98765 43210.'
+    const phone = normalizePhone(f.phone)
+    const pe = phoneError(f.phone)
+    if (pe) errs.phone = pe
     if (f.whatsapp && !phone) errs.phone = 'Add the phone number that is on WhatsApp.'
     if (f.email.trim() && !EMAIL.test(f.email.trim())) errs.email = 'Please enter a valid email address.'
     if (!url && !phone && !f.email.trim() && !errs.website_url && !errs.phone && !errs.email) errs.website_url = 'Add a website, phone or email so people can reach you.'
@@ -113,7 +116,7 @@ function BusinessForm({ editId, initial }: { editId?: string; initial: BusinessF
           <Field label="Website" optional error={errors.website_url} hint="Add a website, a phone number, an email, or any mix.">
             {(p) => <Input {...p} type="url" inputMode="url" value={f.website_url} onChange={set('website_url')} placeholder="https://" />}
           </Field>
-          <Field label="Phone" optional error={errors.phone}>{(p) => <Input {...p} type="tel" inputMode="tel" value={f.phone} onChange={set('phone')} maxLength={16} autoComplete="tel" />}</Field>
+          <Field label="Phone" optional error={errors.phone}>{(p) => <PhoneInput {...p} value={f.phone} onChange={(v) => setF((s) => ({ ...s, phone: v }))} />}</Field>
           <Checkbox checked={f.whatsapp} onChange={(v) => setF({ ...f, whatsapp: v })}>
             This number is on WhatsApp
           </Checkbox>

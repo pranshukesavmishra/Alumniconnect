@@ -4,8 +4,10 @@ import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { Card, Notice } from '../../components/ui/Display'
 import { ChoiceGroup, Field, Input, Select, Stepper } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { FOOD_PREFS, TSHIRT_SIZES } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { normalizePhone } from '../../lib/phone'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import { supabase } from '../../lib/supabase'
 import type { Registration, RegistrationItem } from '../../lib/types'
@@ -21,6 +23,7 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
   const [food, setFood] = useState(reg.food_pref ?? '')
   const [tshirt, setTshirt] = useState(reg.tshirt_size ?? '')
   const [phone, setPhone] = useState(reg.phone)
+  const phoneError = usePhoneError()
   const [fund, setFund] = useState(String(reg.fund_paise / 100))
   const [feedback, setFeedback] = useState(reg.feedback ?? '')
   const [reason, setReason] = useState('')
@@ -34,10 +37,12 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
   async function save() {
     if (!reason.trim()) return toast.error('Please write the reason for this change.')
     if (fundPaise === null) return toast.error('Reunion Fund: enter a valid amount in rupees (0 for none).')
+    const pe = phoneError(phone, true)
+    if (pe) return toast.error(pe)
     setBusy(true)
     const { error } = await supabase.rpc('admin_update_registration', {
       p_registration: reg.id,
-      p_details: { food_pref: food, tshirt_size: tshirt, phone, feedback, ...(fundPaise !== reg.fund_paise ? { fund_paise: fundPaise } : {}) },
+      p_details: { food_pref: food, tshirt_size: tshirt, phone: normalizePhone(phone), feedback, ...(fundPaise !== reg.fund_paise ? { fund_paise: fundPaise } : {}) },
       p_items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: qty[t.id] ?? 0 })),
       p_reason: reason.trim(),
       p_expected: reg.updated_at,
@@ -109,7 +114,7 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
           </Field>
           <Field label="Reunion Fund (₹)" hint="0 for none, otherwise ₹100 to ₹10,00,000. Changing it changes the amount due.">{(p) => <Input {...p} inputMode="decimal" value={fund} onChange={(e) => setFund(e.target.value)} />}</Field>
           <Field label="Feedback from the member" optional>{(p) => <Input {...p} value={feedback} maxLength={2000} onChange={(e) => setFeedback(e.target.value)} />}</Field>
-          <Field label="Mobile">{(p) => <Input {...p} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />}</Field>
+          <Field label="Mobile">{(p) => <PhoneInput {...p} value={phone} onChange={setPhone} />}</Field>
           <Field label="Reason for change" hint="Kept in the activity log.">{(p) => <Input {...p} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Called the desk: spouse also coming" />}</Field>
           <div className="flex gap-2">
             <Button loading={busy} onClick={save}>Save</Button>

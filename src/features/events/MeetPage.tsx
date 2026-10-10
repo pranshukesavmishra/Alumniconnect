@@ -14,6 +14,7 @@ import { clock, groupByDay, useAnnouncements, useProgramme } from './programme'
 import { registrationOpen, useEvent, useMyRegistration, useTicketTypes } from './queries'
 import { StatusBadge } from './StatusBadge'
 import { WaitlistCard } from './WaitlistCard'
+import { formatPhone, telHref } from '../../lib/phone'
 
 export function MeetPage() {
   const tx = useT()
@@ -203,7 +204,7 @@ export function MeetPage() {
               <div className="flex items-start gap-3 p-4">
                 <Phone className="mt-0.5 size-5 text-primary" aria-hidden />
                 <p className="text-[15px]">
-                  {tx('meet.questions')} {event.contact_phone && <a className="font-semibold text-primary" href={`tel:${event.contact_phone.replace(/\s/g, '')}`}>{event.contact_phone}</a>}
+                  {tx('meet.questions')} {event.contact_phone && <a className="font-semibold text-primary" href={telHref(event.contact_phone)}>{formatPhone(event.contact_phone)}</a>}
                   {event.contact_phone && event.contact_email && ' · '}
                   {event.contact_email && <a className="font-semibold text-primary" href={`mailto:${event.contact_email}`}>{event.contact_email}</a>}
                 </p>

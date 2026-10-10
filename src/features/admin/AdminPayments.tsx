@@ -14,6 +14,7 @@ import { indexAfterRemoval, reviewAction, stepIndex } from '../../lib/paymentQue
 import { useBulkReview } from './opsQueries'
 import { proofUrl, useReviewPayment, type AdminData } from './queries'
 import { usePaged } from '../../lib/paging'
+import { formatPhone, telHref } from '../../lib/phone'
 
 const REJECT_REASONS = [
   'UPI reference not found in our bank statement. Please check the 12-digit UTR and submit again.',
@@ -250,8 +251,8 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSel
             <dt className="text-muted">Mobile</dt>
             <dd>
               {reg?.phone ? (
-                <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={`tel:${reg.phone.replace(/\s/g, '')}`}>
-                  <Phone className="size-3.5" aria-hidden /> {reg.phone}
+                <a className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary" href={telHref(reg.phone)}>
+                  <Phone className="size-3.5" aria-hidden /> {formatPhone(reg.phone)}
                 </a>
               ) : (
                 '—'

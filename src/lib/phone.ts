@@ -191,6 +191,7 @@ export const phoneDigits = (raw: string | null | undefined): string => (raw ?? '
 
 /** Does the search text match this number, ignoring spaces and "+"? Also finds a national number inside an E.164 one. */
 export function phoneMatches(stored: string | null | undefined, query: string): boolean {
+  if (!/^[\d\s+()\-.]+$/.test(query.trim())) return false
   const q = phoneDigits(query)
   return q.length >= 3 && phoneDigits(stored).includes(q)
 }

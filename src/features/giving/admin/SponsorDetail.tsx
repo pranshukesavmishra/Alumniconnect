@@ -6,10 +6,12 @@ import { Page, PageHeader } from '../../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../../components/ui/Button'
 import { Badge, Card, Notice, PageSkeleton, SectionTitle } from '../../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../../components/ui/PhoneInput'
 import { Sheet } from '../../../components/ui/Sheet'
 import { friendlyError } from '../../../lib/errors'
 import { formatDate, formatDateTime } from '../../../lib/format'
 import { formatPaise } from '../../../lib/money'
+import { normalizePhone } from '../../../lib/phone'
 import { MemberPicker } from '../../admin/MemberPicker'
 import { useAdminAccess } from '../../admin/access'
 import { useUserId } from '../../auth/AuthProvider'
@@ -63,6 +65,7 @@ export function SponsorDetail() {
   const { data: s, isLoading, error } = useAdminSponsor(id)
   const pk = useAdminPackages({ event: s?.event_id, campaign: s?.campaign_id }, !!s)
   const { run, busy } = useRunner()
+  const phoneError = usePhoneError()
   const [f, setF] = useState({ name: '', logo: '', website: '', blurb: '', cname: '', cemail: '', cphone: '', alumni: '', alumniName: '', pkg: '', committed: '', inKind: false, kindValue: '', kindDesc: '', follow: '', wall: true, owner: '' })
   const [loaded, setLoaded] = useState(false)
   const [note, setNote] = useState('')
@@ -86,9 +89,11 @@ export function SponsorDetail() {
     const comm = money(f.committed, 'The agreed amount', { optional: true })
     const kv = f.inKind ? money(f.kindValue, 'The estimated value') : { paise: null, error: null }
     if (comm.error || kv.error) return setErr(comm.error ?? kv.error)
+    const pe = phoneError(f.cphone)
+    if (pe) return setErr(pe)
     setErr(null)
     await run(() => admin.saveSponsor(s!.id, { event_id: s!.event_id, campaign_id: s!.campaign_id, package_id: f.pkg || null, name: f.name, logo_path: f.logo || null, website: f.website, blurb: f.blurb, contact_name: f.cname, contact_email: f.cemail,
-      contact_phone: f.cphone, alumni_id: f.alumni || null, owner_id: f.owner || null, committed_paise: comm.paise, is_in_kind: f.inKind, in_kind_description: f.kindDesc, in_kind_value_paise: kv.paise, follow_up_on: f.follow || null, show_on_wall: f.wall }), 'Saved.')
+      contact_phone: normalizePhone(f.cphone), alumni_id: f.alumni || null, owner_id: f.owner || null, committed_paise: comm.paise, is_in_kind: f.inKind, in_kind_description: f.kindDesc, in_kind_value_paise: kv.paise, follow_up_on: f.follow || null, show_on_wall: f.wall }), 'Saved.')
   }
   async function stage(to: string) {
     if (to === 'declined' && !window.confirm('Mark this sponsor as declined?')) return
@@ -127,7 +132,7 @@ export function SponsorDetail() {
           <Field label="Contact person" optional>{(p) => <Input {...p} value={f.cname} onChange={(e) => set('cname', e.target.value)} />}</Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Contact e-mail" optional>{(p) => <Input {...p} type="email" value={f.cemail} onChange={(e) => set('cemail', e.target.value)} />}</Field>
-            <Field label="Contact phone" optional>{(p) => <Input {...p} type="tel" value={f.cphone} onChange={(e) => set('cphone', e.target.value)} />}</Field>
+            <Field label="Contact phone" optional>{(p) => <PhoneInput {...p} value={f.cphone} onChange={(v) => set('cphone', v)} />}</Field>
           </div>
           <div className="space-y-2">
             <p className="text-sm font-semibold">Alumnus who brought them</p>
