@@ -62,7 +62,7 @@ declare t jsonb;
 begin
   t := public.admin_role_templates();
   assert jsonb_array_length(t) >= 11, 'the screen gets the templates';
-  assert not exists (select 1 from jsonb_array_elements(t) x where x ->> 'key' = 'funds_sponsorship'), 'a role with no permissions yet is hidden';
+  assert exists (select 1 from jsonb_array_elements(t) x where x ->> 'key' = 'funds_sponsorship' and x -> 'permissions' @> '"funds_verify"'::jsonb and x -> 'permissions' @> '"sponsors_manage"'::jsonb), 'the funds role appears now that the Give Back permissions exist';
   assert (select x -> 'permissions' from jsonb_array_elements(t) x where x ->> 'key' = 'treasurer') @> '"money_payments"'::jsonb, 'permissions are expanded';
   assert public.t9r_fails($q$select public.admin_role_templates()$q$) is null, 'admins can read them';
 end $$;
