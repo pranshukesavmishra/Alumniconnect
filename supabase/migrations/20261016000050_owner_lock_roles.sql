@@ -279,6 +279,22 @@ create policy "admins read member notes" on public.admin_member_notes for select
   using (public._admin_can('members_view') and ((select public._scope_is_all()) or public._scope_ok_member(member_id)));
 
 -- ------------------------------------------------------------------ patch the member-facing admin functions in place
+-- Matches the text exactly first; if the live function differs only in spacing or indentation (it can, depending on the
+-- order older migrations were applied), match it again treating every run of whitespace as equivalent.
+create or replace function pg_temp.flex_replace(def text, p_from text, p_to text)
+returns text
+language plpgsql
+as $$
+declare
+  rx text;
+begin
+  if position(p_from in def) > 0 then return replace(def, p_from, p_to); end if;
+  rx := regexp_replace(p_from, '([\\^$.|?*+()\[\]{}])', '\\\1', 'g');
+  rx := regexp_replace(rx, '\s+', '\s+', 'g');
+  if def !~ rx then return def; end if;
+  return regexp_replace(def, rx, replace(p_to, '\', '\\'));
+end $$;
+
 create or replace function pg_temp.patch(p_fn text, p_from text, p_to text)
 returns void
 language plpgsql
@@ -289,7 +305,7 @@ declare
 begin
   select pg_get_functiondef(p.oid) into strict def from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = p_fn and p.prokind = 'f';
-  new_def := replace(def, p_from, p_to);
+  new_def := pg_temp.flex_replace(def, p_from, p_to);
   if new_def = def then raise exception 'function % has nothing to replace for %', p_fn, p_from; end if;
   execute new_def;
 end $$;
@@ -300,11 +316,16 @@ language plpgsql
 as $$
 declare
   def text;
+  d1 text;
+  d2 text;
 begin
   select pg_get_functiondef(p.oid) into strict def from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = p_fn and p.prokind = 'f';
-  if position(a1 in def) = 0 or position(a2 in def) = 0 then raise exception 'function % has nothing to replace', p_fn; end if;
-  execute replace(replace(def, a1, b1), a2, b2);
+  d1 := pg_temp.flex_replace(def, a1, b1);
+  if d1 = def then raise exception 'function % has nothing to replace (first part)', p_fn; end if;
+  d2 := pg_temp.flex_replace(d1, a2, b2);
+  if d2 = d1 then raise exception 'function % has nothing to replace (second part)', p_fn; end if;
+  execute d2;
 end $$;
 
 do $$
