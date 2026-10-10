@@ -49,7 +49,8 @@ begin
   assert (select scope_kind from public.admin_role_templates where key = 'department_head') = 'department'
      and (select scope_kind from public.admin_role_templates where key = 'batch_rep') = 'batch', 'scoped roles';
   assert public._expand_permissions(array['money_*']) @> array['money_payments', 'money_refunds', 'money_finance', 'money_exports'], 'families expand';
-  assert public._expand_permissions(array['funds_*', 'nonsense']) = '{}', 'unknown keys and empty families expand to nothing';
+  assert public._expand_permissions(array['zzz_*', 'nonsense']) = '{}', 'unknown keys and empty families expand to nothing';
+  assert public._expand_permissions(array['funds_*', 'sponsors_*']) @> array['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'], 'the Give Back families expand';
   -- every non-empty template only names real permissions
   assert not exists (select 1 from public.admin_role_templates t, unnest(t.permissions) k
                       where k not like '%*' and k not in (select key from public._permission_catalog())), 'templates name real permissions';
@@ -61,7 +62,7 @@ declare t jsonb;
 begin
   t := public.admin_role_templates();
   assert jsonb_array_length(t) >= 11, 'the screen gets the templates';
-  assert not exists (select 1 from jsonb_array_elements(t) x where x ->> 'key' = 'funds_sponsorship'), 'a role with no permissions yet is hidden';
+  assert exists (select 1 from jsonb_array_elements(t) x where x ->> 'key' = 'funds_sponsorship' and x -> 'permissions' @> '"funds_verify"'::jsonb and x -> 'permissions' @> '"sponsors_manage"'::jsonb), 'the funds role appears now that the Give Back permissions exist';
   assert (select x -> 'permissions' from jsonb_array_elements(t) x where x ->> 'key' = 'treasurer') @> '"money_payments"'::jsonb, 'permissions are expanded';
   assert public.t9r_fails($q$select public.admin_role_templates()$q$) is null, 'admins can read them';
 end $$;
@@ -86,7 +87,8 @@ begin
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b2', true, null, null, 'batch_rep', 'batch', 'soon')$q$) like '%batch year%', 'a batch must be a year';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'treasurer', 'department', 'MCA')$q$) like '%not limited%', 'a treasurer is not scoped';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'nope')$q$) like '%Unknown role%', 'unknown role';
-  assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'funds_sponsorship')$q$) like '%no permissions%', 'an empty role cannot be given';
+  assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'funds_sponsorship')$q$) is null, 'the funds role can be given now that the permissions exist';
+  assert (select permissions @> array['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'] from public.admin_grants where user_id = '9c000000-0000-0000-0000-0000000000b3'), 'and it grants the four funds permissions';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, null, 'department', 'MCA')$q$) like '%list of permissions%', 'scope needs limited permissions';
 
   r := public.admin_set_admin('9c000000-0000-0000-0000-0000000000b1', true, null, 'MCA HOD', 'department_head', 'department', 'MCA');

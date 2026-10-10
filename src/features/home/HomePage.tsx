@@ -12,6 +12,7 @@ import { daysUntil, formatDateRange } from '../../lib/format'
 import type { Profile } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { useEvent, useMyRegistration } from '../events/queries'
+import { FeaturedGiveCard } from '../giving/FeaturedGiveCard'
 import { GalleryStrips } from '../photos/GalleryStrips'
 import { StatusBadge } from '../events/StatusBadge'
 import { supabase } from '../../lib/supabase'
@@ -181,6 +182,7 @@ export function HomePage() {
 
       {verified ? (
         <>
+          <FeaturedGiveCard />
           <LocationPromptCard />
           <Spotlight />
           <GalleryStrips verified />

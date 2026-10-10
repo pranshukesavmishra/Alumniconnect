@@ -2,6 +2,7 @@ import { CalendarDays, Clock, Images, MapPin, Phone, Pin, Ticket } from 'lucide-
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
+import { SponsorStrip } from '../giving/SponsorWall'
 import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { MEET_SLUG, yearRange } from '../../lib/constants'
 import { useT } from '../../i18n'
@@ -102,6 +103,8 @@ export function MeetPage() {
             <span className="block truncate text-sm text-muted">{tx('meet.photosHint')}</span>
           </span>
         </Link>
+
+        <SponsorStrip event={event.id} />
 
         {!!announcements.data?.length && (
           <section aria-label="Announcements" className="space-y-2">

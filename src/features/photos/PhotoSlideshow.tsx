@@ -9,6 +9,7 @@ import { MEET_SLUG } from '../../lib/constants'
 import { useEvent } from '../events/queries'
 import { captionOf, fetchPhotos, photoUrl, type PhotoRow } from './api'
 import { uploadLink } from './PhotoAdminPanel'
+import { SponsorCorner } from '../giving/SponsorWall'
 
 /**
  * Live slideshow for a venue projector: full screen, autoplay, new approved photos jump the queue as they arrive (the list is
@@ -161,6 +162,7 @@ export function PhotoSlideshow() {
       ) : (
         <p className="px-8 text-center text-2xl text-white/80" role="status">{tx('photos.slideshowEmpty')}</p>
       )}
+      <SponsorCorner event={event.id} />
       <div className="absolute bottom-4 right-4 flex flex-col items-center gap-1 rounded-2xl bg-white p-2 text-black sm:bottom-6 sm:right-6">
         <QrCode value={uploadLink(event.slug)} size={128} label={tx('photos.qrLabel')} />
         <p className="max-w-32 text-center text-xs font-semibold">{tx('photos.scanToAdd')}</p>
