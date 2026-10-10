@@ -77,7 +77,11 @@ export function useSaveSocialLinks() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (v: MySocialLinks) => {
-      const { error } = await supabase.from('profile_social_links').upsert({ user_id: uid!, ...v }, { onConflict: 'user_id' })
+      // update-then-insert (an upsert would also try to write user_id, which members cannot change)
+      const upd = await supabase.from('profile_social_links').update(v).eq('user_id', uid!).select('user_id')
+      if (upd.error) throw upd.error
+      if (upd.data.length) return
+      const { error } = await supabase.from('profile_social_links').insert({ user_id: uid!, ...v })
       if (error) throw error
     },
     onSuccess: async () => {
