@@ -3,6 +3,12 @@
 // `{} ` only matches a number first (so "{} members" never swallows "Select members"). Used by adminTranslate.ts.
 export const ADMIN_HI: Record<string, string> = {
   "Content": "सामग्री",
+  "Added a glimpse video": "झलक वीडियो जोड़ा",
+  "Changed a glimpse video": "झलक वीडियो बदला",
+  "Removed a glimpse video": "झलक वीडियो हटाया",
+  "Reordered the glimpse videos": "झलक वीडियो का क्रम बदला",
+  "Saved a past meet": "पिछला सम्मेलन सहेजा",
+  "Deleted a past meet": "पिछला सम्मेलन हटाया",
   "Glimpse videos and past meets": "झलक वीडियो और पिछले सम्मेलन",
   "Funds": "निधि",
   "Appeals, donations, sponsors, expenses, reports": "अपीलें, दान, प्रायोजक, खर्च, रिपोर्ट",
