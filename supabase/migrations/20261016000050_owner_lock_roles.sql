@@ -267,16 +267,16 @@ grant execute on function public._scope_ok_member(uuid) to anon, authenticated;
 -- direct table reads/writes by admins follow the same scope
 drop policy "own private details" on public.profile_private;
 create policy "own private details" on public.profile_private for select to authenticated
-  using (id = auth.uid() or (public._admin_can('members_view') and public._scope_ok_member(id)));
+  using (id = auth.uid() or (public._admin_can('members_view') and ((select public._scope_is_all()) or public._scope_ok_member(id))));
 drop policy "admins update private details" on public.profile_private;
 create policy "admins update private details" on public.profile_private for update to authenticated
-  using (public._admin_can('members_edit') and public._scope_ok_member(id));
+  using (public._admin_can('members_edit') and ((select public._scope_is_all()) or public._scope_ok_member(id)));
 drop policy "admins update any profile" on public.profiles;
 create policy "admins update any profile" on public.profiles for update to authenticated
-  using (public._admin_can('members_edit') and public._scope_ok(branch, grad_year));
+  using (public._admin_can('members_edit') and ((select public._scope_is_all()) or public._scope_ok(branch, grad_year)));
 drop policy "admins read member notes" on public.admin_member_notes;
 create policy "admins read member notes" on public.admin_member_notes for select to authenticated
-  using (public._admin_can('members_view') and public._scope_ok_member(member_id));
+  using (public._admin_can('members_view') and ((select public._scope_is_all()) or public._scope_ok_member(member_id)));
 
 -- ------------------------------------------------------------------ patch the member-facing admin functions in place
 create or replace function pg_temp.patch(p_fn text, p_from text, p_to text)
@@ -312,11 +312,11 @@ declare
   r record;
 begin
   -- list: only members inside the scope
-  perform pg_temp.patch('admin_list_members', 'where (v_q is null or', 'where public._scope_ok(p.branch, p.grad_year) and (v_q is null or');
+  perform pg_temp.patch('admin_list_members', 'where (v_q is null or', 'where ((select public._scope_is_all()) or public._scope_ok(p.branch, p.grad_year)) and (v_q is null or');
   -- search: members inside the scope; registrations and payments only for admins of everyone
   perform pg_temp.patch2('admin_search',
     E'where position(q in lower(p.full_name)) > 0\n          or position(q in lower(coalesce(p.current_company',
-    E'where public._scope_ok(p.branch, p.grad_year) and (position(q in lower(p.full_name)) > 0\n          or position(q in lower(coalesce(p.current_company',
+    E'where ((select public._scope_is_all()) or public._scope_ok(p.branch, p.grad_year)) and (position(q in lower(p.full_name)) > 0\n          or position(q in lower(coalesce(p.current_company',
     E'like \'%\' || digits || \'%\')\n       order by (position(q in lower(p.full_name)) = 1)',
     E'like \'%\' || digits || \'%\'))\n       order by (position(q in lower(p.full_name)) = 1)');
   perform pg_temp.patch('admin_search', 'where public.has_event_cap(''finance'', r.event_id)', 'where (public._scope_is_all() or not public.is_admin()) and public.has_event_cap(''finance'', r.event_id)');
@@ -351,7 +351,7 @@ begin
     raise exception ''Ownership is locked: an owner cannot be rejected or un-verified.'' using errcode = ''42501'';
   end if;');
   -- the counts a scoped admin sees are their own members
-  perform pg_temp.patch('admin_attention', 'from public.profiles where onboarded and verification = ''pending''', 'from public.profiles where public._scope_ok(branch, grad_year) and onboarded and verification = ''pending''');
+  perform pg_temp.patch('admin_attention', 'from public.profiles where onboarded and verification = ''pending''', 'from public.profiles where ((select public._scope_is_all()) or public._scope_ok(branch, grad_year)) and onboarded and verification = ''pending''');
   -- merging: both people inside the scope, never an owner
   perform pg_temp.patch('admin_merge_members', 'if d.is_admin then raise exception',
     'if public._is_protected_owner(p_drop) then
