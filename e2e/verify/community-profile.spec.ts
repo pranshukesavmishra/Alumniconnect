@@ -64,7 +64,7 @@ test('edit every profile field: validation, save, DB, display', async () => {
   expect(row).toBe(
     `Asha Profile ${run.slice(-4)}|Senior Engineer|Tata Steel|Building bridges, literally|Pune|Germany|2008|Line one about me.\nLine two.|https://www.linkedin.com/in/asha-profile|https://asha.example.com/|Referrals,Mock interviews|Rust,Bridges|connections|14|3`,
   )
-  expect(sql(`select phone from profile_private where id='${A.id}'`)).toBe('+91 91234 56789')
+  expect(sql(`select phone from profile_private where id='${A.id}'`)).toBe('+919123456789')
 
   // own profile shows the data
   await expect(p.getByText('Senior Engineer at Tata Steel')).toBeVisible()
@@ -77,7 +77,7 @@ test('edit every profile field: validation, save, DB, display', async () => {
   await openEdit(p)
   await expect(p.getByLabel('Who can message me')).toHaveValue('connections')
   await expect(p.getByLabel('Birthday: day')).toHaveValue('14')
-  await expect(p.getByLabel('Mobile number')).toHaveValue('+91 91234 56789')
+  await expect(p.getByLabel('Mobile number')).toHaveValue('9123456789')
   // clearing optional fields stores NULL
   await p.getByLabel('Headline').fill('')
   await p.getByLabel('Mobile number').fill('')

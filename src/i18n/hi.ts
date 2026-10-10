@@ -1302,4 +1302,13 @@ export const hi = {
   'menu.org.health': 'स्वास्थ्य',
   'menu.org.activity': 'गतिविधि लॉग',
   'chat.staffOnlyReply': 'यहाँ केवल स्टाफ पोस्ट कर सकता है। जवाब देने के लिए किसी संदेश को देर तक दबाएँ।',
+  'phone.pickTitle': 'देश चुनें',
+  'phone.search': 'देश या कोड खोजें',
+  'phone.noMatch': 'कोई देश नहीं मिला। नाम या कोड लिखकर देखें, जैसे 44।',
+  'phone.countryAria': 'कॉलिंग कोड: {country}, +{dial}। बदलें',
+  'phone.errRequired': 'कृपया मोबाइल नंबर लिखें।',
+  'phone.errFormat': 'देश चुनें और देश कोड के बिना नंबर लिखें।',
+  'phone.errDigits': '{country} के नंबर में +{dial} के बाद {n} अंक होते हैं। कृपया जाँच लें।',
+  'phone.errRange': '{country} के नंबर में +{dial} के बाद {min} से {max} अंक होते हैं। कृपया जाँच लें।',
+  'phone.errStartIn': 'भारतीय मोबाइल नंबर में 10 अंक होते हैं और वह 6, 7, 8 या 9 से शुरू होता है।',
 } as const satisfies Record<keyof typeof en, string>

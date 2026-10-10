@@ -2,6 +2,7 @@
 // The database enforces every rule again (supabase/migrations/20261012000018_reunion_registration.sql); these keep the
 // screen honest so members see the same answer before they submit.
 import { FUND_MAX_PAISE, FUND_MIN_PAISE } from '../../lib/constants'
+import { isValidPhone } from '../../lib/phone'
 import type { CustomAnswer, EventQuestion, EventRow, Experience, Profile, TicketType } from '../../lib/types'
 
 const TZ = 'Asia/Kolkata'
@@ -115,7 +116,7 @@ export function missingProfileFields(
 ): ProfileField[] {
   const out: ProfileField[] = []
   if (!profile.full_name.trim()) out.push('full_name')
-  if (!phone || !/^\+?[0-9 ]{10,16}$/.test(phone.trim())) out.push('phone')
+  if (!phone || !(isValidPhone(phone) || /^\+?[0-9 ]{10,16}$/.test(phone.trim()))) out.push('phone')
   if (!reunion) return out
   if (!profile.grad_year) out.push('grad_year')
   if (!profile.branch) out.push('branch')

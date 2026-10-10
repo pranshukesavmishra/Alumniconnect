@@ -154,9 +154,4 @@ export function useDeleteBusiness() {
   })
 }
 
-/** Digits for wa.me / tel: links. A bare 10-digit Indian number gets the 91 country code. */
-export function whatsappDigits(phone: string): string {
-  const d = phone.replace(/\D/g, '')
-  return d.length === 10 ? `91${d}` : d
-}
-export const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`
+export { telHref, whatsappDigits } from '../../lib/phone'

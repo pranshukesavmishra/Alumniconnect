@@ -1283,4 +1283,13 @@ export const en = {
   'menu.org.health': 'Health',
   'menu.org.activity': 'Activity log',
   'chat.staffOnlyReply': 'Only staff can post here. Long-press a message to reply.',
+  'phone.pickTitle': 'Choose country',
+  'phone.search': 'Search country or code',
+  'phone.noMatch': 'No country found. Try the name or the code, like 44.',
+  'phone.countryAria': 'Calling code: {country}, +{dial}. Change',
+  'phone.errRequired': 'Please enter a mobile number.',
+  'phone.errFormat': 'Choose the country and type the number without the country code.',
+  'phone.errDigits': 'Numbers in {country} have {n} digits after +{dial}. Please check yours.',
+  'phone.errRange': 'Numbers in {country} have {min} to {max} digits after +{dial}. Please check yours.',
+  'phone.errStartIn': 'An Indian mobile number has 10 digits and starts with 6, 7, 8 or 9.',
 } as const satisfies Record<string, string>

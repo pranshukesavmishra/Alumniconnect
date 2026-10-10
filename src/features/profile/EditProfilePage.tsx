@@ -9,20 +9,21 @@ import { Button } from '../../components/ui/Button'
 import { Avatar, Card, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { LinkedInIcon } from '../../components/ui/Icons'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { BRANCHES, CURRENT_YEAR, HELP_TAGS, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { maxBirthDay, normalizeLinkedInUrl, normalizeWebUrl } from '../../lib/linkedin/common'
+import { normalizePhone } from '../../lib/phone'
 import { supabase } from '../../lib/supabase'
 import type { Experience } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { PhotoImportError, useImportProviderPhoto, useMember, useMyPrivate, useRemoveAvatar, useUpdateProfile, useUploadAvatar, type PhotoProvider } from './queries'
 
-const PHONE = /^\+?[0-9 ]{10,16}$/
-
 export function EditProfilePage() {
   const { data: profile, isLoading } = useMyProfile()
   const { data: priv } = useMyPrivate()
   const update = useUpdateProfile()
+  const phoneError = usePhoneError()
   const avatar = useUploadAvatar()
   const photo = useImportProviderPhoto()
   const removeAvatar = useRemoveAvatar()
@@ -103,7 +104,8 @@ export function EditProfilePage() {
     e.preventDefault()
     const errs: Record<string, string> = {}
     if ((f.full_name ?? '').trim().length < 2) errs.full_name = 'Please enter your full name.'
-    if (f.phone && !PHONE.test(f.phone.trim())) errs.phone = 'Please enter a valid mobile number.'
+    const pe = phoneError(f.phone)
+    if (pe) errs.phone = pe
     let linkedin: string | null = null
     if (f.linkedin_url?.trim()) {
       linkedin = normalizeLinkedInUrl(f.linkedin_url)
@@ -140,7 +142,7 @@ export function EditProfilePage() {
           birth_month: f.birth_month ? Number(f.birth_month) : null,
           message_policy: (f.message_policy || 'jec') as 'jec',
         },
-        phone: n(f.phone),
+        phone: n(normalizePhone(f.phone)),
       })
       toast.success('Profile saved')
       navigate('/me')
@@ -214,7 +216,7 @@ export function EditProfilePage() {
               </Field>
             </div>
             <Field label="Mobile number" optional error={errors.phone} hint="Private. Only you and event organisers can see it.">
-              {(p) => <Input {...p} type="tel" inputMode="tel" value={f.phone} onChange={set('phone')} />}
+              {(p) => <PhoneInput {...p} value={f.phone ?? ''} onChange={(v) => setF((s) => ({ ...s, phone: v }))} />}
             </Field>
           </section>
 

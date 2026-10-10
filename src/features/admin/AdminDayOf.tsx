@@ -12,6 +12,7 @@ import { ArrivalsCounter, GateSearch } from './CheckInTools'
 import { saveCsv, spreadsheetSafe } from './export'
 import { loggedExport } from './exportLog'
 import { useArrivals, useAttendance } from './opsQueries'
+import { telHref } from '../../lib/phone'
 
 const hourLabel = (h: string) => {
   const [day, time] = h.split(' ')
@@ -150,7 +151,7 @@ export function AdminDayOf({ event, manager }: { event: EventRow; manager: boole
                     <div key={n.code} className="flex items-center gap-3 p-3 text-sm">
                       <span className="min-w-0 flex-1 truncate"><span className="font-semibold">{n.full_name}</span> <span className="text-muted">· {n.code} · {plural(n.headcount, 'person', 'people')}</span></span>
                       {n.phone && (
-                        <a href={`tel:${n.phone.replace(/\s/g, '')}`} className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={`Call ${n.full_name}`}>
+                        <a href={telHref(n.phone)} className="grid size-11 shrink-0 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={`Call ${n.full_name}`}>
                           <Phone className="size-4" />
                         </a>
                       )}

@@ -4,8 +4,10 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Notice, PageSkeleton } from '../../components/ui/Display'
 import { ChoiceGroup, Field, Input, Select } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { BRANCHES, CURRENT_YEAR, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
+import { normalizePhone } from '../../lib/phone'
 import { useT } from '../../i18n'
 import { memberTypeOptions } from '../../i18n/labels'
 import { safeNext } from '../../lib/safeNext'
@@ -13,11 +15,10 @@ import type { MemberType } from '../../lib/types'
 import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { isOurAvatar, useImportProviderPhoto, useMyPrivate, useUpdateProfile } from '../profile/queries'
 
-const PHONE = /^\+?[0-9 ]{10,16}$/
-
 
 export function WelcomePage() {
   const tx = useT()
+  const phoneError = usePhoneError()
   const { session } = useAuth()
   const { data: profile, isLoading } = useMyProfile()
   const importPhoto = useImportProviderPhoto()
@@ -69,7 +70,8 @@ export function WelcomePage() {
     if (!isFaculty && !form.branch) e.branch = tx('welcome.errBranch')
     if (!isFaculty && !form.grad_year) e.grad_year = isStudent ? tx('welcome.errGradStudent') : tx('welcome.errGrad')
     if (!form.city.trim()) e.city = tx('welcome.errCity')
-    if (!PHONE.test(form.phone.trim())) e.phone = tx('welcome.errPhone')
+    const pe = phoneError(form.phone, true)
+    if (pe) e.phone = pe
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -91,7 +93,7 @@ export function WelcomePage() {
           city: form.city.trim(),
           onboarded: true,
         },
-        phone: form.phone.trim().replace(/\s+/g, ' '),
+        phone: normalizePhone(form.phone),
       })
     } catch {
       return // error shown below the form
@@ -160,7 +162,7 @@ export function WelcomePage() {
 
         <Field label={tx('welcome.phone')} error={errors.phone} hint={tx('welcome.phoneHint')}>
           {(p) => (
-            <Input {...p} type="tel" inputMode="tel" autoComplete="tel" placeholder="+91 98765 43210" value={form.phone} onChange={(e) => set('phone')(e.target.value)} />
+            <PhoneInput {...p} value={form.phone} onChange={set('phone')} />
           )}
         </Field>
 

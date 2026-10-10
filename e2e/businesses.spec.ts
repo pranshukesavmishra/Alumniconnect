@@ -40,7 +40,7 @@ test('list a business, find it, contact it, report it; owner edits and deletes; 
   await asha.page.getByRole('button', { name: 'List business' }).click()
   await expect(asha.page).toHaveURL(/\/businesses\/[0-9a-f-]{36}$/)
   await expect(asha.page.getByRole('heading', { name })).toBeVisible()
-  expect(sql(`select website_url || '|' || phone || '|' || whatsapp from businesses where name = '${name}'`)).toBe('https://studio.example.com/|+91 98765 43210|true')
+  expect(sql(`select website_url || '|' || phone || '|' || whatsapp from businesses where name = '${name}'`)).toBe('https://studio.example.com/|+919876543210|true')
   const id = sql(`select id from businesses where name = '${name}'`)
 
   // a batchmate finds it by search and by category, with the offer visible
@@ -86,9 +86,9 @@ test('list a business, find it, contact it, report it; owner edits and deletes; 
   await asha.page.getByRole('link', { name: 'Edit' }).click()
   await expect(asha.page.getByLabel('Business name')).toHaveValue(name)
   await asha.page.getByLabel('Offer for JECians').fill('15% off for JECians')
-  await asha.page.getByLabel('Phone').fill('abc')
+  await asha.page.getByLabel('Phone').fill('1234')
   await asha.page.getByRole('button', { name: 'Save changes' }).click()
-  await expect(asha.page.getByText(/Enter a phone number/)).toBeVisible()
+  await expect(asha.page.getByText(/Numbers in India have 10 digits/)).toBeVisible()
   await asha.page.getByLabel('Phone').fill('98765 43210')
   await asha.page.getByRole('button', { name: 'Save changes' }).click()
   await expect(asha.page).toHaveURL(new RegExp(`/businesses/${id}$`))

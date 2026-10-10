@@ -10,6 +10,7 @@ import { formatDate } from '../../../lib/format'
 import { formatPaise } from '../../../lib/money'
 import { useAdminAccess } from '../../admin/access'
 import { admin, useAdminCampaigns, useAdminEvents, useAdminPackages, useAdminSponsors, useSuggestedLeads, type AdminPackage } from '../api'
+import { formatPhone } from '../../../lib/phone'
 import { SPONSOR_STAGES, paiseToRupeesText } from '../helpers'
 import { money, useRunner } from './util'
 
@@ -139,7 +140,7 @@ export function SponsorsPanel() {
             <Card key={l.registration_id} className="space-y-1 p-4" data-testid="lead-row">
               <p className="font-bold">{l.org ?? l.name} <span className="font-normal text-muted">· {l.name}{l.batch ? ` · batch ${l.batch}` : ''}</span></p>
               <p className="text-sm text-muted">Level: {l.level ?? 'not sure'}{l.note ? ` · ${l.note}` : ''}</p>
-              <p className="text-sm text-muted">{[l.phone, l.email].filter(Boolean).join(' · ')}</p>
+              <p className="text-sm text-muted">{[l.phone ? formatPhone(l.phone) : null, l.email].filter(Boolean).join(' · ')}</p>
               <Button size="sm" icon={<UserPlus className="size-4" />} loading={busy} data-testid="import-lead" onClick={() => run(() => admin.importLead(l.registration_id), 'Added to the pipeline.')}>Add to pipeline</Button>
             </Card>
           ))}

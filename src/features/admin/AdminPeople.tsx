@@ -19,6 +19,7 @@ import { RegistrationAdjustments } from './RegistrationAdjustments'
 import { AdminReunionDetail } from './AdminReunionDetail'
 import { RegistrationEditor } from './RegistrationEditor'
 import { usePaged } from '../../lib/paging'
+import { formatPhone, phoneMatches, telHref, whatsappDigits } from '../../lib/phone'
 
 const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -38,7 +39,7 @@ export function AdminPeople({ event, data, manager, caps, initialQuery = '' }: {
     return data.registrations.filter(
       (r) =>
         (filter === 'all' ? needle !== '' || r.status !== 'cancelled' : r.status === filter) &&
-        (!needle || [r.full_name, r.code, r.phone, r.email, r.city, String(r.grad_year ?? '')].some((v) => v?.toLowerCase().includes(needle))),
+        (!needle || [r.full_name, r.code, r.email, r.city, String(r.grad_year ?? '')].some((v) => v?.toLowerCase().includes(needle)) || phoneMatches(r.phone, needle)),
     )
   }, [data.registrations, q, filter])
   const open = data.registrations.find((r) => r.id === openId)
@@ -145,10 +146,10 @@ function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registratio
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <StatusBadge status={reg.status} />
           {manager && (<>
-          <a href={`tel:${reg.phone.replace(/\s/g, '')}`} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-primary">
-            <Phone className="size-3.5" aria-hidden /> {reg.phone}
+          <a href={telHref(reg.phone)} className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border px-3 text-sm font-semibold text-primary">
+            <Phone className="size-3.5" aria-hidden /> {formatPhone(reg.phone)}
           </a>
-          <a href={`https://wa.me/${reg.phone.replace(/[^\d]/g, '').replace(/^(\d{10})$/, '91$1')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-sm font-semibold text-primary">
+          <a href={`https://wa.me/${whatsappDigits(reg.phone)}`} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-sm font-semibold text-primary">
             WhatsApp
           </a>
           </>)}

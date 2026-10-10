@@ -5,6 +5,8 @@ import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
 import { Card, Notice, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Textarea } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
+import { normalizePhone } from '../../lib/phone'
 import { MEET_SLUG } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
@@ -38,6 +40,7 @@ interface TicketDraft {
 }
 
 export function AdminSettings({ existing }: { existing?: { event: EventRow; tickets: TicketType[] } }) {
+  const phoneError = usePhoneError()
   const navigate = useNavigate()
   const save = useSaveEvent()
   const e = existing?.event
@@ -93,6 +96,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     const errs: string[] = []
     if (!/^[a-z0-9-]{3,60}$/.test(f.slug)) errs.push('Web address name: use lowercase letters, numbers and dashes.')
     if (!f.title.trim()) errs.push('Title is required.')
+    const pe = phoneError(f.contact_phone)
+    if (pe) errs.push(pe)
     if (f.upi_id && !isValidUpiId(f.upi_id)) errs.push('UPI ID looks wrong (expected something like name@okicici).')
     if (f.upi_id && !f.upi_payee_name.trim()) errs.push('Enter the payee name exactly as UPI apps show it.')
     for (const [k, label] of [['capacity', 'Max people'], ['eligible_from_year', 'Batches from'], ['eligible_to_year', 'Batches to']] as const) {
@@ -136,7 +141,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           upi_id: n(f.upi_id),
           upi_payee_name: n(f.upi_payee_name),
           payment_note: n(f.payment_note),
-          contact_phone: n(f.contact_phone),
+          contact_phone: n(normalizePhone(f.contact_phone)),
           contact_email: n(f.contact_email),
           is_published: f.is_published,
           ask_reunion_questions: f.ask_reunion_questions,
@@ -283,7 +288,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-4">
         <SectionTitle>Contact</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Phone for questions" optional>{(p) => <Input {...p} type="tel" value={f.contact_phone} onChange={set('contact_phone')} />}</Field>
+          <Field label="Phone for questions" optional>{(p) => <PhoneInput {...p} value={f.contact_phone} onChange={(v) => setF((s) => ({ ...s, contact_phone: v }))} />}</Field>
           <Field label="Email for questions" optional>{(p) => <Input {...p} type="email" value={f.contact_email} onChange={set('contact_email')} />}</Field>
         </div>
       </section>

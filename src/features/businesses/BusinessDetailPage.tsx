@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
 import { startDm } from '../chat/queries'
 import { Linkified } from '../community/PostCard'
+import { formatPhone } from '../../lib/phone'
 import { telHref, useBusiness, useDeleteBusiness, whatsappDigits } from './queries'
 
 const REPORT_REASONS = ['Fake or misleading', 'Spam or advertising', 'Offensive or illegal', 'Something else']
@@ -82,7 +83,7 @@ export function BusinessDetailPage() {
           )}
           {b.phone && (
             <a href={telHref(b.phone)} className={actionClass}>
-              <Phone className="size-4" aria-hidden /> Call {b.phone}
+              <Phone className="size-4" aria-hidden /> Call {formatPhone(b.phone)}
             </a>
           )}
           {b.phone && b.whatsapp && (

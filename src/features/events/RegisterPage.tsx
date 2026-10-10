@@ -7,6 +7,7 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Stepper, Textarea } from '../../components/ui/Form'
+import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { useT, type MsgKey } from '../../i18n'
 import { foodLabel, foodOptions, modeLabel, performLabel, sponsorLabel, teamLabel, tshirtLabel } from '../../i18n/labels'
 import { useDraft } from '../../hooks/useDraft'
@@ -14,6 +15,7 @@ import { ARRIVAL_MODES, FUND_PRESETS, MEET_SLUG, ORG_TEAMS, PERFORM_TYPES, SPONS
 import { friendlyError } from '../../lib/errors'
 import { formatDateRange } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
+import { formatPhone, normalizePhone } from '../../lib/phone'
 import type { CustomAnswer, EventRow, FoodPref, Guest, TicketType } from '../../lib/types'
 import { useAuth, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useMyPrivate } from '../profile/queries'
@@ -122,6 +124,7 @@ function fundPaiseOf(f: Pick<FormState, 'fund' | 'fund_choice' | 'fund_custom'>)
 
 export function RegisterPage() {
   const tx = useT()
+  const phoneError = usePhoneError()
   const uid = useUserId()
   const { session } = useAuth()
   const navigate = useNavigate()
@@ -333,7 +336,8 @@ export function RegisterPage() {
     if (s === 'memorable') {
       qe = checkCustomAnswers(questions ?? [], form.custom)
       const ph = form.emergency_phone.trim()
-      if (ph && !/^\+?[0-9 ]{8,16}$/.test(ph)) e.emergency_phone = tx('rr.errPhone')
+      const pe = phoneError(ph)
+      if (pe) e.emergency_phone = pe
       if (!!ph !== !!form.emergency_name.trim()) e.emergency = tx('rr.errEmergencyBoth')
     }
     if (s === 'review' && !form.accept_terms) e.accept_terms = tx('reg.errTerms')
@@ -416,7 +420,7 @@ export function RegisterPage() {
                 memory: form.memory,
                 memory_wall_consent: form.memory_wall_consent && !!form.memory.trim(),
                 emergency_name: form.emergency_name,
-                emergency_phone: form.emergency_phone,
+                emergency_phone: normalizePhone(form.emergency_phone),
                 medical_notes: form.medical_notes,
               }
             : {}),
@@ -750,7 +754,7 @@ export function RegisterPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field label={tx('rr.emergencyName')} optional>{(p) => <Input {...p} maxLength={80} value={form.emergency_name} onChange={(e) => set('emergency_name', e.target.value)} />}</Field>
                     <Field label={tx('rr.emergencyPhone')} optional error={err('emergency_phone')}>
-                      {(p) => <Input {...p} type="tel" inputMode="tel" maxLength={16} value={form.emergency_phone} onChange={(e) => set('emergency_phone', e.target.value)} />}
+                      {(p) => <PhoneInput {...p} value={form.emergency_phone} onChange={(v) => set('emergency_phone', v)} />}
                     </Field>
                   </div>
                   {errors.emergency && (
@@ -785,7 +789,7 @@ export function RegisterPage() {
               'details',
               <>
                 <KeyValue label={tx('rr.fullName')}>{profile.full_name}</KeyValue>
-                <KeyValue label={tx('rr.mobile')}>{phone ?? '—'}</KeyValue>
+                <KeyValue label={tx('rr.mobile')}>{formatPhone(phone) || '—'}</KeyValue>
                 <KeyValue label={tx('rr.batchBranch')}>{[profile.grad_year, profile.branch].filter(Boolean).join(' · ') || '—'}</KeyValue>
                 <KeyValue label={tx('rr.cityCountry')}>{[profile.city, profile.country].filter(Boolean).join(', ') || '—'}</KeyValue>
               </>,
@@ -836,7 +840,7 @@ export function RegisterPage() {
                 {reunion && form.nickname.trim() && <KeyValue label={tx('rr.nicknameShort')}>{form.nickname}</KeyValue>}
                 {reunion && form.hostel.trim() && <KeyValue label={tx('rr.hostel')}>{form.hostel}</KeyValue>}
                 {reunion && form.songs.some((x) => x.trim()) && <KeyValue label={tx('rr.songsShort')}>{form.songs.filter((x) => x.trim()).join(', ')}</KeyValue>}
-                {reunion && form.emergency_name.trim() && <KeyValue label={tx('rr.emergencyTitle')}>{`${form.emergency_name} · ${form.emergency_phone}`}</KeyValue>}
+                {reunion && form.emergency_name.trim() && <KeyValue label={tx('rr.emergencyTitle')}>{`${form.emergency_name} · ${formatPhone(form.emergency_phone)}`}</KeyValue>}
                 {activeQuestions
                   .filter((q) => answerText(form.custom[q.id]))
                   .map((q) => (
