@@ -319,7 +319,7 @@ begin
     E'where public._scope_ok(p.branch, p.grad_year) and (position(q in lower(p.full_name)) > 0\n          or position(q in lower(coalesce(p.current_company',
     E'like \'%\' || digits || \'%\')\n       order by (position(q in lower(p.full_name)) = 1)',
     E'like \'%\' || digits || \'%\'))\n       order by (position(q in lower(p.full_name)) = 1)');
-  perform pg_temp.patch('admin_search', 'where public.has_event_cap(''finance'', r.event_id)', 'where public._scope_is_all() and public.has_event_cap(''finance'', r.event_id)');
+  perform pg_temp.patch('admin_search', 'where public.has_event_cap(''finance'', r.event_id)', 'where (public._scope_is_all() or not public.is_admin()) and public.has_event_cap(''finance'', r.event_id)');
 end $$;
 
 do $$

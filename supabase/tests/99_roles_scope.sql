@@ -29,13 +29,13 @@ update public.profiles set branch = 'MCA', grad_year = 2010 where id = '9c000000
 update public.profiles set branch = 'MCA', grad_year = 2005, verification = 'pending' where id = '9c000000-0000-0000-0000-0000000000c5';
 update public.profiles set branch = 'B.E. in Civil Engineering', grad_year = 2005, verification = 'pending' where id = '9c000000-0000-0000-0000-0000000000c3';
 update public.profiles set branch = 'B.E. in Civil Engineering', grad_year = 2010, verification = 'pending' where id = '9c000000-0000-0000-0000-0000000000c4';
-update public.profile_private set phone = '+91 98765 9C003' where id = '9c000000-0000-0000-0000-0000000000c3';
-update public.profile_private set phone = '+91 98765 9C001' where id = '9c000000-0000-0000-0000-0000000000c1';
+update public.profile_private set phone = '+91 98765 90003' where id = '9c000000-0000-0000-0000-0000000000c3';
+update public.profile_private set phone = '+91 98765 90001' where id = '9c000000-0000-0000-0000-0000000000c1';
 update public.profiles set is_admin = true, is_super_admin = true where id = '9c000000-0000-0000-0000-0000000000a1';
 insert into public.protected_owners (user_id) values ('9c000000-0000-0000-0000-0000000000a1');
 insert into public.groups (kind, slug, name, branch, grad_year) values
-  ('department', 'r9-mca', 'R9 MCA', 'MCA', null), ('department', 'r9-civil', 'R9 Civil', 'B.E. in Civil Engineering', null),
-  ('batch', 'r9-2005', 'R9 Batch 2005', null, 2005), ('batch', 'r9-2010', 'R9 Batch 2010', null, 2010);
+  ('circle', 'r9-mca', 'R9 MCA', 'MCA', null), ('circle', 'r9-civil', 'R9 Civil', 'B.E. in Civil Engineering', null),
+  ('circle', 'r9-2005', 'R9 Batch 2005', null, 2005), ('circle', 'r9-2010', 'R9 Batch 2010', null, 2010);
 select set_config('t9r.all', (select count(*)::text from public.profiles), false);
 select set_config('t9r.mca', (select count(*)::text from public.profiles where branch = 'MCA'), false);
 select set_config('t9r.b05', (select count(*)::text from public.profiles where grad_year = 2005), false);
@@ -143,7 +143,7 @@ begin
   -- direct table reads follow the scope
   assert (select count(*) from public.profile_private where id = '9c000000-0000-0000-0000-0000000000c3') = 0, 'phone of an outsider is not readable';
   assert (select count(*) from public.profile_private where id = '9c000000-0000-0000-0000-0000000000c1') = 1, 'phone of an own member is';
-  assert public.admin_set_member('9c000000-0000-0000-0000-0000000000c5', null, 'verified') is null, 'verify an own member works';
+  perform public.admin_set_member('9c000000-0000-0000-0000-0000000000c5', null, 'verified');
   assert (select verification from public.profiles where id = '9c000000-0000-0000-0000-0000000000c5') = 'verified', 'and really verifies';
   assert (public.admin_bulk_set_verification(array['9c000000-0000-0000-0000-0000000000c5']::uuid[], 'pending') ->> 'changed')::int = 1, 'bulk inside the scope works';
   -- groups
@@ -180,7 +180,8 @@ select pg_temp.login('9c000000-0000-0000-0000-0000000000a1');
 set local role authenticated;
 do $$ begin
   assert (public.admin_list_members('{}'::jsonb, 1, 0, false) ->> 'total')::int = current_setting('t9r.all')::int, 'the owner still sees everyone';
-  assert public.admin_set_member('9c000000-0000-0000-0000-0000000000c4', null, 'verified') is null, 'and verifies anyone';
+  perform public.admin_set_member('9c000000-0000-0000-0000-0000000000c4', null, 'verified');
+  assert (select verification from public.profiles where id = '9c000000-0000-0000-0000-0000000000c4') = 'verified', 'and verifies anyone';
 end $$;
 reset role;
 select pg_temp.login('9c000000-0000-0000-0000-0000000000b3');
