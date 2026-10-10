@@ -87,7 +87,8 @@ begin
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b2', true, null, null, 'batch_rep', 'batch', 'soon')$q$) like '%batch year%', 'a batch must be a year';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'treasurer', 'department', 'MCA')$q$) like '%not limited%', 'a treasurer is not scoped';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'nope')$q$) like '%Unknown role%', 'unknown role';
-  assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'funds_sponsorship')$q$) like '%no permissions%', 'an empty role cannot be given';
+  assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, 'funds_sponsorship')$q$) is null, 'the funds role can be given now that the permissions exist';
+  assert (select permissions @> array['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'] from public.admin_grants where user_id = '9c000000-0000-0000-0000-0000000000b3'), 'and it grants the four funds permissions';
   assert public.t9r_fails($q$select public.admin_set_admin('9c000000-0000-0000-0000-0000000000b3', true, null, null, null, 'department', 'MCA')$q$) like '%list of permissions%', 'scope needs limited permissions';
 
   r := public.admin_set_admin('9c000000-0000-0000-0000-0000000000b1', true, null, 'MCA HOD', 'department_head', 'department', 'MCA');
