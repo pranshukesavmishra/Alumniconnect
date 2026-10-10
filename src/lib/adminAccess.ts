@@ -65,9 +65,33 @@ export interface AdminAccess {
   /** a super admin, or an admin without a limited grant: holds every permission, now and in future */
   full: boolean
   permissions: string[]
+  /** the role it was made from, and the department or batch it is limited to ('all' = everyone) */
+  role_key?: string | null
+  scope_kind?: ScopeKind
+  scope_value?: string | null
 }
 
+export type ScopeKind = 'all' | 'department' | 'batch'
+
 export const NO_ACCESS: AdminAccess = { is_admin: false, is_super: false, full: false, permissions: [] }
+
+/** A ready-made role (Treasurer, Event manager, ...) from admin_role_templates(). */
+export interface RoleTemplate {
+  key: string
+  label: string
+  description: string
+  /** a full admin: everything, including things added later */
+  full: boolean
+  permissions: string[]
+  /** 'none' = everywhere; otherwise the role is limited to one department or one batch year */
+  scope_kind: 'none' | 'department' | 'batch'
+}
+
+/** "Department: MCA" / "Batch 2005" / '' for everyone. */
+export function scopeText(kind: ScopeKind | undefined, value: string | null | undefined): string {
+  if (!kind || kind === 'all' || !value) return ''
+  return kind === 'department' ? `Department: ${value}` : `Batch ${value}`
+}
 
 /** True when the person holds the permission. A trailing * asks about a whole family ('events_*'). */
 export function hasPerm(a: AdminAccess | null | undefined, key: string): boolean {

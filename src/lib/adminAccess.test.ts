@@ -71,3 +71,13 @@ describe('tiles on the admin home', () => {
     expect(visibleTiles(limited(['members_view']))).toEqual(['members'])
   })
 })
+
+describe('scopeText', () => {
+  it('describes a department or batch scope and is empty for everyone', async () => {
+    const { scopeText } = await import('./adminAccess')
+    expect(scopeText('department', 'MCA')).toBe('Department: MCA')
+    expect(scopeText('batch', '2005')).toBe('Batch 2005')
+    expect(scopeText('all', null)).toBe('')
+    expect(scopeText(undefined, 'x')).toBe('')
+  })
+})

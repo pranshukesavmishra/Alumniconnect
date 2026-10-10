@@ -42,7 +42,7 @@ export function AdminHome() {
   const g = attention.data?.global
   const queueRelevant = access.is_admin ? canAny(['members_verify', 'moderation_*', 'community_circles', 'messages_send', 'money_*', 'events_*']) || mod.any : canManage
   const accessLabel = access.is_super
-    ? 'Super admin'
+    ? 'Owner'
     : access.is_admin
       ? access.full ? 'Admin' : `Admin (${access.permissions.length} permissions)`
       : ''
@@ -105,7 +105,7 @@ export function AdminHome() {
                 <p className="text-sm text-muted">{formatDateRange(event.starts_at, event.ends_at)}</p>
               </div>
               {!event.is_published && <Badge tone="warning">Draft</Badge>}
-              <Badge tone="primary">{access.is_admin ? (access.is_super ? 'Super admin' : 'Admin') : roles.map((x) => ROLE_INFO[x].label).join(' + ')}</Badge>
+              <Badge tone="primary">{access.is_admin ? (access.is_super ? 'Owner' : 'Admin') : roles.map((x) => ROLE_INFO[x].label).join(' + ')}</Badge>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
           ))
