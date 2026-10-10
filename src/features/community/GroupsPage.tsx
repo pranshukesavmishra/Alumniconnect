@@ -16,7 +16,7 @@ import { useGroups, useJoinGroup, type GroupWithMe } from './queries'
 
 function GroupRow({ g }: { g: GroupWithMe }) {
   const join = useJoinGroup()
-  const auto = g.kind === 'batch' || g.kind === 'year'
+  const auto = g.kind === 'batch' || g.kind === 'year' || g.kind === 'official' || g.kind === 'department'
   return (
     <div className="flex items-center gap-3 p-3.5">
       <Link to={`/groups/${g.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
@@ -27,7 +27,7 @@ function GroupRow({ g }: { g: GroupWithMe }) {
           <span className="block truncate font-semibold">{g.name}</span>
           <span className="block truncate text-sm text-muted">
             {g.member_count} {g.member_count === 1 ? 'member' : 'members'}
-            {g.kind === 'channel' && ' · announcements'}
+            {(g.kind === 'channel' || g.post_mode === 'staff_only') && ' · announcements'}
           </span>
         </span>
       </Link>
@@ -62,23 +62,29 @@ export function GroupsPage() {
     )
   }
   const groups = data ?? []
-  const mine = groups.filter((g) => g.kind === 'batch' || g.kind === 'year')
+  const official = groups.filter((g) => g.kind === 'official')
+  const departments = groups.filter((g) => g.kind === 'department' && g.joined)
+  const batches = groups.filter((g) => g.kind === 'year' && g.joined)
+  const deptBatches = groups.filter((g) => g.kind === 'batch' && g.joined)
   const channels = groups.filter((g) => g.kind === 'channel')
   const circles = groups.filter((g) => g.kind === 'circle')
   const sections: [string, GroupWithMe[]][] = [
-    ['Your batch', mine.filter((g) => g.joined)],
+    ['Official', official],
+    ['My department', departments],
+    ['My batch', batches],
+    ['My department + batch', deptBatches],
     ['Channels', channels],
-    ['Your circles', circles.filter((g) => g.joined)],
+    ['Circles', circles.filter((g) => g.joined)],
     ['Discover circles', circles.filter((g) => !g.joined)],
   ]
   return (
     <div>
-      <PageHeader title="Groups" subtitle="Your batch, interest circles and official channels" action={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setProposing(true)}>New circle</Button>} />
+      <PageHeader title="Groups" subtitle="Official, your department and batch, interest circles" action={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setProposing(true)}>New circle</Button>} />
       <Page className="space-y-6">
         {proposing && <ProposeCircle onDone={() => setProposing(false)} />}
         {sections.map(([title, list]) =>
           list.length ? (
-            <section key={title}>
+            <section key={title} aria-label={title} data-section={title}>
               <SectionTitle>{title}</SectionTitle>
               <Card className="divide-y divide-border">
                 {list.map((g) => (
@@ -138,7 +144,7 @@ export function GroupPage() {
       </div>
     )
   }
-  const canPost = g.joined && (g.kind !== 'channel' || g.myRole === 'admin' || !!me?.is_admin)
+  const canPost = g.joined && (g.kind !== 'channel' || g.myRole === 'admin' || !!me?.is_admin) && (g.post_mode !== 'staff_only' || g.myRole === 'admin' || !!me?.is_admin)
   const canRead = g.joined || g.kind === 'channel' || !!me?.is_admin
   return (
     <div>
@@ -156,10 +162,10 @@ export function GroupPage() {
       />
       <Page className="space-y-4">
         {g.description && <p className="text-[15px] text-muted">{g.description}</p>}
-        {canRead && <GroupChatLink groupId={g.id} channel={g.kind === 'channel'} />}
+        {canRead && <GroupChatLink groupId={g.id} channel={g.kind === 'channel' || g.post_mode === 'staff_only'} />}
         {canPost && <Composer fixedGroup={g} />}
         {canRead ? (
-          <FeedList scope={`group:${g.id}`} showGroup={false} empty={g.kind === 'channel' ? 'No announcements yet.' : 'Start the conversation.'} />
+          <FeedList scope={`group:${g.id}`} showGroup={false} empty={g.kind === 'channel' || g.post_mode === 'staff_only' ? 'No announcements yet.' : 'Start the conversation.'} />
         ) : (
           <Card className={clsx('p-6 text-center')}>
             <p className="font-semibold">Join to see posts</p>

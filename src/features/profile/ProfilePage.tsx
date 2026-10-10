@@ -1,5 +1,6 @@
 import { BadgeCheck, Briefcase, Globe, GraduationCap, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useEffect } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
@@ -12,6 +13,7 @@ import { LocationSettings } from '../location/LocationSharing'
 import { TripChips } from '../location/TripChips'
 import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
+import { profileCompleteness } from '../home/HomePage'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
 import { useT } from '../../i18n'
@@ -64,6 +66,12 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const { data: me } = useMyProfile()
   const navigate = useNavigate()
   const organiser = useIsOrganiser()
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (!hash) return
+    const t = setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }), 150)
+    return () => clearTimeout(t)
+  }, [hash, data])
 
   if (isLoading) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
@@ -79,6 +87,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   }
 
   const { profile: p, experiences, educations } = data
+  const comp = profileCompleteness(p)
   const role = p.current_title && p.current_company ? `${p.current_title} at ${p.current_company}` : p.headline
   return (
     <div>
@@ -147,31 +156,35 @@ export function ProfilePage({ self }: { self?: boolean }) {
         <TripChips userId={p.id} isMe={isMe} />
 
         {isMe && (
-          <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('profile.shortcuts')}>
-            {[
-              { to: '/me/connections', label: tx('profile.connections'), hint: tx('profile.connectionsHint'), icon: '🤝' },
-              { to: '/help', label: tx('profile.askJec'), hint: tx('profile.askJecHint'), icon: '🤝' },
-              { to: '/jobs', label: tx('profile.jobs'), hint: tx('profile.jobsHint'), icon: '💼' },
-              { to: '/mentors', label: 'Mentorship', hint: 'Find or become a mentor', icon: '🎓' },
-              { to: '/businesses', label: 'Businesses', hint: 'Support JECian-owned', icon: '🏪' },
-              { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
-              { to: '/people', label: tx('home.findJecians'), hint: tx('profile.findHint'), icon: '🔎' },
-              { to: '/gallery', label: tx('profile.gallery'), hint: tx('profile.galleryHint'), icon: '🖼️' },
-              { to: '/meet/photos?view=tagged', label: tx('profile.findPhotos'), hint: tx('profile.findPhotosHint'), icon: '📸' },
-              { to: '/nearby', label: tx('nearby.title'), hint: tx('nearby.entryHint'), icon: '📍' },
-              { to: '/trips', label: tx('trips.title'), hint: tx('trips.subtitle'), icon: '✈️' },
-              { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
-              ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
-            ].map((l) => (
-              <Link key={l.to} to={l.to} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
-                <span className="text-2xl" aria-hidden>{l.icon}</span>
-                <span className="min-w-0">
-                  <span className="block font-semibold">{l.label}</span>
-                  <span className="block truncate text-sm text-muted">{l.hint}</span>
-                </span>
-              </Link>
-            ))}
-          </nav>
+          <>
+            {comp.next && (
+              <Card className="p-4" data-testid="me-completeness">
+                <p className="font-semibold">{tx('home.complete', { percent: comp.percent })}</p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={comp.percent} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="h-full rounded-full bg-primary" style={{ width: `${comp.percent}%` }} />
+                </div>
+                <Link to={comp.next.to} className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary">
+                  {tx('home.next')} {tx(comp.next.label)}
+                </Link>
+              </Card>
+            )}
+            <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('menu.settings')}>
+              {[
+                { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
+                { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
+                ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
+              ].map((l) => (
+                <Link key={l.to} to={l.to} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
+                  <span className="text-2xl" aria-hidden>{l.icon}</span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{l.label}</span>
+                    <span className="block truncate text-sm text-muted">{l.hint}</span>
+                  </span>
+                </Link>
+              ))}
+            </nav>
+            <p className="text-sm text-muted">{tx('menu.meHint')}</p>
+          </>
         )}
 
         {isMe && p.verification !== 'verified' && (
@@ -250,7 +263,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
         )}
 
         {isMe && (
-          <section aria-labelledby="lang-title">
+          <section id="language" aria-labelledby="lang-title" className="scroll-mt-20">
             <SectionTitle><span id="lang-title">भाषा / Language</span></SectionTitle>
             <LanguageSwitch />
           </section>
@@ -263,7 +276,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
         )}
 
         {isMe && (
-          <section className="pt-2">
+          <section id="my-data" className="scroll-mt-20 pt-2">
             <DownloadMyData />
           </section>
         )}

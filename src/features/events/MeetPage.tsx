@@ -117,7 +117,7 @@ export function MeetPage() {
         )}
 
         {!!programme.data?.length && (
-          <section aria-label="Programme" className="space-y-4">
+          <section id="programme" aria-label="Programme" className="scroll-mt-20 space-y-4">
             <SectionTitle>Programme</SectionTitle>
             {groupByDay(programme.data).map((d) => (
               <div key={d.day}>

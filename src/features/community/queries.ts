@@ -16,7 +16,7 @@ export interface Author {
 
 export interface Group {
   id: string
-  kind: 'batch' | 'year' | 'circle' | 'channel'
+  kind: 'batch' | 'year' | 'circle' | 'channel' | 'official' | 'department' | 'meetup'
   slug: string
   name: string
   description: string | null
@@ -26,6 +26,8 @@ export interface Group {
   is_official: boolean
   is_approved: boolean
   member_count: number
+  post_mode?: 'everyone' | 'staff_only'
+  comments_allowed?: boolean
 }
 
 export interface Post {
