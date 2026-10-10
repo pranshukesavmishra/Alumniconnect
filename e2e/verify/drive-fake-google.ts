@@ -121,7 +121,7 @@ export class FakeGoogle {
   }
 
   private project(f: FakeFile, fields: string | null) {
-    const all: Record<string, unknown> = { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, appProperties: f.appProperties, description: f.description, size: f.content ? String(f.content.length) : undefined }
+    const all: Record<string, unknown> = { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, appProperties: f.appProperties, description: f.description, size: f.content ? String(f.content.length) : undefined, trashed: f.trashed }
     if (!fields) return { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType }
     const o: Record<string, unknown> = {}
     for (const k of fields.split(',').map((s) => s.trim())) if (k in all && all[k] !== undefined && !(k === 'appProperties' && !Object.keys(f.appProperties).length)) o[k] = all[k]
