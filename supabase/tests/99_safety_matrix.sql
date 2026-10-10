@@ -27,6 +27,7 @@ update public.profiles set onboarded = true, verification = 'verified', member_t
  where id::text like '93000000-%';
 update public.profiles set is_admin = true where id in ('93000000-0000-0000-0000-0000000000a1', '93000000-0000-0000-0000-0000000000a2');
 update public.profiles set is_super_admin = true where id = '93000000-0000-0000-0000-0000000000a2';
+insert into public.protected_owners (user_id) values ('93000000-0000-0000-0000-0000000000a2');
 -- one LIMITED admin per permission: holds exactly that one key
 insert into auth.users (id, email, raw_user_meta_data)
   select ('93100000-0000-0000-0000-' || lpad(c.sort::text, 12, '0'))::uuid, 'lim' || c.sort || '@m93.com', json_build_object('full_name', 'Lim ' || c.key)::jsonb
@@ -169,8 +170,8 @@ insert into public.t93_cases values
   ('admin_grant_role', $q$select public.admin_grant_role('93000000-0000-0000-0000-0000000000c2', 'admin')$q$, '', ''),
   ('admin_revoke_role', $q$select public.admin_revoke_role('93000000-0000-0000-0000-0000000000a2', 'admin')$q$, '', ''),
   ('admin_set_admin', $q$select public.admin_set_admin('93000000-0000-0000-0000-0000000000c3', true, array['members_view'], 'n')$q$, 's', ''),
-  ('admin_set_super_admin', $q$select public.admin_set_super_admin('93000000-0000-0000-0000-0000000000c3', true)$q$, 's', ''),
-  ('admin_transfer_ownership', $q$select public.admin_transfer_ownership('93000000-0000-0000-0000-0000000000c3', false)$q$, 's', ''),
+  ('admin_set_admin', $q$select public.admin_set_admin('93000000-0000-0000-0000-0000000000c4', true, null, null, 'treasurer')$q$, 's', ''),
+  ('admin_role_templates', $q$select public.admin_role_templates()$q$, 'as', '*'),
   ('admin_list_admins', $q$select public.admin_list_admins()$q$, 'as', 'admins'),
   ('admin_permission_catalog', $q$select * from public.admin_permission_catalog()$q$, 'as', '*'),
   ('admin_log_event_export', $q$select public.admin_log_event_export('93000000-0000-0000-0000-0000000000e1', 'not_arrived', 3)$q$, 'atcv', 'events_checkin,events_registrations,money_exports'),
@@ -512,17 +513,17 @@ begin
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('is_admin', 'is_verified', 'is_event_manager', 'is_event_staff', 'is_blocked_between', 'can_see_group_content',
                            'are_connected', 'event_public_stats', 'is_group_member', 'is_group_admin', 'can_view_event_photos',
-                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try', 'is_super_admin', '_admin_can', '_admin_can_any');
+                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try', 'is_super_admin', '_admin_can', '_admin_can_any', '_scope_is_all', '_scope_ok', '_scope_ok_member');
   assert bad is null, 'anon can execute: ' || coalesce(bad, '');
   select string_agg(p.proname, ', ') into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
-     and (p.proname like 'admin\_%' or (p.proname like '\_%' and p.proname not in ('_admin_can', '_admin_can_any')) or p.proname in ('moderate', 'moderate_photo', 'review_payment', 'record_offline_payment', 'check_in', 'checkin_search', 'post_announcement'));
+     and (p.proname like 'admin\_%' or (p.proname like '\_%' and p.proname not in ('_admin_can', '_admin_can_any', '_scope_is_all', '_scope_ok', '_scope_ok_member')) or p.proname in ('moderate', 'moderate_photo', 'review_payment', 'record_offline_payment', 'check_in', 'checkin_search', 'post_announcement'));
   assert bad is null, 'anon can execute privileged functions: ' || coalesce(bad, '');
   -- internal helpers (leading underscore) are not callable by members, except the chat path helper used by storage policies
   select string_agg(p.proname, ', ') into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname like '\_%' and has_function_privilege('authenticated', p.oid, 'execute') and p.proname not in ('_chat_of_path', '_admin_can', '_admin_can_any');
+   where n.nspname = 'public' and p.proname like '\_%' and has_function_privilege('authenticated', p.oid, 'execute') and p.proname not in ('_chat_of_path', '_admin_can', '_admin_can_any', '_scope_is_all', '_scope_ok', '_scope_ok_member');
   assert bad is null, 'members can execute internal helpers: ' || coalesce(bad, '');
   -- every table has row level security
   select string_agg(c.relname, ', ') into bad from pg_class c join pg_namespace n on n.oid = c.relnamespace
