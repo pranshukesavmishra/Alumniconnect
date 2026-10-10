@@ -2,7 +2,7 @@
 // quick actions all read it. To add a destination add ONE line to MENU (label key in en.ts and hi.ts, icon, route, group, who sees it).
 import {
   Activity, BarChart3, Bell, BriefcaseBusiness, CalendarHeart, CalendarRange, Download, Flag, GraduationCap, Handshake, History, Home, Image, Images,
-  Inbox, KeyRound, Languages, Link2, LogOut, MapPin, MessagesSquare, Network, PenLine, Search, ShieldCheck, ShieldHalf, ScrollText, Store, UserPlus, UserRound,
+  Inbox, KeyRound, Landmark, Languages, Link2, LogOut, MapPin, MessagesSquare, Network, PenLine, Search, ShieldCheck, ShieldHalf, ScrollText, Store, UserPlus, UserRound,
   Users, UsersRound, type LucideIcon,
 } from 'lucide-react'
 import { hasAnyPerm, type AdminAccess } from '../../lib/adminAccess'
@@ -87,6 +87,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'import', group: 'me', label: 'home.importLinkedin', icon: Link2, to: '/me/import', keywords: 'linkedin pdf' },
   { id: 'language', group: 'me', label: 'menu.language', icon: Languages, to: '/me#language', keywords: 'hindi english bhasha' },
   { id: 'my-data', group: 'me', label: 'menu.downloadData', icon: Download, to: '/me#my-data', keywords: 'export privacy' },
+  { id: 'about', group: 'me', label: 'menu.about', icon: Landmark, to: '/about', public: true, keywords: 'college gec government engineering jecaa association history' },
   { id: 'privacy', group: 'me', label: 'menu.privacy', icon: ShieldHalf, to: '/privacy', public: true },
   { id: 'terms', group: 'me', label: 'menu.terms', icon: ScrollText, to: '/terms', public: true },
   { id: 'signout', group: 'me', label: 'profile.signOut', icon: LogOut, action: 'signout', keywords: 'log out' },

@@ -7,6 +7,41 @@ function Prose({ children }: { children: ReactNode }) {
   return <div className="space-y-4 text-[15px] leading-relaxed [&_h2]:mt-6 [&_h2]:text-lg [&_h2]:font-bold [&_li]:ml-5 [&_li]:list-disc [&_ul]:space-y-1.5">{children}</div>
 }
 
+export function AboutPage() {
+  return (
+    <div>
+      <PageHeader title="About JEC" back="/" />
+      <Page className="space-y-5">
+        <Card className="flex items-center gap-4 p-5">
+          <img src="/jec-logo.png" alt="Jabalpur Engineering College crest" className="h-24 w-auto shrink-0" />
+          <div>
+            <h2 className="text-lg font-bold">Jabalpur Engineering College</h2>
+            <p className="text-sm text-muted">Onwards on wings. Established 1947, the oldest technical institution in Central India.</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <img src="/gec-crest.png" alt="Earlier crest of Government Engineering College, Jabalpur" className="h-24 w-auto shrink-0 rounded-lg bg-white p-1" />
+          <div>
+            <h2 className="text-lg font-bold">Formerly Government Engineering College, Jabalpur</h2>
+            <p className="text-sm text-muted">Many alumni still say GEC Jabalpur. Both names are welcome here, and you will find the same college under either.</p>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-4 p-5">
+          <img src="/jecaa-logo.png" alt="JECAA, Jabalpur Engineering College Alumni Association" className="h-24 w-auto shrink-0 rounded-lg bg-white p-1" />
+          <div>
+            <h2 className="text-lg font-bold">JECAA, the Alumni Association</h2>
+            <p className="text-sm text-muted">The Jabalpur Engineering College Alumni Association. JEC Alumni Connect is the place where its members find each other, share news and meet.</p>
+          </div>
+        </Card>
+        <div className="flex flex-wrap gap-3">
+          <ButtonLink to="/privacy" variant="secondary">Privacy</ButtonLink>
+          <ButtonLink to="/terms" variant="secondary">Terms</ButtonLink>
+        </div>
+      </Page>
+    </div>
+  )
+}
+
 // DRAFT wording for committee approval (plan Section 12, item 9).
 export function PrivacyPage() {
   return (
