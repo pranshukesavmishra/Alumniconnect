@@ -140,7 +140,7 @@ test('members: uploads wait for approval or show at once, tags notify and can be
 
   // Bala does not see it yet
   const b = await open(browser, bala, `/events/${ev.slug}/photos`)
-  await expect(b.page.getByText('No photos yet')).toBeVisible()
+  await expect(b.page.getByText('No photos or videos yet')).toBeVisible()
   expect(sql(`select count(*) from event_photos where id = '${pending}'`)).toBe('1') // exists, but hidden from Bala by row security
 
   // the organiser approves it from "Waiting for approval"
@@ -321,7 +321,7 @@ test('slideshow shows new photos as they arrive; the QR upload page opens for a 
   // the QR leads members to the upload page (after sign-in)
   const m = await open(browser, member, `/events/${ev.slug}/photos/upload`, 360)
   await expect(m.page.getByRole('heading', { name: 'Add photos' })).toBeVisible()
-  await expect(m.page.getByText('Your photos appear straight away')).toBeVisible()
+  await expect(m.page.getByText('Your photos and videos appear straight away')).toBeVisible()
   await noSideScroll(m.page)
   for (const path of [`/events/${ev.slug}/photos`, '/gallery']) {
     for (const w of [360, 412]) {
