@@ -1305,7 +1305,7 @@ export const hi = {
   'phone.pickTitle': 'देश चुनें',
   'phone.search': 'देश या कोड खोजें',
   'phone.noMatch': 'कोई देश नहीं मिला। नाम या कोड लिखकर देखें, जैसे 44।',
-  'phone.countryAria': 'देश कोड: {country}, +{dial}। बदलें',
+  'phone.countryAria': 'कॉलिंग कोड: {country}, +{dial}। बदलें',
   'phone.errRequired': 'कृपया मोबाइल नंबर लिखें।',
   'phone.errFormat': 'देश चुनें और देश कोड के बिना नंबर लिखें।',
   'phone.errDigits': '{country} के नंबर में +{dial} के बाद {n} अंक होते हैं। कृपया जाँच लें।',

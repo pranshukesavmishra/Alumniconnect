@@ -1286,7 +1286,7 @@ export const en = {
   'phone.pickTitle': 'Choose country',
   'phone.search': 'Search country or code',
   'phone.noMatch': 'No country found. Try the name or the code, like 44.',
-  'phone.countryAria': 'Country code: {country}, +{dial}. Change',
+  'phone.countryAria': 'Calling code: {country}, +{dial}. Change',
   'phone.errRequired': 'Please enter a mobile number.',
   'phone.errFormat': 'Choose the country and type the number without the country code.',
   'phone.errDigits': 'Numbers in {country} have {n} digits after +{dial}. Please check yours.',
