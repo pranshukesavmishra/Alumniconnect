@@ -178,7 +178,7 @@ test('reunion registration: profile card, days and family, fund, teams, sponsor,
     perform_interest: true, perform_types: ['singing'], perform_group: false, perform_minutes: 5,
     needs_accommodation: true, needs_local_travel: false, arrival_from: 'Pune', arrival_date: '2026-12-25', arrival_mode: 'train',
     nickname: 'Ashu', hostel: 'Hostel 3', song_requests: ['Yaaron Dosti'], memory_wall_consent: true, emergency_name: 'Ravi Alum',
-    emergency_phone: '+91 90000 22222', medical_notes: 'Needs ground-floor seating', feedback: `Please start the main event on time. ${S}`,
+    emergency_phone: '+919000022222', medical_notes: 'Needs ground-floor seating', feedback: `Please start the main event on time. ${S}`,
     food_pref: 'none', tshirt_size: 'L', branch: 'B.E. in Computer Science & Engineering', grad_year: 2007, email,
   })
   expect(row.day_heads).toEqual({ '1': 1, '2': 3 })

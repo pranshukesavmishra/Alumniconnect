@@ -149,7 +149,7 @@ test('settings: change event fields, ticket valid-on days, UPI and the publish s
   page.once('dialog', (d) => void d.accept())
   await page.getByRole('button', { name: 'Save changes' }).click()
   await expect(page.getByText('Event saved')).toBeVisible()
-  expect(sql(`select concat_ws('|', title, venue, capacity, upi_id, upi_payee_name, contact_phone, is_published) from events where id = '${ev.id}'`)).toBe(`Renamed ${t}|Hall Seven|321|newupi@okhdfc|JEC Fund|+91 99999 11111|t`)
+  expect(sql(`select concat_ws('|', title, venue, capacity, upi_id, upi_payee_name, contact_phone, is_published) from events where id = '${ev.id}'`)).toBe(`Renamed ${t}|Hall Seven|321|newupi@okhdfc|JEC Fund|+919999911111|t`)
   expect(sql(`select coalesce(days::text, 'all') from event_ticket_types where id = '${ev.spouse}'`)).toBe('{2}')
   expect(sql(`select coalesce(days::text, 'all') from event_ticket_types where id = '${ev.alumnus}'`)).toBe('all')
   expect(auditCount(`target_id = '${ev.id}' and actor = '${boss.id}'`)).toBeGreaterThan(0)

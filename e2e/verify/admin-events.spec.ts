@@ -141,7 +141,7 @@ test('registrations: search, edit tickets / food / phone with a reason, cancel, 
   await dlg.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByText('Registration updated')).toBeVisible()
   expect(sql(`select concat_ws('|', amount_paise, headcount, food_pref, tshirt_size, phone, status) from event_registrations where id = '${reg.id}'`)).toBe(
-    '270000|2|jain|XL|+91 90000 54321|pending_payment',
+    '270000|2|jain|XL|+919000054321|pending_payment',
   )
   expect(auditCount(`action = 'update_registration' and target_id = '${reg.id}' and actor = '${admin.id}'`)).toBe(1)
   // cancel then reopen (reason via prompt)
@@ -213,7 +213,7 @@ test('exports download real CSVs with the right rows', async () => {
     expect(text).toContain(expectCol)
     if (btn === 'Registrations (Excel)') {
       for (const c of codes) expect(text).toContain(c)
-      expect(text).toContain('"=""+91 90000 54321"""') // phone kept as text for Excel (CSV-escaped)
+      expect(text).toContain('"=""+919000054321"""') // phone kept as text for Excel (CSV-escaped)
     }
   }
 })

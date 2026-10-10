@@ -107,7 +107,7 @@ test('members: edit every field in the editor; saved in DB and audited', async (
   expect(sql(`select concat_ws('|', full_name, member_type, branch, grad_year, join_year, current_title, current_company, city) from profiles where id = '${target.id}'`)).toBe(
     `Target Edited ${ts}|faculty|B.E. in Mechanical Engineering|2008|2004|Principal Engineer|Acme|Indore`,
   )
-  expect(sql(`select phone from profile_private where id = '${target.id}'`)).toBe('+91 98111 22333')
+  expect(sql(`select phone from profile_private where id = '${target.id}'`)).toBe('+919811122333')
   expect(auditCount(`action = 'update_member' and target_id = '${target.id}' and actor = '${adminId}'`)).toBe(before + 1)
   const changed = sql(`select details->'changed' from admin_audit where action = 'update_member' and target_id = '${target.id}' order by id desc limit 1`)
   for (const k of ['full_name', 'member_type', 'branch', 'grad_year', 'join_year', 'current_title', 'current_company', 'city']) expect(changed).toContain(k)
@@ -126,10 +126,10 @@ test('members: friendly errors for an empty name and a bad phone', async () => {
   await dlg.getByRole('button', { name: 'Save changes' }).click()
   await expect(page.getByText('Name cannot be empty')).toBeVisible()
   await dlg.getByLabel('Full name').fill(`Target Edited ${ts}`)
-  await dlg.getByLabel('Mobile (private)').fill('call me')
+  await dlg.getByLabel('Mobile (private)').fill('12')
   await dlg.getByRole('button', { name: 'Save changes' }).click()
-  await expect(page.getByText('Please enter a valid mobile number')).toBeVisible()
-  expect(sql(`select phone from profile_private where id = '${target.id}'`)).toBe('+91 98111 22333')
+  await expect(page.getByText('Numbers in India have 10 digits')).toBeVisible()
+  expect(sql(`select phone from profile_private where id = '${target.id}'`)).toBe('+919811122333')
   await dlg.getByRole('button', { name: 'Close' }).click()
 })
 

@@ -46,7 +46,7 @@ test('email code sign-in from a protected page, onboarding validation, next redi
   await expect(page.getByText('Please choose your branch.')).toBeVisible()
   await expect(page.getByText('Please choose your passing-out year.')).toBeVisible()
   await expect(page.getByText('Please enter the city you live in.')).toBeVisible()
-  await expect(page.getByText(/Please enter a valid mobile number/)).toBeVisible()
+  await expect(page.getByText(/Please enter a mobile number/)).toBeVisible()
   expect(sql(`select onboarded from profiles where id = (select id from auth.users where email = '${mail}')`)).toBe('f')
 
   // faculty hides branch/year and does not require them
@@ -62,7 +62,7 @@ test('email code sign-in from a protected page, onboarding validation, next redi
   await page.getByLabel('City you live in').fill('Indore')
   await page.getByLabel('Mobile number').fill('12345')
   await page.getByRole('button', { name: 'Continue' }).click()
-  await expect(page.getByText(/Please enter a valid mobile number/)).toBeVisible()
+  await expect(page.getByText(/Numbers in India have 10 digits/)).toBeVisible()
   await page.getByLabel('Mobile number').fill('+91 99887 76655')
   await page.getByRole('button', { name: 'Continue' }).click()
 
@@ -74,7 +74,7 @@ test('email code sign-in from a protected page, onboarding validation, next redi
   expect(sql(`select full_name||'|'||member_type||'|'||branch||'|'||grad_year||'|'||join_year||'|'||city||'|'||onboarded||'|'||verification from profiles where id='${uid}'`)).toBe(
     'Auth Tester|alumnus|B.E. in Mechanical Engineering|2009|2005|Indore|true|pending',
   )
-  expect(sql(`select phone from profile_private where id='${uid}'`)).toBe('+91 99887 76655')
+  expect(sql(`select phone from profile_private where id='${uid}'`)).toBe('+919988776655')
   // auto batch + year groups
   expect(sql(`select string_agg(g.slug, ',' order by g.slug) from group_members m join groups g on g.id=m.group_id where m.user_id='${uid}'`)).toBe(
     'b-e-in-mechanical-engineering-2009,jec-2009',
