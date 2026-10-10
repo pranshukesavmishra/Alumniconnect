@@ -23,7 +23,8 @@ psql_run() { psql -h localhost -p "$PORT" -v ON_ERROR_STOP=1 -q "$@"; }
 psql_run -U supabase_admin -d postgres -f supabase/tests/00_test_prelude.sql
 for f in supabase/migrations/*.sql; do
   echo "migrate: $f"
-  psql_run -U postgres -f "$f"
+  # DB_TEST_CRLF=1 applies every migration with Windows line endings, as `supabase db push` sees them after a Windows git pull
+  if [ "${DB_TEST_CRLF:-}" = 1 ]; then sed 's/$/\r/' "$f" | psql_run -U postgres -f -; else psql_run -U postgres -f "$f"; fi
 done
 psql_run -U postgres -f supabase/seed.sql
 for f in supabase/tests/[1-9]*.sql; do
