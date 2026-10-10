@@ -80,8 +80,13 @@ Deno.serve(async (req) => {
 
 async function createRoot(req: Request, userId: string, eventId: string | undefined): Promise<Response> {
   const admin = asService()
-  const [me] = await admin.select<{ is_admin: boolean }>('profiles', `select=is_admin&id=${eq(userId)}`)
+  const [me] = await admin.select<{ is_admin: boolean; is_super_admin: boolean }>('profiles', `select=is_admin,is_super_admin&id=${eq(userId)}`)
   if (!me?.is_admin) return json(req, { error: 'Only admins can set up the Drive archive' }, 403)
+  // a limited admin needs the event-settings permission; super admins and admins without a limited grant hold every permission
+  const [grant] = await admin.select<{ permissions: string[] }>('admin_grants', `select=permissions&user_id=${eq(userId)}`)
+  if (!me.is_super_admin && grant && !grant.permissions.includes('events_settings')) {
+    return json(req, { error: 'You do not have permission to change event settings. Ask a super admin.' }, 403)
+  }
   if (!driveConfigured()) return json(req, { skipped: true })
   if (!eventId || !/^[0-9a-f-]{36}$/.test(eventId)) return json(req, { error: 'Event not found' }, 404)
   const [ev] = await admin.select<{ title: string }>('events', `select=title&id=${eq(eventId)}`)

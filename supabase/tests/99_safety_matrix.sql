@@ -21,10 +21,20 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('93000000-0000-0000-0000-0000000000b4', 'v@m93.com', '{"full_name":"Vol"}'),
   ('93000000-0000-0000-0000-0000000000c1', 'x@m93.com', '{"full_name":"Mem"}'),
   ('93000000-0000-0000-0000-0000000000c2', 'y@m93.com', '{"full_name":"Mem Two"}'),
-  ('93000000-0000-0000-0000-0000000000c3', 'z@m93.com', '{"full_name":"Mem Three"}');
+  ('93000000-0000-0000-0000-0000000000c3', 'z@m93.com', '{"full_name":"Mem Three"}'),
+  ('93000000-0000-0000-0000-0000000000c4', 'w@m93.com', '{"full_name":"Mem Four"}');
 update public.profiles set onboarded = true, verification = 'verified', member_type = 'alumnus', branch = 'Civil Engineering', city = 'Pune', grad_year = 2001
  where id::text like '93000000-%';
 update public.profiles set is_admin = true where id in ('93000000-0000-0000-0000-0000000000a1', '93000000-0000-0000-0000-0000000000a2');
+update public.profiles set is_super_admin = true where id = '93000000-0000-0000-0000-0000000000a2';
+-- one LIMITED admin per permission: holds exactly that one key
+insert into auth.users (id, email, raw_user_meta_data)
+  select ('93100000-0000-0000-0000-' || lpad(c.sort::text, 12, '0'))::uuid, 'lim' || c.sort || '@m93.com', json_build_object('full_name', 'Lim ' || c.key)::jsonb
+    from public._permission_catalog() c;
+update public.profiles set onboarded = true, verification = 'verified', member_type = 'alumnus', branch = 'Civil Engineering', city = 'Pune', grad_year = 2001, is_admin = true
+ where id::text like '93100000-%';
+insert into public.admin_grants (user_id, permissions)
+  select ('93100000-0000-0000-0000-' || lpad(c.sort::text, 12, '0'))::uuid, array[c.key] from public._permission_catalog() c;
 update public.profile_private set phone = '+91 98765 93000' where id = '93000000-0000-0000-0000-0000000000c1';
 insert into public.events (id, slug, title, is_published, upi_id) values
   ('93000000-0000-0000-0000-0000000000e1', 'm93-one', 'M93 One', true, 'jec@okhdfc'),
@@ -64,104 +74,123 @@ insert into storage.objects (bucket_id, name, owner) select 'payment-proofs', v.
 
 -- ---------------------------------------------------------------- the matrix
 -- fields: label (function name), call, who may call it. Letters: a admin, m moderator, t treasurer of event 1, c content manager of event 1, v volunteer of event 1.
-create table public.t93_cases (fn text, call text, allowed text);
+-- allowed: letters of the role-holders who may call it (a legacy full admin, s super admin, m moderator, t treasurer, c content, v volunteer);
+-- perms: the admin permission keys that allow it for a LIMITED admin ('*' = any admin). Every permission has its own limited admin below.
+create table public.t93_cases (fn text, call text, allowed text, perms text);
 insert into public.t93_cases values
   -- admins only
-  ('admin_add_member_note', $q$select public.admin_add_member_note('93000000-0000-0000-0000-0000000000c1', 'note')$q$, 'a'),
-  ('admin_analytics', $q$select public.admin_analytics()$q$, 'a'),
-  ('admin_audit_search', $q$select * from public.admin_audit_search(null, null, null, null, null, 10, null)$q$, 'a'),
-  ('admin_bulk_set_verification', $q$select public.admin_bulk_set_verification(array['93000000-0000-0000-0000-0000000000c2']::uuid[], 'rejected', 'x', null)$q$, 'a'),
-  ('admin_delete_member_note', $q$select public.admin_delete_member_note('93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_delete_member_view', $q$select public.admin_delete_member_view('93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_dismiss_duplicate', $q$select public.admin_dismiss_duplicate('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_export_members', $q$select * from public.admin_export_members(array['93000000-0000-0000-0000-0000000000c1']::uuid[], true)$q$, 'a'),
-  ('admin_grant_role', $q$select public.admin_grant_role('93000000-0000-0000-0000-0000000000c2', 'moderator')$q$, 'a'),
-  ('admin_revoke_role', $q$select public.admin_revoke_role('93000000-0000-0000-0000-0000000000b3', 'moderator')$q$, 'a'),
-  ('admin_health', $q$select public.admin_health()$q$, 'a'),
-  ('admin_import_claim', $q$select * from public.admin_import_claim('93000000-0000-0000-0000-0000000000c2', 10)$q$, 'a'),
-  ('admin_import_jobs', $q$select public.admin_import_jobs(null)$q$, 'a'),
-  ('admin_import_mark', $q$select public.admin_import_mark(1, true, null, null)$q$, 'a'),
-  ('admin_import_preview', $q$select public.admin_import_preview('[{"full_name":"A B"}]'::jsonb)$q$, 'a'),
-  ('admin_import_retry', $q$select public.admin_import_retry('93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_import_start', $q$select public.admin_import_start('[{"full_name":"A B"}]'::jsonb, false, null)$q$, 'a'),
-  ('admin_list_members', $q$select public.admin_list_members('{}'::jsonb, 10, 0, false)$q$, 'a'),
-  ('admin_member_duplicates', $q$select * from public.admin_member_duplicates('all')$q$, 'a'),
-  ('admin_member_email', $q$select public.admin_member_email('93000000-0000-0000-0000-0000000000c1')$q$, 'a'),
-  ('admin_member_timeline', $q$select public.admin_member_timeline('93000000-0000-0000-0000-0000000000c1')$q$, 'a'),
-  ('admin_merge_members', $q$select public.admin_merge_members('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_merge_preview', $q$select public.admin_merge_preview('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
-  ('admin_review_event_message', $q$select public.admin_review_event_message('93000000-0000-0000-0000-0000000000a5', false, 'no')$q$, 'a'),
-  ('admin_roles_overview', $q$select public.admin_roles_overview()$q$, 'a'),
-  ('admin_save_member_view', $q$select public.admin_save_member_view('v', '{}'::jsonb)$q$, 'a'),
-  ('admin_set_member', $q$select public.admin_set_member('93000000-0000-0000-0000-0000000000c2', null, 'verified')$q$, 'a'),
-  ('admin_update_member', $q$select public.admin_update_member('93000000-0000-0000-0000-0000000000c2', '{"city":"Delhi"}'::jsonb, null)$q$, 'a'),
-  ('admin_view_as_member', $q$select public.admin_view_as_member('93000000-0000-0000-0000-0000000000c2')$q$, 'a'),
+  ('admin_add_member_note', $q$select public.admin_add_member_note('93000000-0000-0000-0000-0000000000c1', 'note')$q$, 'a', 'members_edit'),
+  ('admin_analytics', $q$select public.admin_analytics()$q$, 'a', 'analytics'),
+  ('admin_audit_search', $q$select * from public.admin_audit_search(null, null, null, null, null, 10, null)$q$, 'a', 'audit'),
+  ('admin_bulk_set_verification', $q$select public.admin_bulk_set_verification(array['93000000-0000-0000-0000-0000000000c2']::uuid[], 'rejected', 'x', null)$q$, 'a', 'members_verify'),
+  ('admin_delete_member_note', $q$select public.admin_delete_member_note('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_edit'),
+  ('admin_delete_member_view', $q$select public.admin_delete_member_view('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_view'),
+  ('admin_dismiss_duplicate', $q$select public.admin_dismiss_duplicate('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_merge'),
+  ('admin_export_members', $q$select * from public.admin_export_members(array['93000000-0000-0000-0000-0000000000c1']::uuid[], true)$q$, 'a', 'members_export'),
+  ('admin_grant_role', $q$select public.admin_grant_role('93000000-0000-0000-0000-0000000000c2', 'moderator')$q$, 'a', 'moderation_reports,moderation_hide,moderation_slowmode,moderation_meetups'),
+  ('admin_revoke_role', $q$select public.admin_revoke_role('93000000-0000-0000-0000-0000000000b3', 'moderator')$q$, 'a', 'moderation_reports,moderation_hide,moderation_slowmode,moderation_meetups'),
+  ('admin_health', $q$select public.admin_health()$q$, 'a', 'health'),
+  ('admin_import_claim', $q$select * from public.admin_import_claim('93000000-0000-0000-0000-0000000000c2', 10)$q$, 'a', 'members_import'),
+  ('admin_import_jobs', $q$select public.admin_import_jobs(null)$q$, 'a', 'members_import'),
+  ('admin_import_mark', $q$select public.admin_import_mark(1, true, null, null)$q$, 'a', 'members_import'),
+  ('admin_import_preview', $q$select public.admin_import_preview('[{"full_name":"A B"}]'::jsonb)$q$, 'a', 'members_import'),
+  ('admin_import_retry', $q$select public.admin_import_retry('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_import'),
+  ('admin_import_start', $q$select public.admin_import_start('[{"full_name":"A B"}]'::jsonb, false, null)$q$, 'a', 'members_import'),
+  ('admin_list_members', $q$select public.admin_list_members('{}'::jsonb, 10, 0, false)$q$, 'a', 'members_view'),
+  ('admin_member_duplicates', $q$select * from public.admin_member_duplicates('all')$q$, 'a', 'members_merge'),
+  ('admin_member_email', $q$select public.admin_member_email('93000000-0000-0000-0000-0000000000c1')$q$, 'a', 'members_view'),
+  ('admin_member_timeline', $q$select public.admin_member_timeline('93000000-0000-0000-0000-0000000000c1')$q$, 'a', 'members_view'),
+  ('admin_merge_members', $q$select public.admin_merge_members('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_merge'),
+  ('admin_merge_preview', $q$select public.admin_merge_preview('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_merge'),
+  ('admin_review_event_message', $q$select public.admin_review_event_message('93000000-0000-0000-0000-0000000000a5', false, 'no')$q$, 'a', 'messages_send'),
+  ('admin_roles_overview', $q$select public.admin_roles_overview()$q$, 'a', 'admins,events_team,moderation_reports,moderation_hide,moderation_slowmode,moderation_meetups'),
+  ('admin_save_member_view', $q$select public.admin_save_member_view('v', '{}'::jsonb)$q$, 'a', 'members_view'),
+  ('admin_set_member', $q$select public.admin_set_member('93000000-0000-0000-0000-0000000000c2', null, 'verified')$q$, 'a', 'members_verify'),
+  ('admin_update_member', $q$select public.admin_update_member('93000000-0000-0000-0000-0000000000c2', '{"city":"Delhi"}'::jsonb, null)$q$, 'a', 'members_edit'),
+  ('admin_view_as_member', $q$select public.admin_view_as_member('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_view'),
   -- money: treasurer of the event (and admins)
-  ('admin_add_waitlist', $q$select public.admin_add_waitlist('93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c1', 1)$q$, 'at'),
-  ('admin_apply_discount', $q$select public.admin_apply_discount('93000000-0000-0000-0000-0000000000d1', 100, 'because')$q$, 'at'),
-  ('admin_attendance_report', $q$select public.admin_attendance_report('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
-  ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
-  ('admin_event_ledger_rows', $q$select * from public.admin_event_ledger_rows('93000000-0000-0000-0000-0000000000e1', null, null, false)$q$, 'at'),
-  ('admin_log_event_export', $q$select public.admin_log_event_export('93000000-0000-0000-0000-0000000000e1', 'registrations', 3)$q$, 'at'),
-  ('admin_log_audit_export', $q$select public.admin_log_audit_export(1, '{}')$q$, 'a'),
-  ('admin_event_ops', $q$select public.admin_event_ops('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
-  ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000b9')$q$, 'at'),
-  ('admin_record_refund', $q$select public.admin_record_refund('93000000-0000-0000-0000-0000000000eb', 100, 'cash', 'ref', 'note', false)$q$, 'at'),
-  ('admin_remove_waitlist', $q$select public.admin_remove_waitlist('93000000-0000-0000-0000-0000000000b9', 'x')$q$, 'at'),
-  ('admin_run_waitlist', $q$select public.admin_run_waitlist('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
-  ('admin_save_event_ops', $q$select public.admin_save_event_ops('93000000-0000-0000-0000-0000000000e1', false, '[]'::jsonb)$q$, 'at'),
-  ('admin_search', $q$select public.admin_search('Mem', 5)$q$, 'at'),
-  ('admin_set_registration_status', $q$select public.admin_set_registration_status('93000000-0000-0000-0000-0000000000d1', true, 'why', false, null)$q$, 'at'),
-  ('admin_transfer_registration', $q$select public.admin_transfer_registration('93000000-0000-0000-0000-0000000000d1', '93000000-0000-0000-0000-0000000000c2', 'why')$q$, 'at'),
-  ('admin_update_registration', $q$select public.admin_update_registration('93000000-0000-0000-0000-0000000000d1', '{"food_pref":"jain"}'::jsonb, null, 'why', null)$q$, 'at'),
-  ('admin_waitlist', $q$select * from public.admin_waitlist('93000000-0000-0000-0000-0000000000e1')$q$, 'at'),
-  ('review_payment', $q$select public.review_payment('93000000-0000-0000-0000-0000000000e9', true, null)$q$, 'at'),
-  ('record_offline_payment', $q$select public.record_offline_payment('93000000-0000-0000-0000-0000000000d1', 'cash', 100, 'n')$q$, 'at'),
+  ('admin_add_waitlist', $q$select public.admin_add_waitlist('93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c1', 1)$q$, 'at', 'events_registrations'),
+  ('admin_apply_discount', $q$select public.admin_apply_discount('93000000-0000-0000-0000-0000000000d1', 100, 'because')$q$, 'at', 'money_refunds'),
+  ('admin_attendance_report', $q$select public.admin_attendance_report('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'events_registrations'),
+  ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'money_finance'),
+  ('admin_event_ledger_rows', $q$select * from public.admin_event_ledger_rows('93000000-0000-0000-0000-0000000000e1', null, null, false)$q$, 'at', 'money_finance'),
+  ('admin_log_event_export', $q$select public.admin_log_event_export('93000000-0000-0000-0000-0000000000e1', 'registrations', 3)$q$, 'at', 'money_exports,events_registrations'),
+  ('admin_log_audit_export', $q$select public.admin_log_audit_export(1, '{}')$q$, 'a', 'audit'),
+  ('admin_event_ops', $q$select public.admin_event_ops('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'events_registrations'),
+  ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000b9')$q$, 'at', 'events_registrations'),
+  ('admin_record_refund', $q$select public.admin_record_refund('93000000-0000-0000-0000-0000000000eb', 100, 'cash', 'ref', 'note', false)$q$, 'at', 'money_refunds'),
+  ('admin_remove_waitlist', $q$select public.admin_remove_waitlist('93000000-0000-0000-0000-0000000000b9', 'x')$q$, 'at', 'events_registrations'),
+  ('admin_run_waitlist', $q$select public.admin_run_waitlist('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'events_registrations'),
+  ('admin_save_event_ops', $q$select public.admin_save_event_ops('93000000-0000-0000-0000-0000000000e1', false, '[]'::jsonb)$q$, 'at', 'events_registrations'),
+  ('admin_search', $q$select public.admin_search('Mem', 5)$q$, 'at', 'members_view,money_payments,money_refunds,money_finance,money_exports,events_registrations'),
+  ('admin_set_registration_status', $q$select public.admin_set_registration_status('93000000-0000-0000-0000-0000000000d1', true, 'why', false, null)$q$, 'at', 'events_registrations'),
+  ('admin_transfer_registration', $q$select public.admin_transfer_registration('93000000-0000-0000-0000-0000000000d1', '93000000-0000-0000-0000-0000000000c2', 'why')$q$, 'at', 'events_registrations'),
+  ('admin_update_registration', $q$select public.admin_update_registration('93000000-0000-0000-0000-0000000000d1', '{"food_pref":"jain"}'::jsonb, null, 'why', null)$q$, 'at', 'events_registrations'),
+  ('admin_waitlist', $q$select * from public.admin_waitlist('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'events_registrations'),
+  ('review_payment', $q$select public.review_payment('93000000-0000-0000-0000-0000000000e9', true, null)$q$, 'at', 'money_payments'),
+  ('record_offline_payment', $q$select public.record_offline_payment('93000000-0000-0000-0000-0000000000d1', 'cash', 100, 'n')$q$, 'at', 'money_payments'),
   -- the same functions on another event: the event 1 treasurer is refused
-  ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e2')$q$, 'a'),
-  ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000ba')$q$, 'a'),
-  ('review_payment', $q$select public.review_payment('93000000-0000-0000-0000-0000000000ea', true, null)$q$, 'a'),
-  ('admin_update_registration', $q$select public.admin_update_registration('93000000-0000-0000-0000-0000000000d2', '{"food_pref":"jain"}'::jsonb, null, 'why', null)$q$, 'a'),
+  ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e2')$q$, 'a', 'money_finance'),
+  ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000ba')$q$, 'a', 'events_registrations'),
+  ('review_payment', $q$select public.review_payment('93000000-0000-0000-0000-0000000000ea', true, null)$q$, 'a', 'money_payments'),
+  ('admin_update_registration', $q$select public.admin_update_registration('93000000-0000-0000-0000-0000000000d2', '{"food_pref":"jain"}'::jsonb, null, 'why', null)$q$, 'a', 'events_registrations'),
   -- messages and programme: content manager of the event (and admins)
-  ('admin_message_preview', $q$select public.admin_message_preview('93000000-0000-0000-0000-0000000000e1', '{}'::jsonb)$q$, 'ac'),
-  ('admin_send_event_message', $q$select public.admin_send_event_message('93000000-0000-0000-0000-0000000000e1', 'announcement', 'Title', 'Body', '{}'::jsonb)$q$, 'ac'),
-  ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a5')$q$, 'ac'),
-  ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a6')$q$, 'a'),
-  ('post_announcement', $q$select public.post_announcement('93000000-0000-0000-0000-0000000000e1', 'Title', 'Body text', false)$q$, 'ac'),
-  ('event_announcement_audience', $q$select public.event_announcement_audience('93000000-0000-0000-0000-0000000000e1')$q$, 'ac'),
-  ('moderate_photo', $q$select public.moderate_photo('93000000-0000-0000-0000-0000000000a7', true)$q$, 'ac'),
+  ('admin_message_preview', $q$select public.admin_message_preview('93000000-0000-0000-0000-0000000000e1', '{}'::jsonb)$q$, 'ac', 'messages_send'),
+  ('admin_send_event_message', $q$select public.admin_send_event_message('93000000-0000-0000-0000-0000000000e1', 'announcement', 'Title', 'Body', '{}'::jsonb)$q$, 'ac', 'messages_send'),
+  ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a5')$q$, 'ac', 'messages_send'),
+  ('admin_cancel_event_message', $q$select public.admin_cancel_event_message('93000000-0000-0000-0000-0000000000a6')$q$, 'a', 'messages_send'),
+  ('post_announcement', $q$select public.post_announcement('93000000-0000-0000-0000-0000000000e1', 'Title', 'Body text', false)$q$, 'ac', 'messages_announcements'),
+  ('event_announcement_audience', $q$select public.event_announcement_audience('93000000-0000-0000-0000-0000000000e1')$q$, 'ac', 'messages_announcements'),
+  ('moderate_photo', $q$select public.moderate_photo('93000000-0000-0000-0000-0000000000a7', true)$q$, 'ac', 'events_edit,moderation_hide'),
   -- moderation: moderators and admins
-  ('admin_reports', $q$select * from public.admin_reports('open')$q$, 'am'),
-  ('admin_dismiss_reports', $q$select public.admin_dismiss_reports('post', '93000000-0000-0000-0000-0000000000a9')$q$, 'am'),
-  ('admin_remove_message', $q$select public.admin_remove_message('93000000-0000-0000-0000-0000000000d8')$q$, 'am'),
-  ('moderate', $q$select public.moderate('post', '93000000-0000-0000-0000-0000000000a9', true, 'actioned')$q$, 'am'),
-  ('admin_set_meetup', $q$select public.admin_set_meetup('93000000-0000-0000-0000-0000000000a8', 'hidden', 'x')$q$, 'am'),
-  ('admin_set_slow_mode', $q$select public.admin_set_slow_mode('93000000-0000-0000-0000-0000000000a8', 30)$q$, 'am'),
-  ('admin_groups_for_moderation', $q$select * from public.admin_groups_for_moderation()$q$, 'am'),
+  ('admin_reports', $q$select * from public.admin_reports('open')$q$, 'am', 'moderation_reports'),
+  ('admin_dismiss_reports', $q$select public.admin_dismiss_reports('post', '93000000-0000-0000-0000-0000000000a9')$q$, 'am', 'moderation_reports'),
+  ('admin_remove_message', $q$select public.admin_remove_message('93000000-0000-0000-0000-0000000000d8')$q$, 'am', 'moderation_hide'),
+  ('moderate', $q$select public.moderate('post', '93000000-0000-0000-0000-0000000000a9', true, 'actioned')$q$, 'am', 'moderation_hide'),
+  ('admin_set_meetup', $q$select public.admin_set_meetup('93000000-0000-0000-0000-0000000000a8', 'hidden', 'x')$q$, 'am', 'moderation_meetups'),
+  ('admin_set_slow_mode', $q$select public.admin_set_slow_mode('93000000-0000-0000-0000-0000000000a8', 30)$q$, 'am', 'moderation_slowmode'),
+  ('admin_groups_for_moderation', $q$select * from public.admin_groups_for_moderation()$q$, 'am', 'moderation_slowmode'),
   -- queues: each role sees its own slice
-  ('admin_attention', $q$select public.admin_attention()$q$, 'amtc'),
-  ('admin_inbox', $q$select public.admin_inbox()$q$, 'amt'),
+  ('admin_attention', $q$select public.admin_attention()$q$, 'amtc', '*'),
+  ('admin_inbox', $q$select public.admin_inbox()$q$, 'amt', 'moderation_reports,messages_send,money_refunds,events_registrations'),
   -- the door
-  ('check_in', $q$select public.check_in('93000000-0000-0000-0000-0000000000e1', 'JEC-M93001', false)$q$, 'atcv'),
-  ('check_in', $q$select public.check_in('93000000-0000-0000-0000-0000000000e2', 'JEC-M93002', false)$q$, 'a'),
-  ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e1', 'Mem')$q$, 'atcv'),
-  ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e2', 'Mem')$q$, 'a'),
-  ('event_arrivals', $q$select * from public.event_arrivals('93000000-0000-0000-0000-0000000000e1')$q$, 'atcv');
+  ('admin_grant_role', $q$select public.admin_grant_role('93000000-0000-0000-0000-0000000000c2', 'treasurer', '93000000-0000-0000-0000-0000000000e1')$q$, 'a', 'events_team'),
+  ('admin_revoke_role', $q$select public.admin_revoke_role('93000000-0000-0000-0000-0000000000b1', 'treasurer', '93000000-0000-0000-0000-0000000000e1')$q$, 'a', 'events_team'),
+  -- admin access has its own door: nobody but a super admin, not even a full admin
+  ('admin_grant_role', $q$select public.admin_grant_role('93000000-0000-0000-0000-0000000000c2', 'admin')$q$, '', ''),
+  ('admin_revoke_role', $q$select public.admin_revoke_role('93000000-0000-0000-0000-0000000000a2', 'admin')$q$, '', ''),
+  ('admin_set_admin', $q$select public.admin_set_admin('93000000-0000-0000-0000-0000000000c3', true, array['members_view'], 'n')$q$, 's', ''),
+  ('admin_set_super_admin', $q$select public.admin_set_super_admin('93000000-0000-0000-0000-0000000000c3', true)$q$, 's', ''),
+  ('admin_transfer_ownership', $q$select public.admin_transfer_ownership('93000000-0000-0000-0000-0000000000c3', false)$q$, 's', ''),
+  ('admin_list_admins', $q$select public.admin_list_admins()$q$, 'as', 'admins'),
+  ('admin_permission_catalog', $q$select * from public.admin_permission_catalog()$q$, 'as', '*'),
+  ('admin_log_event_export', $q$select public.admin_log_event_export('93000000-0000-0000-0000-0000000000e1', 'not_arrived', 3)$q$, 'atcv', 'events_checkin,events_registrations,money_exports'),
+  ('check_in', $q$select public.check_in('93000000-0000-0000-0000-0000000000e1', 'JEC-M93001', false)$q$, 'atcv', 'events_checkin,events_registrations'),
+  ('check_in', $q$select public.check_in('93000000-0000-0000-0000-0000000000e2', 'JEC-M93002', false)$q$, 'a', 'events_checkin,events_registrations'),
+  ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e1', 'Mem')$q$, 'atcv', 'events_checkin,events_registrations'),
+  ('checkin_search', $q$select public.checkin_search('93000000-0000-0000-0000-0000000000e2', 'Mem')$q$, 'a', 'events_checkin,events_registrations'),
+  ('event_arrivals', $q$select * from public.event_arrivals('93000000-0000-0000-0000-0000000000e1')$q$, 'atcv', 'events_checkin,events_registrations');
+
+-- callers: anon, a plain member, each event role, a moderator, a legacy full admin (no grants row), a super admin, and one limited admin per permission
+create table public.t93_actors (label text, uid text, perm text);
+insert into public.t93_actors values
+  ('anon', '', null), ('x', '93000000-0000-0000-0000-0000000000c1', null), ('v', '93000000-0000-0000-0000-0000000000b4', null),
+  ('t', '93000000-0000-0000-0000-0000000000b1', null), ('c', '93000000-0000-0000-0000-0000000000b2', null), ('m', '93000000-0000-0000-0000-0000000000b3', null),
+  ('a', '93000000-0000-0000-0000-0000000000a1', null), ('s', '93000000-0000-0000-0000-0000000000a2', null);
+insert into public.t93_actors
+  select 'p:' || c.key, '93100000-0000-0000-0000-' || lpad(c.sort::text, 12, '0'), c.key from public._permission_catalog() c;
 
 do $$
 declare
-  c record; who record; denied boolean; st text; msg text; bad text := '';
-  actors constant text[][] := array[['anon', ''], ['x', '93000000-0000-0000-0000-0000000000c1'], ['v', '93000000-0000-0000-0000-0000000000b4'],
-    ['t', '93000000-0000-0000-0000-0000000000b1'], ['c', '93000000-0000-0000-0000-0000000000b2'], ['m', '93000000-0000-0000-0000-0000000000b3'],
-    ['a', '93000000-0000-0000-0000-0000000000a1']];
-  i int; calls int := 0;
+  c record; who record; denied boolean; should boolean; st text; msg text; bad text := '';
+  calls int := 0;
 begin
   for c in select * from public.t93_cases loop
-    for i in 1..array_length(actors, 1) loop
+    for who in select * from public.t93_actors loop
       begin
-        execute format('set local role %s', case when actors[i][1] = 'anon' then 'anon' else 'authenticated' end);
-        perform set_config('request.jwt.claims', case when actors[i][2] = '' then '{"role":"anon"}' else json_build_object('sub', actors[i][2], 'role', 'authenticated')::text end, true);
-        perform set_config('request.jwt.claim.sub', actors[i][2], true);
+        execute format('set local role %s', case when who.label = 'anon' then 'anon' else 'authenticated' end);
+        perform set_config('request.jwt.claims', case when who.uid = '' then '{"role":"anon"}' else json_build_object('sub', who.uid, 'role', 'authenticated')::text end, true);
+        perform set_config('request.jwt.claim.sub', who.uid, true);
         execute c.call;
         raise exception 'done' using errcode = 'ZZ001';
       exception when others then
@@ -171,16 +200,21 @@ begin
       calls := calls + 1;
       denied := st = '42501';
       if st not in ('ZZ001', '42501') and st not in ('P0001', '23505', '23514', '22023') then
-        bad := bad || format(E'\n  %s as %s: unexpected %s %s', c.fn, actors[i][1], st, left(msg, 80));
+        bad := bad || format(E'\n  %s as %s: unexpected %s %s', c.fn, who.label, st, left(msg, 80));
       end if;
-      if actors[i][1] = 'anon' or actors[i][1] = 'x' then
-        if not denied then bad := bad || format(E'\n  %s as %s: should be refused but got %s %s', c.fn, actors[i][1], st, left(msg, 60)); end if;
-      elsif (position(actors[i][1] in c.allowed) > 0) = denied then
-        bad := bad || format(E'\n  %s as %s: %s (%s %s)', c.fn, actors[i][1], case when denied then 'wrongly refused' else 'wrongly allowed' end, st, left(msg, 60));
+      should := case
+        when who.label in ('anon', 'x') then false
+        when who.label = 'a' then position('a' in c.allowed) > 0                    -- a legacy admin is a full admin, except for super-only functions
+        when who.label = 's' then position('a' in c.allowed) > 0 or position('s' in c.allowed) > 0
+        when who.perm is not null then c.perms = '*' or who.perm = any (string_to_array(c.perms, ','))
+        else position(who.label in c.allowed) > 0 end;
+      if who.label in ('anon', 'x') then
+        if not denied then bad := bad || format(E'\n  %s as %s: should be refused but got %s %s', c.fn, who.label, st, left(msg, 60)); end if;
+      elsif should = denied then
+        bad := bad || format(E'\n  %s as %s: %s (%s %s)', c.fn, who.label, case when denied then 'wrongly refused' else 'wrongly allowed' end, st, left(msg, 60));
       end if;
     end loop;
   end loop;
-  -- admin is allowed in every row ('a' always in allowed); every role/anon column was checked above
   assert bad = '', 'enforcement matrix failures:' || bad;
   raise notice 'matrix: % function x caller combinations checked', calls;
 end $$;
@@ -312,6 +346,105 @@ do $$ begin
   assert (select title from public.events where id = '93000000-0000-0000-0000-0000000000e1') = 'M93 One', 'a member cannot edit events';
 end $$;
 
+-- ---------------------------------------------------------------- limited admins: which rows each permission reads and writes
+insert into public.admin_audit (actor, action, target_table) values ('93000000-0000-0000-0000-0000000000a1', 'x93', 'profiles');
+insert into public.admin_member_notes (member_id, author, body) values ('93000000-0000-0000-0000-0000000000c1', '93000000-0000-0000-0000-0000000000a1', 'note');
+insert into public.reports (reporter, target_type, target_id, reason) values ('93000000-0000-0000-0000-0000000000c2', 'post', '93000000-0000-0000-0000-0000000000a9', 'spam');
+insert into public.events (id, slug, title, is_published) values ('93000000-0000-0000-0000-0000000000e3', 'm93-draft', 'M93 Draft', false);
+insert into public.posts (id, author_id, body, is_hidden) values ('93000000-0000-0000-0000-0000000000aa', '93000000-0000-0000-0000-0000000000c2', 'hidden one', true);
+insert into public.event_settings (event_id) values ('93000000-0000-0000-0000-0000000000e1');
+insert into public.batch_sizes (grad_year, branch, total) values (2001, 'Civil Engineering', 50);
+insert into public.spotlights (profile_id, headline) values ('93000000-0000-0000-0000-0000000000c1', 'h');
+
+create function pg_temp.fam(p_prefix text) returns text language sql as $$
+  select string_agg(key, ',') from public._permission_catalog() where left(key, length(p_prefix)) = p_prefix;
+$$;
+create function pg_temp.affected(p_uid uuid, q text) returns bigint language plpgsql as $$
+declare n bigint;
+begin
+  set local role authenticated;
+  perform pg_temp.login(p_uid);
+  begin
+    execute 'with w as (' || q || ' returning 1) select count(*) from w' into n;
+    raise exception 'undo' using errcode = 'ZZ002';
+  exception when sqlstate 'ZZ002' then null; when others then n := -1; end;
+  reset role;
+  return n;
+end $$;
+create function pg_temp.seen(p_uid uuid, q text) returns bigint language plpgsql as $$
+declare n bigint;
+begin
+  set local role authenticated;
+  perform pg_temp.login(p_uid);
+  begin execute 'select count(*) from (' || q || ') s' into n; exception when others then n := -1; end;
+  reset role;
+  return n;
+end $$;
+
+create table public.t93_rls (q text, perms text, write boolean);
+insert into public.t93_rls values
+  ('select * from public.admin_audit', 'audit', false),
+  ('select * from public.admin_member_notes', 'members_view', false),
+  ('select * from public.event_registrations', pg_temp.fam('money_') || ',events_registrations', false),
+  ('select * from public.event_payments', pg_temp.fam('money_') || ',events_registrations', false),
+  ('select * from public.event_waitlist where status = ''waiting''', 'events_registrations', false),
+  ('select * from public.event_messages', 'messages_send', false),
+  ('select * from public.profile_private where id = ''93000000-0000-0000-0000-0000000000c1''', 'members_view', false),
+  ('select * from public.reports', 'moderation_reports', false),
+  ('select * from public.events where id = ''93000000-0000-0000-0000-0000000000e3''', pg_temp.fam('events_') || ',' || pg_temp.fam('money_') || ',' || pg_temp.fam('messages_'), false),
+  ('select * from public.posts where id = ''93000000-0000-0000-0000-0000000000aa''', 'moderation_hide', false),
+  ('select * from public.groups where id = ''93000000-0000-0000-0000-0000000000a8''', 'community_circles,' || pg_temp.fam('moderation_'), false),
+  ('select * from public.event_staff', 'admins,events_team', false),
+  ('select * from public.site_roles where user_id = ''93000000-0000-0000-0000-0000000000b3''', 'admins,' || pg_temp.fam('moderation_'), false),
+  ('update public.events set title = title where id = ''93000000-0000-0000-0000-0000000000e1''', 'events_edit', true),
+  ('insert into public.events (slug, title) values (''m93-new'', ''New'')', 'events_create', true),
+  ('delete from public.events where id = ''93000000-0000-0000-0000-0000000000e3''', 'events_create', true),
+  ('update public.event_ticket_types set label = label where id = ''93000000-0000-0000-0000-0000000000f1''', 'events_tickets', true),
+  ('update public.event_settings set drive_folder_id = drive_folder_id', 'events_settings', true),
+  ('update public.batch_sizes set total = total', 'community_batches', true),
+  ('update public.spotlights set headline = headline', 'community_spotlight', true),
+  ('update public.groups set name = name where id = ''93000000-0000-0000-0000-0000000000a8''', 'community_circles', true),
+  ('update public.profiles set about = about where id = ''93000000-0000-0000-0000-0000000000c1''', 'members_edit', true),
+  ('delete from public.posts where id = ''93000000-0000-0000-0000-0000000000a9''', 'moderation_hide', true);
+
+do $$
+declare
+  r record; who record; n bigint; ok boolean; bad text := ''; k int := 0;
+begin
+  for r in select * from public.t93_rls loop
+    for who in select * from public.t93_actors where label not in ('anon', 't', 'c', 'm', 'v') loop
+      -- the plain member here is one who owns none of the rows being touched
+      who.uid := case when who.label = 'x' then '93000000-0000-0000-0000-0000000000c4' else who.uid end;
+      n := case when r.write then pg_temp.affected(who.uid::uuid, r.q) else pg_temp.seen(who.uid::uuid, r.q) end;
+      ok := case when who.label = 'x' then false
+                 when who.label in ('a', 's') then true
+                 else who.perm = any (string_to_array(r.perms, ',')) end;
+      k := k + 1;
+      if ok and n <= 0 then bad := bad || format(E'\n  should be allowed for %s (got %s): %s', who.label, n, left(r.q, 70)); end if;
+      if not ok and n > 0 then bad := bad || format(E'\n  must be refused for %s (got %s): %s', who.label, n, left(r.q, 70)); end if;
+    end loop;
+  end loop;
+  assert bad = '', 'row level security failures for limited admins:' || bad;
+  raise notice 'rls: % table x caller checks', k;
+end $$;
+
+-- nobody writes the admin flags or the permission table through the API, whoever they are
+do $$
+declare who record; bad text := '';
+begin
+  for who in select * from public.t93_actors where label not in ('anon', 't', 'c', 'm', 'v') loop
+    if pg_temp.affected(who.uid::uuid, 'insert into public.admin_grants (user_id, permissions) values (''93000000-0000-0000-0000-0000000000c1'', ''{members_view}'')') > 0 then bad := bad || ' grants-insert:' || who.label; end if;
+    if pg_temp.affected(who.uid::uuid, 'update public.admin_grants set permissions = ''{}''') > 0 then bad := bad || ' grants-update:' || who.label; end if;
+    if pg_temp.affected(who.uid::uuid, 'update public.profiles set is_super_admin = true where id = ''93000000-0000-0000-0000-0000000000c1''') > 0 then bad := bad || ' super-flag:' || who.label; end if;
+    if pg_temp.affected(who.uid::uuid, 'update public.profiles set is_admin = true where id = ''93000000-0000-0000-0000-0000000000c1''') > 0 then bad := bad || ' admin-flag:' || who.label; end if;
+  end loop;
+  assert bad = '', 'someone could write admin flags or grants:' || bad;
+  -- limited admins see their own grant row and nobody else's; a super admin sees all of them
+  assert pg_temp.seen('93100000-0000-0000-0000-000000000010'::uuid, 'select * from public.admin_grants') = 1, 'a limited admin reads only their own grant';
+  assert pg_temp.seen('93000000-0000-0000-0000-0000000000a2'::uuid, 'select * from public.admin_grants') = 30, 'a super admin reads every grant';
+  assert pg_temp.seen('93000000-0000-0000-0000-0000000000c1'::uuid, 'select * from public.admin_grants') = 0, 'a member reads none';
+end $$;
+
 -- ---------------------------------------------------------------- the payment-proof bucket
 do $$
 declare
@@ -329,6 +462,10 @@ begin
     assert pg_temp.rows_as(who, $q$select * from storage.objects where bucket_id = 'payment-proofs'$q$) = 0, 'content / moderator / volunteer see no proofs: ' || who;
   end loop;
   assert pg_temp.rows_as(a, $q$select * from storage.objects where bucket_id = 'payment-proofs'$q$) >= 2, 'admin sees all proofs';
+  assert pg_temp.rows_as('93100000-0000-0000-0000-000000000030'::uuid, $q$select * from storage.objects where bucket_id = 'payment-proofs'$q$) >= 2, 'an admin who verifies payments sees every proof';
+  foreach who in array array['93100000-0000-0000-0000-000000000031', '93100000-0000-0000-0000-000000000010', '93100000-0000-0000-0000-000000000050']::uuid[] loop
+    assert pg_temp.rows_as(who, $q$select * from storage.objects where bucket_id = 'payment-proofs'$q$) = 0, 'other limited admins see no proofs: ' || who;
+  end loop;
 end $$;
 
 -- ---------------------------------------------------------------- pg_proc scan
@@ -345,17 +482,17 @@ begin
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('is_admin', 'is_verified', 'is_event_manager', 'is_event_staff', 'is_blocked_between', 'can_see_group_content',
                            'are_connected', 'event_public_stats', 'is_group_member', 'is_group_admin', 'can_view_event_photos',
-                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try');
+                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try', 'is_super_admin', '_admin_can', '_admin_can_any');
   assert bad is null, 'anon can execute: ' || coalesce(bad, '');
   select string_agg(p.proname, ', ') into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
-     and (p.proname like 'admin\_%' or p.proname like '\_%' or p.proname in ('moderate', 'moderate_photo', 'review_payment', 'record_offline_payment', 'check_in', 'checkin_search', 'post_announcement'));
+     and (p.proname like 'admin\_%' or (p.proname like '\_%' and p.proname not in ('_admin_can', '_admin_can_any')) or p.proname in ('moderate', 'moderate_photo', 'review_payment', 'record_offline_payment', 'check_in', 'checkin_search', 'post_announcement'));
   assert bad is null, 'anon can execute privileged functions: ' || coalesce(bad, '');
   -- internal helpers (leading underscore) are not callable by members, except the chat path helper used by storage policies
   select string_agg(p.proname, ', ') into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname like '\_%' and has_function_privilege('authenticated', p.oid, 'execute') and p.proname not in ('_chat_of_path');
+   where n.nspname = 'public' and p.proname like '\_%' and has_function_privilege('authenticated', p.oid, 'execute') and p.proname not in ('_chat_of_path', '_admin_can', '_admin_can_any');
   assert bad is null, 'members can execute internal helpers: ' || coalesce(bad, '');
   -- every table has row level security
   select string_agg(c.relname, ', ') into bad from pg_class c join pg_namespace n on n.oid = c.relnamespace

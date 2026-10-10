@@ -12,6 +12,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
+import { NoAccess, useAdminAccess } from './access'
 
 interface Circle {
   id: string
@@ -36,15 +37,17 @@ interface BatchSize {
 /** Admin: approve member-proposed circles, choose the Member Spotlight, set batch sizes for the "% on board" bars. */
 export function AdminCommunity() {
   const { data: me, isLoading } = useMyProfile()
-  if (isLoading) return <PageSkeleton />
+  const { can, isLoading: accessLoading } = useAdminAccess()
+  if (isLoading || accessLoading) return <PageSkeleton />
   if (!me?.is_admin) return <Navigate to="/admin" replace />
+  if (!can('community_*')) return <NoAccess what="Community tools" />
   return (
     <div>
       <PageHeader title="Community" subtitle="Circles, spotlight and batch sizes" back="/admin" />
       <Page className="space-y-8">
-        <PendingCircles />
-        <SpotlightEditor />
-        <BatchSizes />
+        {can('community_circles') && <PendingCircles />}
+        {can('community_spotlight') && <SpotlightEditor />}
+        {can('community_batches') && <BatchSizes />}
       </Page>
     </div>
   )

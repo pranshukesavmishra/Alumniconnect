@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AdminTranslator } from './i18n/AdminTranslator'
 import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
+import { RequirePerm } from './features/admin/access'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
 import { LocationAutoRefresh } from './features/location/LocationAutoRefresh'
 import { readCachedTicket } from './features/events/ticketCache'
@@ -188,16 +189,16 @@ export function App() {
             <Route path="me/import" element={m(<LinkedInImportPage />)} />
             <Route path="admin" element={m(<AdminHome />)} />
             <Route path="admin/members" element={m(<AdminMembers />)} />
-            <Route path="admin/members/import" element={m(<AdminImport />)} />
-            <Route path="admin/members/duplicates" element={m(<AdminDuplicates />)} />
-            <Route path="admin/members/:id" element={m(<AdminMemberTimeline />)} />
-            <Route path="admin/members/:id/preview" element={m(<AdminViewAs />)} />
-            <Route path="admin/health" element={m(<AdminHealth />)} />
+            <Route path="admin/members/import" element={m(<RequirePerm any={['members_import']} what="Importing members"><AdminImport /></RequirePerm>)} />
+            <Route path="admin/members/duplicates" element={m(<RequirePerm any={['members_merge']} what="Merging duplicate members"><AdminDuplicates /></RequirePerm>)} />
+            <Route path="admin/members/:id" element={m(<RequirePerm any={['members_view']} what="The member history"><AdminMemberTimeline /></RequirePerm>)} />
+            <Route path="admin/members/:id/preview" element={m(<RequirePerm any={['members_view']} what="Viewing as a member"><AdminViewAs /></RequirePerm>)} />
+            <Route path="admin/health" element={m(<RequirePerm any={['health']} what="The health page"><AdminHealth /></RequirePerm>)} />
             <Route path="admin/inbox" element={m(<AdminInbox />)} />
-            <Route path="admin/activity" element={m(<AdminAudit />)} />
+            <Route path="admin/activity" element={m(<RequirePerm any={['audit']} what="The activity log"><AdminAudit /></RequirePerm>)} />
             <Route path="admin/roles" element={m(<AdminRoles />)} />
             <Route path="admin/reports" element={m(<AdminModeration />)} />
-            <Route path="admin/analytics" element={m(<AdminAnalytics />)} />
+            <Route path="admin/analytics" element={m(<RequirePerm any={['analytics']} what="Analytics"><AdminAnalytics /></RequirePerm>)} />
             <Route path="admin/community" element={m(<AdminCommunity />)} />
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />

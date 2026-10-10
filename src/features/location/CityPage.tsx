@@ -11,7 +11,7 @@ import { dateLocale } from '../../i18n/core'
 import { useT } from '../../i18n'
 import { friendlyError } from '../../lib/errors'
 import { shortBranch } from '../../lib/constants'
-import { useIsModerator } from '../admin/queries'
+import { useModerationCaps } from '../admin/queries'
 import { useMyProfile } from '../auth/AuthProvider'
 import { tripDates, useCityInfo, useCityMeetups, useCityTrips, useMeetupActions, type Meetup } from './trips'
 
@@ -95,7 +95,7 @@ function StartMeetup({ cityId, cityName, onClose }: { cityId: number; cityName: 
 function MeetupCard({ m, cityId }: { m: Meetup; cityId: number }) {
   const t = useT()
   const navigate = useNavigate()
-  const moderator = useIsModerator()
+  const moderator = useModerationCaps().meetups
   const { join, leave, close, adminSet } = useMeetupActions(cityId)
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     try {

@@ -10,6 +10,7 @@ import { friendlyError } from '../../lib/errors'
 import { plural } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
 import { useMyProfile } from '../auth/AuthProvider'
+import { NoAccess, useAdminAccess } from './access'
 import { AdminDayOf } from './AdminDayOf'
 import { AdminFinance } from './AdminFinance'
 import { AdminMessages } from './AdminMessages'
@@ -29,13 +30,16 @@ export function AdminEventPage() {
   const { slug = '' } = useParams()
   const [params, setParams] = useSearchParams()
   const { data: me } = useMyProfile()
+  const { can, isLoading: accessLoading } = useAdminAccess()
   const isNew = slug === 'new'
   const { data, isLoading, error } = useAdminEvent(isNew ? '__none__' : slug)
   const caps = useEventCaps(data?.event.id)
   const admin = useAdminData(data?.event.id, caps)
 
   if (isNew) {
+    if (accessLoading) return <PageSkeleton />
     if (!me?.is_admin) return <Navigate to="/admin" replace />
+    if (!can('events_create')) return <NoAccess what="Creating events" />
     return (
       <div>
         <PageHeader title="New event" back="/admin" />
@@ -45,7 +49,7 @@ export function AdminEventPage() {
       </div>
     )
   }
-  if (isLoading || !me) return <PageSkeleton />
+  if (isLoading || accessLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
   if (!data || !caps) return <Navigate to="/admin" replace />
 
@@ -54,17 +58,18 @@ export function AdminEventPage() {
   type TabDef = { id: Tab; label: string; count?: number }
   const tabs: TabDef[] = ([
     caps.finance && { id: 'overview' as const, label: 'Overview' },
-    caps.finance && { id: 'payments' as const, label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
+    caps.payments && { id: 'payments' as const, label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
     caps.checkin && { id: 'people' as const, label: 'People' },
     caps.finance && { id: 'responses' as const, label: 'Responses' },
-    caps.programme && { id: 'programme' as const, label: 'Programme' },
+    (caps.programme || caps.announce) && { id: 'programme' as const, label: 'Programme' },
     caps.messages && { id: 'messages' as const, label: 'Messages' },
-    caps.finance && { id: 'finance' as const, label: 'Finance' },
+    caps.ledger && { id: 'finance' as const, label: 'Finance' },
     caps.registrations && { id: 'waitlist' as const, label: 'Waitlist' },
     caps.checkin && { id: 'dayof' as const, label: 'Day-of' },
-    !!me.is_admin && { id: 'settings' as const, label: 'Settings' },
-    !!me.is_admin && { id: 'team' as const, label: 'Team' },
+    (caps.editEvent || caps.tickets || caps.settings) && { id: 'settings' as const, label: 'Settings' },
+    caps.team && { id: 'team' as const, label: 'Team' },
   ] as (TabDef | false)[]).filter((t): t is TabDef => !!t)
+  if (!tabs.length) return <NoAccess what="This event" />
   const tab = (tabs.find((t) => t.id === params.get('tab'))?.id ?? tabs[0]!.id) as Tab
 
   return (
@@ -107,10 +112,10 @@ export function AdminEventPage() {
         )}
         {tab === 'overview' && (admin.data ? <Overview data={admin.data} /> : <PageSkeleton />)}
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
-        {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} initialQuery={params.get('q') ?? ''} /> : <PageSkeleton />)}
+        {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} caps={caps} initialQuery={params.get('q') ?? ''} /> : <PageSkeleton />)}
         {tab === 'responses' && (admin.data ? <AdminResponses event={data.event} data={admin.data} /> : <PageSkeleton />)}
-        {tab === 'programme' && <AdminProgramme eventId={data.event.id} />}
-        {tab === 'messages' && <AdminMessages eventId={data.event.id} isAdmin={!!me.is_admin} />}
+        {tab === 'programme' && <AdminProgramme eventId={data.event.id} canAnnounce={caps.announce} canProgramme={caps.programme} />}
+        {tab === 'messages' && <AdminMessages eventId={data.event.id} isAdmin={!!me.is_admin && caps.messages} canViews={can('members_view')} />}
         {tab === 'finance' && <AdminFinance event={data.event} />}
         {tab === 'waitlist' && <AdminWaitlist event={data.event} />}
         {tab === 'dayof' && <AdminDayOf event={data.event} manager={manager} />}

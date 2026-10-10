@@ -54,9 +54,9 @@ test('roles page: give and remove a moderator with confirmation, no self-demotio
   expect(sql(`select count(*) from site_roles where role = 'moderator' and user_id = (select id from auth.users where email like 'adm-${ts}-${tag}rm@%')`)).toBe('1')
   expect(sql(`select count(*) from admin_audit where action = 'role_grant' and details->>'name' = 'Rolemod ${tag}'`)).toBe('1')
 
-  // an admin has no remove button on their own row, and the database refuses too
+  // an ordinary admin has no remove button on their own row, and the database refuses too (admin access has its own door: super admins only)
   await expect(page.getByRole('button', { name: `Remove admin access from Roleboss ${tag}` })).toHaveCount(0)
-  expect((await boss.db.rpc('admin_revoke_role', { p_user: boss.id, p_role: 'admin', p_event: null, p_note: null })).error?.message).toContain('your own admin access')
+  expect((await boss.db.rpc('admin_revoke_role', { p_user: boss.id, p_role: 'admin', p_event: null, p_note: null })).error?.message).toContain('super admin only')
 
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: `Remove moderator role from Rolemod ${tag}` }).click()
@@ -68,7 +68,7 @@ test('roles page: give and remove a moderator with confirmation, no self-demotio
   await page.getByRole('button', { name: 'Roles', exact: true }).click()
   const rows = page.getByTestId('audit-rows').locator('[data-action]')
   await expect(rows.first()).toBeVisible()
-  expect(await rows.evaluateAll((els) => els.every((e) => ['role_grant', 'role_revoke', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'].includes(e.getAttribute('data-action')!)))).toBe(true)
+  expect(await rows.evaluateAll((els) => els.every((e) => ['role_grant', 'role_revoke', 'admin_granted', 'admin_permissions_changed', 'admin_removed', 'super_admin_granted', 'super_admin_removed', 'ownership_transferred', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'].includes(e.getAttribute('data-action')!)))).toBe(true)
   await page.getByLabel('Search the activity log').fill(`Rolemod ${tag}`)
   await page.getByRole('button', { name: 'Search', exact: true }).click()
   await expect(rows).toHaveCount(2)

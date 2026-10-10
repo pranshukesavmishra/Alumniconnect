@@ -133,7 +133,7 @@ test('members: friendly errors for an empty name and a bad phone', async () => {
   await dlg.getByRole('button', { name: 'Close' }).click()
 })
 
-test('members: verify, unverify, reject, make admin, remove admin; all audited', async () => {
+test('members: verify, unverify, reject; all audited; no admin switches for an ordinary admin', async () => {
   await page.goto('/admin/members')
   await page.getByLabel('Search members').fill(`Target Edited ${ts}`)
   await page.getByRole('button', { name: new RegExp(`Target Edited ${ts}`) }).click()
@@ -153,14 +153,22 @@ test('members: verify, unverify, reject, make admin, remove admin; all audited',
   expect(flags()).toBe('rejected:false')
   await dlg.getByRole('button', { name: 'Verify member' }).click()
   await expect(dlg.getByRole('button', { name: 'Remove verification' })).toBeVisible()
-  await dlg.getByRole('button', { name: 'Make admin' }).click()
-  await expect(dlg.getByRole('button', { name: 'Remove admin' })).toBeVisible()
-  expect(flags()).toBe('verified:true')
-  await dlg.getByRole('button', { name: 'Remove admin' }).click()
-  await expect(dlg.getByRole('button', { name: 'Make admin' })).toBeVisible()
+  // admin access is a super admin's job (Roles page): an ordinary admin gets no switch, and the database refuses the old one
+  await expect(dlg.getByRole('button', { name: /^(Make|Remove) admin/ })).toHaveCount(0)
+  const refusedAdmin = await page.evaluate(async ([id, anon]) => {
+    const key = Object.keys(localStorage).find((k) => k.endsWith('-auth-token'))!
+    const token = JSON.parse(localStorage.getItem(key)!).access_token
+    const res = await fetch('http://127.0.0.1:54321/rest/v1/rpc/admin_set_member', {
+      method: 'POST',
+      headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: id, p_is_admin: true, p_verification: null }),
+    })
+    return res.status
+  }, [target.id, ANON] as const)
+  expect(refusedAdmin).toBe(403)
   expect(flags()).toBe('verified:false')
-  expect(n()).toBe(start + 6)
-  await dlg.getByRole('button', { name: 'Close' }).click()
+  expect(n()).toBe(start + 4)
+  await dlg.getByRole('button', { name: 'Close' }).dispatchEvent('click') // a toast may still sit over the button
 })
 
 test('members: an admin cannot remove their own admin access (UI and API)', async () => {
@@ -189,8 +197,6 @@ test('activity log lists every admin action with actor', async () => {
   await page.goto('/admin/activity')
   await expect(page.getByText('Edited a member profile').first()).toBeVisible()
   await expect(page.getByText('Changed verification / admin access').first()).toBeVisible()
-  await expect(page.getByText(/made admin/).first()).toBeVisible()
-  await expect(page.getByText(/admin removed/).first()).toBeVisible()
   await expect(page.locator('main').getByText(new RegExp(`Admin Verify ${ts} ·`)).first()).toBeVisible()
 })
 

@@ -41,6 +41,8 @@ function describe(n: Notification, tx: (key: MsgKey, params?: Params) => string)
       return { text: tx('notif.nearbyBatchmate', { who, city: body }), to: '/nearby' }
     case 'nearby_trip':
       return { text: tx('notif.nearbyTrip', { who, city: body }), to: '/nearby' }
+    case 'admin_access':
+      return { text: n.body ?? 'Your admin access changed', to: '/admin' }
     case 'invite_joined':
       return { text: tx('notif.invite', { who }), to: `/people/${n.actor?.id}` }
     default:

@@ -11,11 +11,11 @@ import { supabase } from '../../lib/supabase'
 import { clock, groupByDay, isoToIstInput, istInputToIso, useAnnouncements, useProgramme, type ProgrammeItem } from '../events/programme'
 
 /** Organisers: build the day's programme and send announcements to everyone who registered. */
-export function AdminProgramme({ eventId }: { eventId: string }) {
+export function AdminProgramme({ eventId, canAnnounce = true, canProgramme = true }: { eventId: string; canAnnounce?: boolean; canProgramme?: boolean }) {
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <Announcements eventId={eventId} />
-      <Programme eventId={eventId} />
+      {canAnnounce && <Announcements eventId={eventId} />}
+      {canProgramme && <Programme eventId={eventId} />}
     </div>
   )
 }

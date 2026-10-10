@@ -8,6 +8,7 @@ import { friendlyError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { describeTimelineItem, TIMELINE_GROUPS, type RawTimelineItem, type TimelineGroup } from '../../lib/memberTimeline'
 import { useMyProfile } from '../auth/AuthProvider'
+import { useAdminAccess } from './access'
 import { MemberNotes } from './AdminMembers'
 import { useMemberTimeline } from './queries'
 
@@ -16,6 +17,7 @@ export function AdminMemberTimeline() {
   const { id } = useParams()
   const { data: me, isLoading } = useMyProfile()
   const qc = useQueryClient()
+  const { can } = useAdminAccess()
   const { data, isLoading: loading, error } = useMemberTimeline(id, !!me?.is_admin)
   const [group, setGroup] = useState<TimelineGroup | 'all'>('all')
   if (isLoading) return <PageSkeleton />
@@ -43,7 +45,7 @@ export function AdminMemberTimeline() {
               <Link to={`/admin/members/${m.id}/preview`} className="grid min-h-11 place-items-center rounded-full px-3 text-sm font-semibold text-primary hover:bg-primary-soft">View as member</Link>
               <Link to={`/admin/members?open=${m.id}`} className="grid min-h-11 place-items-center rounded-full px-3 text-sm font-semibold text-primary hover:bg-primary-soft">Open profile</Link>
             </Card>
-            <MemberNotes id={m.id} />
+            <MemberNotes id={m.id} canWrite={can('members_edit')} />
             <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
               {TIMELINE_GROUPS.map((g) => (
                 <button key={g.id} type="button" aria-pressed={group === g.id} onClick={() => setGroup(g.id)}

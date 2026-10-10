@@ -17,7 +17,7 @@ type Panel = null | 'transfer' | 'discount' | 'refund'
 type RefundMethod = 'upi' | 'cash' | 'bank_transfer' | 'other'
 
 /** Managers: move a ticket to someone else, give a discount, or record money given back. Each is validated on the server and written to the activity log. */
-export function RegistrationAdjustments({ reg, payments, due, onClose }: { reg: Registration; payments: Payment[]; due: number; onClose?: () => void }) {
+export function RegistrationAdjustments({ reg, payments, due, onClose, canTransfer = true, canMoney = true }: { reg: Registration; payments: Payment[]; due: number; onClose?: () => void; canTransfer?: boolean; canMoney?: boolean }) {
   const [panel, setPanel] = useState<Panel>(null)
   const refunds = useRegistrationRefunds(reg.id)
   const refresh = useRefreshMoney(reg.event_id)
@@ -32,9 +32,9 @@ export function RegistrationAdjustments({ reg, payments, due, onClose }: { reg: 
     <div className="mt-6 space-y-3" aria-label="Adjustments">
       <h3 className="text-[13px] font-bold uppercase tracking-wide text-muted">Adjust this registration</h3>
       <div className="flex flex-wrap gap-2">
-        {!cancelled && <Button size="sm" variant={panel === 'transfer' ? 'primary' : 'secondary'} icon={<ArrowRightLeft className="size-4" />} onClick={() => setPanel(panel === 'transfer' ? null : 'transfer')}>Transfer ticket</Button>}
-        {!cancelled && due > 0 && <Button size="sm" variant={panel === 'discount' ? 'primary' : 'secondary'} icon={<BadgePercent className="size-4" />} onClick={() => setPanel(panel === 'discount' ? null : 'discount')}>Discount</Button>}
-        {refundable.length > 0 && <Button size="sm" variant={panel === 'refund' ? 'primary' : 'secondary'} icon={<Undo2 className="size-4" />} onClick={() => setPanel(panel === 'refund' ? null : 'refund')}>Record a refund</Button>}
+        {canTransfer && !cancelled && <Button size="sm" variant={panel === 'transfer' ? 'primary' : 'secondary'} icon={<ArrowRightLeft className="size-4" />} onClick={() => setPanel(panel === 'transfer' ? null : 'transfer')}>Transfer ticket</Button>}
+        {canMoney && !cancelled && due > 0 && <Button size="sm" variant={panel === 'discount' ? 'primary' : 'secondary'} icon={<BadgePercent className="size-4" />} onClick={() => setPanel(panel === 'discount' ? null : 'discount')}>Discount</Button>}
+        {canMoney && refundable.length > 0 && <Button size="sm" variant={panel === 'refund' ? 'primary' : 'secondary'} icon={<Undo2 className="size-4" />} onClick={() => setPanel(panel === 'refund' ? null : 'refund')}>Record a refund</Button>}
       </div>
 
       {panel === 'transfer' && <Transfer reg={reg} onDone={() => { refresh(); setPanel(null); onClose?.() }} />}

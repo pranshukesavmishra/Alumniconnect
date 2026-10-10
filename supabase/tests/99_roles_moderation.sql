@@ -191,11 +191,10 @@ begin
   assert public.admin_revoke_role('99000000-0000-0000-0000-0000000000c1', 'treasurer', '99000000-0000-0000-0000-0000000000e2') = true, 'event role removed';
   assert not exists (select 1 from public.event_staff where user_id = '99000000-0000-0000-0000-0000000000c1'), 'gone from the table';
   -- admins
-  assert public.t99_fails($q$select public.admin_revoke_role('99000000-0000-0000-0000-0000000000a1', 'admin')$q$) like '%your own admin access%', 'cannot demote yourself';
-  assert public.admin_grant_role('99000000-0000-0000-0000-0000000000c1', 'admin') = true, 'new admin';
-  assert (select is_admin from public.profiles where id = '99000000-0000-0000-0000-0000000000c1'), 'flag set';
-  assert public.admin_revoke_role('99000000-0000-0000-0000-0000000000c1', 'admin') = true, 'admin removed by another admin';
-  assert (select count(*) from public.admin_audit where action in ('role_grant', 'role_revoke')) = 6, 'every change logged';
+  assert public.t99_fails($q$select public.admin_revoke_role('99000000-0000-0000-0000-0000000000a1', 'admin')$q$) like '%super admin only%', 'admin access has its own door: super admins only';
+  assert public.t99_fails($q$select public.admin_grant_role('99000000-0000-0000-0000-0000000000c1', 'admin')$q$) like '%super admin only%', 'an ordinary admin cannot make an admin';
+  assert not (select is_admin from public.profiles where id = '99000000-0000-0000-0000-0000000000c1'), 'flag untouched';
+  assert (select count(*) from public.admin_audit where action in ('role_grant', 'role_revoke')) = 4, 'every change logged';
   assert (select details ->> 'event' from public.admin_audit where action = 'role_grant' and details ->> 'role' = 'treasurer') = 'Roles Two', 'log names the event';
   -- overview lists the new roles
   assert exists (select 1 from jsonb_array_elements(public.admin_roles_overview() -> 'moderators') x where x ->> 'full_name' = 'Meera Moderator'), 'moderator listed';
@@ -306,7 +305,7 @@ reset role;
 select pg_temp.login('99000000-0000-0000-0000-0000000000a1');
 set local role authenticated;
 do $$ begin
-  assert (select count(*) from public.admin_audit_search(array['role_grant', 'role_revoke'])) >= 6, 'filter by action';
+  assert (select count(*) from public.admin_audit_search(array['role_grant', 'role_revoke'])) >= 4, 'filter by action';
   assert (select count(*) from public.admin_audit_search(array['role_grant', 'role_revoke'])) = (select count(*) from public.admin_audit where action in ('role_grant', 'role_revoke')), 'only those actions';
   assert (select count(*) from public.admin_audit_search(null, '99000000-0000-0000-0000-0000000000b3')) >= 2, 'filter by actor (the moderator)';
   assert (select count(*) from public.admin_audit_search(null, null, 'meera')) >= 1, 'search by a person''s name (the actor)';

@@ -22,6 +22,11 @@ begin
   assert not has_column_privilege('authenticated', 'public.posts', 'group_id', 'UPDATE'), 'posts.group_id writable';
   assert not has_column_privilege('authenticated', 'public.profiles', 'is_admin', 'UPDATE'), 'profiles.is_admin writable';
   assert not has_column_privilege('authenticated', 'public.profiles', 'verification', 'UPDATE'), 'profiles.verification writable';
+  assert not has_column_privilege('authenticated', 'public.profiles', 'is_super_admin', 'UPDATE'), 'profiles.is_super_admin writable';
+  assert not has_column_privilege('anon', 'public.profiles', 'is_super_admin', 'SELECT'), 'profiles.is_super_admin readable by anon';
+  assert not has_table_privilege('authenticated', 'public.admin_grants', 'INSERT') and not has_table_privilege('authenticated', 'public.admin_grants', 'UPDATE')
+     and not has_table_privilege('authenticated', 'public.admin_grants', 'DELETE'), 'admin_grants writable through the API';
+  assert not has_table_privilege('anon', 'public.admin_grants', 'SELECT'), 'admin_grants readable by anon';
   assert not has_table_privilege('authenticated', 'public.admin_audit', 'INSERT'), 'audit log writable';
   assert not has_table_privilege('authenticated', 'public.messages', 'INSERT'), 'messages must go through send_message';
   assert not has_table_privilege('authenticated', 'public.reports', 'UPDATE'), 'reports are changed only by admins through functions';

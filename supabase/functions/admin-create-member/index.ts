@@ -5,7 +5,7 @@
 // Safety: only signed-in admins may call it; the profile fields are saved through admin_update_member (validated
 // and written to the activity log), and the creation itself is logged too.
 import { corsHeaders, json } from '../_shared/http.ts'
-import { asService, asUser, currentUser, eq } from '../_shared/db.ts'
+import { asService, currentUser } from '../_shared/db.ts'
 
 const URL_ = Deno.env.get('SUPABASE_URL')!
 const ANON = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -103,8 +103,12 @@ Deno.serve(async (req) => {
   const authorization = req.headers.get('Authorization')
   const caller = await currentUser(authorization)
   if (!caller) return json(req, { error: 'unauthorized' }, 401)
-  const me = await asUser(authorization!).select<{ is_admin: boolean }>('profiles', `select=is_admin&id=${eq(caller.id)}`)
-  if (!me[0]?.is_admin) return json(req, { error: 'forbidden', message: 'Only admins can add members.' }, 403)
+  // adding and importing members is the "Import members" permission (full admins and super admins hold every permission)
+  const acc = await fetch(`${URL_}/rest/v1/rpc/my_admin_access`, { method: 'POST', headers: { apikey: ANON, Authorization: authorization!, 'Content-Type': 'application/json' }, body: '{}' })
+  const access = acc.ok ? ((await acc.json()) as { is_admin: boolean; full: boolean; permissions: string[] }) : null
+  if (!access?.is_admin || !(access.full || access.permissions.includes('members_import'))) {
+    return json(req, { error: 'forbidden', message: 'You do not have permission to add members. Ask a super admin for access.' }, 403)
+  }
 
   const b = (await req.json().catch(() => ({}))) as Body & { job_id?: string }
   if (b.job_id) {

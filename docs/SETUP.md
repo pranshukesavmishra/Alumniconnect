@@ -11,7 +11,7 @@ Everything below uses free plans. Do it once, with an **association-owned email*
 | 5 | Google Drive connection | photo originals and nightly CSV backups |
 | 6 | Hosting (Cloudflare Pages) | the website / installable app |
 | 7 | Nightly backup (GitHub Actions) | encrypted database backups outside Google Drive; keeps Supabase awake |
-| 8 | First admin, the event, the go-live checklist | |
+| 8 | First super admin, the event, the go-live checklist | |
 
 ---
 
@@ -116,16 +116,23 @@ In the GitHub repository, go to **Settings → Secrets and variables → Actions
 
 Then open **Actions → Nightly backup and keep-alive → Run workflow** once and check that it is green. How to restore: `docs/BACKUP_RESTORE.md`.
 
-## 8. First admin and the event
+## 8. First super admin and the event
 
-1. Open the app and sign in with your own Google account. Complete the short profile.
-2. In Supabase, go to **SQL Editor** and run, replacing the email:
+The app is owned by **super admins** (two people is the recommended minimum). A super admin can do everything, and is the only kind
+of admin who can make other admins, choose exactly what each admin may do, and hand over ownership. The full picture is in
+`docs/ADMIN_ACCESS.md`.
+
+1. Open the app and sign in with your own Google account. Complete the short profile. The second owner does the same.
+2. In Supabase, go to **SQL Editor** and run this once for **each** owner, replacing the placeholder email with that person's own sign-in email:
    ```sql
-   update public.profiles set is_admin = true, verification = 'verified'
-   where id = (select id from auth.users where email = 'you@example.com');
+   update public.profiles
+      set is_admin = true, is_super_admin = true, verification = 'verified', onboarded = true
+    where id = (select id from auth.users where email = 'owner@example.com');
    ```
+   Nothing in the repository or a migration makes anybody a super admin: this step is the only way in the first time.
+   From then on owners are managed inside the app: **Organise → Roles → Admins and owners**.
 3. In the app, go to **Organise → New event**. Fill in the final details, fees and the association's UPI ID, but **leave "Published" unticked**.
-4. Use **Organise → event → Team** to add treasurers (managers) and gate volunteers (check-in). Each person must sign in once first.
+4. Use **Organise → event → Team** to add treasurers and gate volunteers (check-in), and **Organise → Roles → Admins and owners → Make admin** to give committee members only the access they need. Each person must sign in once first.
 5. Complete the **go-live checklist** in the Phase 1 build plan (Section 10): two people check fees and the UPI ID with a real ₹1 payment, plus a dry run with 5 committee members. Then tick **Published**.
 
 ---

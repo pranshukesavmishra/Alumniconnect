@@ -25,10 +25,10 @@ function inAnHour(): string {
 }
 
 /** Organisers: message exactly the people who need it (by payment state, batch, city, ticket), now or later. Delivered as app notifications and push. */
-export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: boolean }) {
+export function AdminMessages({ eventId, isAdmin, canViews = isAdmin }: { eventId: string; isAdmin: boolean; canViews?: boolean }) {
   const messages = useEventMessages(eventId)
   const tickets = useTicketTypes(eventId)
-  const views = useMemberViews(isAdmin)
+  const views = useMemberViews(canViews)
   const send = useSendMessage(eventId)
   const cancel = useCancelMessage(eventId)
   const review = useReviewMessage(eventId)
@@ -137,7 +137,7 @@ export function AdminMessages({ eventId, isAdmin }: { eventId: string; isAdmin: 
               )}
             </Field>
           )}
-          {isAdmin && (views.data?.length ?? 0) > 0 && (
+          {canViews && (views.data?.length ?? 0) > 0 && (
             <Field label="Only members in a saved view" optional hint="Saved views come from the Members screen. The list is fixed when you send or schedule.">
               {(p) => (
                 <Select {...p} value={aud.viewId} onChange={(e) => set({ viewId: e.target.value })}>

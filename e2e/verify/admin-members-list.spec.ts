@@ -497,7 +497,7 @@ test('edit a member: every field saved, phone and e-mail handled privately, erro
   await ed.getByRole('button', { name: 'Close' }).click()
 })
 
-test('switches: verify, remove verification, reject, make admin, remove admin; confirmations, log, and what changes for the member', async () => {
+test('switches: verify, remove verification, reject; confirmations, log, and what changes for the member; admin access is not here', async () => {
   const target = m.Echo!
   await page.getByLabel('Search members').fill(`Echo ${T}`)
   await page.getByRole('button', { name: new RegExp(`Echo ${T}`) }).click()
@@ -528,22 +528,18 @@ test('switches: verify, remove verification, reject, make admin, remove admin; c
   expect(logged('rejected')).toBe(1)
   expect(logged('pending')).toBe(1)
 
-  await ed.getByRole('button', { name: 'Make admin' }).click()
-  await expect.poll(flags).toBe('pending|t')
-  // an admin sees everything: the new admin can open the admin screens
-  expect((await target.db.rpc('admin_list_members', { p_filter: {} })).error).toBeNull()
-  await ed.getByRole('button', { name: 'Remove admin' }).click()
-  await expect.poll(flags).toBe('pending|f')
+  // admin access is a super admin's job (Roles page): no switch here, and the old function refuses to flip it
+  await expect(ed.getByRole('button', { name: /^(Make|Remove) admin/ })).toHaveCount(0)
+  expect((await boss.db.rpc('admin_set_member', { p_id: target.id, p_is_admin: true, p_verification: null })).error?.code).toBe('42501')
+  expect(flags()).toBe('pending|f')
   expect((await target.db.rpc('admin_list_members', { p_filter: {} })).error?.code).toBe('42501')
-  expect(auditCount(`action = 'set_member_flags' and actor = '${boss.id}' and target_id = '${target.id}' and details->'is_admin'->>'to' = 'true'`)).toBe(1)
-  expect(auditCount(`action = 'set_member_flags' and actor = '${boss.id}' and target_id = '${target.id}' and details->'is_admin'->>'to' = 'false' and details->'is_admin'->>'from' = 'true'`)).toBe(1)
-  await ed.getByRole('button', { name: 'Close' }).click()
+  await ed.getByRole('button', { name: 'Close' }).dispatchEvent('click') // a toast may still sit over the button
 
   // one's own row has no "remove admin" button, and the server refuses it too
   await page.getByLabel('Search members').fill(`Boss ${T}`)
   await page.getByRole('button', { name: new RegExp(`Boss ${T}`) }).click()
   await expect(ed.getByRole('button', { name: 'Make admin' })).toHaveCount(0)
-  await expect(ed.getByRole('button', { name: 'Remove admin' })).toHaveCount(0)
+  await expect(ed.getByRole('button', { name: /Remove admin/ })).toHaveCount(0)
   expect((await boss.db.rpc('admin_set_member', { p_id: boss.id, p_is_admin: false, p_verification: null })).error?.message).toContain('cannot remove your own admin access')
   expect(sql(`select is_admin from profiles where id = '${boss.id}'`)).toBe('t')
   await ed.getByRole('button', { name: 'Close' }).click()

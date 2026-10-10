@@ -71,6 +71,12 @@ export const AUDIT_LABELS: Record<string, string> = {
   add_waitlist: 'Added someone to the waiting list',
   role_grant: 'Gave a role',
   role_revoke: 'Removed a role',
+  admin_granted: 'Made someone an admin',
+  admin_permissions_changed: 'Changed what an admin may do',
+  admin_removed: 'Removed someone’s admin access',
+  super_admin_granted: 'Made someone a super admin',
+  super_admin_removed: 'Removed someone’s super admin status',
+  ownership_transferred: 'Transferred ownership',
   message_needs_approval: 'Submitted a large message for approval',
   approve_event_message: 'Approved a large message',
   reject_event_message: 'Rejected a large message',
@@ -94,7 +100,7 @@ export const AUDIT_LABELS: Record<string, string> = {
 
 /** Filter chips on the activity log: a label and the actions it covers. */
 export const AUDIT_GROUPS: { id: string; label: string; actions: string[] }[] = [
-  { id: 'roles', label: 'Roles', actions: ['role_grant', 'role_revoke', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'] },
+  { id: 'roles', label: 'Roles', actions: ['role_grant', 'role_revoke', 'admin_granted', 'admin_permissions_changed', 'admin_removed', 'super_admin_granted', 'super_admin_removed', 'ownership_transferred', 'set_member_flags', 'event_staff_insert', 'event_staff_update', 'event_staff_delete'] },
   { id: 'moderation', label: 'Moderation', actions: ['hide_post', 'restore_post', 'hide_comment', 'restore_comment', 'hide_job', 'restore_job', 'hide_help', 'restore_help', 'hide_business', 'restore_business', 'remove_message', 'dismiss_reports', 'slow_mode', 'meetup_hidden', 'meetup_closed', 'meetup_restored', 'meetup_member_removed'] },
   { id: 'messages', label: 'Messages', actions: ['send_event_message', 'schedule_event_message', 'cancel_event_message', 'message_needs_approval', 'approve_event_message', 'reject_event_message', 'post_announcement'] },
   { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'export_event_data', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
@@ -105,6 +111,10 @@ export function auditSummary(details: Record<string, unknown>): string {
   const d = details as Record<string, any>
   const parts: string[] = []
   if (typeof d.role === 'string') parts.push(`${d.name ? `${String(d.name)}: ` : ''}${d.role}${d.event ? ` on ${String(d.event)}` : ''}`)
+  if (typeof d.full === 'boolean' && 'permissions' in d) parts.push(`${d.name ? `${String(d.name)}: ` : ''}${d.full ? 'full admin' : `${Array.isArray(d.permissions) ? d.permissions.length : 0} permissions`}`)
+  else if (typeof d.full === 'undefined' && 'was_full' in d) parts.push(`${d.name ? `${String(d.name)}: ` : ''}${d.was_full ? 'was a full admin' : 'was a limited admin'}`)
+  if ('step_down' in d) parts.push(`${String(d.from ?? 'An owner')} → ${String(d.name ?? '')}${d.step_down ? ' (stepped down)' : ''}`)
+  if (('was_admin' in d || 'self' in d) && typeof d.name === 'string' && !('permissions' in d)) parts.push(d.name)
   if (d.code) parts.push(String(d.code))
   if (typeof d.what === 'string') parts.push(`${d.what.replace(/_/g, ' ')}${typeof d.count === 'number' ? ` (${d.count})` : ''}`)
   if (typeof d.amount === 'number') parts.push(formatPaise(d.amount))

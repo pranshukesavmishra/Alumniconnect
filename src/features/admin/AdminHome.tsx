@@ -1,4 +1,5 @@
 import { BarChart3, CalendarPlus, CheckCircle2, ChevronRight, Flag, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -9,34 +10,59 @@ import { friendlyError } from '../../lib/errors'
 import { formatDateRange } from '../../lib/format'
 import { useMyProfile } from '../auth/AuthProvider'
 import { AdminSearch } from './AdminSearch'
-import { useAttention, useIsModerator, useManagedEvents } from './queries'
+import { useAdminAccess } from './access'
+import { useAttention, useManagedEvents, useModerationCaps } from './queries'
+
+function TileLink({ to, icon, title, blurb, badge }: { to: string; icon: ReactNode; title: string; blurb: string; badge?: ReactNode }) {
+  return (
+    <Link to={to} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
+      <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary">{icon}</span>
+      <span className="flex-1"><span className="block font-semibold">{title}</span><span className="block text-sm text-muted">{blurb}</span></span>
+      {badge}
+      <ChevronRight className="size-5 text-muted" aria-hidden />
+    </Link>
+  )
+}
 
 export function AdminHome() {
   const { data: me } = useMyProfile()
   const { data, isLoading, error } = useManagedEvents()
-  const moderator = useIsModerator()
-  const canManage = !!me?.is_admin || moderator || !!data?.some((d) => d.caps.manage)
+  const { access, isLoading: accessLoading, can, canAny } = useAdminAccess()
+  const mod = useModerationCaps()
+  const canManage = access.is_admin || mod.any || !!data?.some((d) => d.caps.manage)
   const attention = useAttention(canManage)
-  if (isLoading || !me) return <PageSkeleton />
+  if (isLoading || accessLoading || !me) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
-  if (!me.is_admin && !moderator && !data?.length) return <Navigate to="/" replace />
-  if (data?.length === 1 && !me.is_admin && !moderator && !data[0]!.caps.manage) return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
+  if (!access.is_admin && !mod.any && !data?.length) return <Navigate to="/" replace />
+  if (data?.length === 1 && !access.is_admin && !mod.any && !data[0]!.caps.manage) return <Navigate to={`/admin/events/${data[0]!.event.slug}`} replace />
+
+  // every tile shows only what this person may use; the database refuses the rest anyway
+  const seesInbox = mod.reports || can('messages_send') || canAny(['money_refunds', 'events_registrations']) || !!data?.some((d) => d.caps.finance)
+  const seesReports = mod.any
+  const g = attention.data?.global
+  const queueRelevant = access.is_admin ? canAny(['members_verify', 'moderation_*', 'community_circles', 'messages_send', 'money_*', 'events_*']) || mod.any : canManage
+  const accessLabel = access.is_super
+    ? 'Super admin'
+    : access.is_admin
+      ? access.full ? 'Admin' : `Admin (${access.permissions.length} permissions)`
+      : ''
+  const staffLabels = describeAccess(false, mod.any && !access.is_admin, (data ?? []).flatMap((d) => d.roles.map((role) => ({ role, title: d.event.title })))).map((a) => a.label)
+  const labels = [accessLabel, ...staffLabels].filter((l, i, all) => !!l && all.indexOf(l) === i)
 
   return (
     <div>
       <PageHeader
         title="Organise"
         subtitle="Events you manage"
-        action={me.is_admin && <ButtonLink to="/admin/events/new" size="sm" icon={<CalendarPlus className="size-4" />}>New event</ButtonLink>}
+        action={can('events_create') && <ButtonLink to="/admin/events/new" size="sm" icon={<CalendarPlus className="size-4" />}>New event</ButtonLink>}
       />
       <Page className="space-y-3">
         <p className="text-sm text-muted" data-testid="my-access">
-          Signed in as{' '}
-          {describeAccess(me.is_admin, moderator, (data ?? []).flatMap((d) => d.roles.map((role) => ({ role, title: d.event.title })))).map((a) => a.label).filter((l, i, all) => all.indexOf(l) === i).join(' + ') || 'member'}.
-          {me.is_admin && <> <Link to="/admin/roles" className="font-semibold text-primary">Who can do what</Link></>}
+          Signed in as {labels.join(' + ') || 'member'}.
+          {canAny(['admins', 'events_team']) && <> <Link to="/admin/roles" className="font-semibold text-primary">Who can do what</Link></>}
         </p>
-        {canManage && (me.is_admin || data?.some((d) => d.caps.finance)) && <AdminSearch members={me.is_admin} />}
-        {canManage && (
+        {canManage && (can('members_view') || data?.some((d) => d.caps.finance) || canAny(['money_*', 'events_registrations'])) && <AdminSearch members={can('members_view')} />}
+        {canManage && queueRelevant && (
           <section aria-label="Needs your attention" className="space-y-2 pt-1">
             <SectionTitle>Needs your attention</SectionTitle>
             {attention.error ? (
@@ -48,65 +74,27 @@ export function AdminHome() {
             )}
           </section>
         )}
-        {(moderator || me.is_admin || data?.some((d) => d.caps.finance)) && (
-          <Link to="/admin/inbox" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-            <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Inbox className="size-5" aria-hidden /></span>
-            <span className="flex-1"><span className="block font-semibold">Inbox</span><span className="block text-sm text-muted">Everything waiting for a decision</span></span>
-            <ChevronRight className="size-5 text-muted" aria-hidden />
-          </Link>
+        {seesInbox && <TileLink to="/admin/inbox" icon={<Inbox className="size-5" aria-hidden />} title="Inbox" blurb="Everything waiting for a decision" />}
+        {mod.any && !can('moderation_*') && (
+          <TileLink to="/admin/reports" icon={<Flag className="size-5" aria-hidden />} title="Reports and slow mode" blurb="Posts and messages members flagged"
+            badge={!!g?.reports_open && <Badge tone="danger">{g.reports_open}</Badge>} />
         )}
-        {moderator && !me.is_admin && (
-          <Link to="/admin/reports" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-            <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Flag className="size-5" aria-hidden /></span>
-            <span className="flex-1"><span className="block font-semibold">Reports and slow mode</span><span className="block text-sm text-muted">Posts and messages members flagged</span></span>
-            {!!attention.data?.global?.reports_open && <Badge tone="danger">{attention.data.global.reports_open}</Badge>}
-            <ChevronRight className="size-5 text-muted" aria-hidden />
-          </Link>
-        )}
-        {me.is_admin && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Link to="/admin/members" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Users className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Members</span><span className="block text-sm text-muted">Edit profiles, verify, admins</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/analytics" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><BarChart3 className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Analytics</span><span className="block text-sm text-muted">Growth, batches, engagement</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/community" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Network className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Community</span><span className="block text-sm text-muted">Approve circles, spotlight, batch sizes</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/reports" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Flag className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Reports</span><span className="block text-sm text-muted">Posts and messages members flagged</span></span>
-              {!!attention.data?.global?.reports_open && <Badge tone="danger">{attention.data.global.reports_open}</Badge>}
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/roles" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><KeyRound className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Roles</span><span className="block text-sm text-muted">Admins, treasurers, content managers, moderators</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/health" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><Activity className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Health</span><span className="block text-sm text-muted">Backups, push, storage</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-            <Link to="/admin/activity" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-              <span className="grid size-11 place-items-center rounded-xl bg-primary-soft text-primary"><History className="size-5" aria-hidden /></span>
-              <span className="flex-1"><span className="block font-semibold">Activity log</span><span className="block text-sm text-muted">Every admin change, with names</span></span>
-              <ChevronRight className="size-5 text-muted" aria-hidden />
-            </Link>
-          </div>
-        )}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {can('members_view') && <TileLink to="/admin/members" icon={<Users className="size-5" aria-hidden />} title="Members" blurb="Edit profiles, verify, import" />}
+          {can('analytics') && <TileLink to="/admin/analytics" icon={<BarChart3 className="size-5" aria-hidden />} title="Analytics" blurb="Growth, batches, engagement" />}
+          {can('community_*') && <TileLink to="/admin/community" icon={<Network className="size-5" aria-hidden />} title="Community" blurb="Approve circles, spotlight, batch sizes" />}
+          {seesReports && can('moderation_*') && (
+            <TileLink to="/admin/reports" icon={<Flag className="size-5" aria-hidden />} title="Reports" blurb="Posts and messages members flagged"
+              badge={!!g?.reports_open && <Badge tone="danger">{g.reports_open}</Badge>} />
+          )}
+          {canAny(['admins', 'events_team']) && <TileLink to="/admin/roles" icon={<KeyRound className="size-5" aria-hidden />} title="Roles" blurb="Admins, owners, treasurers, content managers, moderators" />}
+          {can('health') && <TileLink to="/admin/health" icon={<Activity className="size-5" aria-hidden />} title="Health" blurb="Backups, push, storage" />}
+          {can('audit') && <TileLink to="/admin/activity" icon={<History className="size-5" aria-hidden />} title="Activity log" blurb="Every admin change, with names" />}
+        </div>
         <h2 className="pt-2 text-[13px] font-bold uppercase tracking-wide text-muted">Events</h2>
         {!data?.length ? (
-          <EmptyState icon={<ShieldCheck />} title="No events yet" action={<ButtonLink to="/admin/events/new">Create the Alumni Meet</ButtonLink>}>
-            Create the event, set the fees and UPI details, then publish it.
+          <EmptyState icon={<ShieldCheck />} title="No events yet" action={can('events_create') ? <ButtonLink to="/admin/events/new">Create the Alumni Meet</ButtonLink> : undefined}>
+            {can('events_create') ? 'Create the event, set the fees and UPI details, then publish it.' : 'There are no events you can manage yet.'}
           </EmptyState>
         ) : (
           data.map(({ event, roles }) => (
@@ -116,7 +104,7 @@ export function AdminHome() {
                 <p className="text-sm text-muted">{formatDateRange(event.starts_at, event.ends_at)}</p>
               </div>
               {!event.is_published && <Badge tone="warning">Draft</Badge>}
-              <Badge tone="primary">{me.is_admin ? 'Admin' : roles.map((x) => ROLE_INFO[x].label).join(' + ')}</Badge>
+              <Badge tone="primary">{access.is_admin ? (access.is_super ? 'Super admin' : 'Admin') : roles.map((x) => ROLE_INFO[x].label).join(' + ')}</Badge>
               <ChevronRight className="size-5 text-muted" aria-hidden />
             </Link>
           ))

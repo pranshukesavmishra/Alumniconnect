@@ -1,7 +1,9 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMyProfile } from '../auth/AuthProvider'
+import { useAdminAccess } from './access'
 import { useMySiteRoles, useMyStaffEvents } from '../events/queries'
-import { capsFor, rolesOnEvent, type Caps, type EventRole } from '../../lib/roles'
+import { hasAnyPerm, hasPerm } from '../../lib/adminAccess'
+import { capsForAccess, rolesOnEvent, type Caps, type EventRole } from '../../lib/roles'
 import { supabase } from '../../lib/supabase'
 import type { Attention } from '../../lib/adminAttention'
 import type { EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, TicketType, VerificationStatus } from '../../lib/types'
@@ -17,26 +19,44 @@ async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ da
   }
 }
 
+/** Any moderation duty: an admin with a moderation permission, or the site moderator role. */
 export function useIsModerator(): boolean {
-  const { data: me } = useMyProfile()
+  const { access } = useAdminAccess()
   const { data: site } = useMySiteRoles()
-  return !!me?.is_admin || !!site?.includes('moderator')
+  return hasPerm(access, 'moderation_*') || !!site?.includes('moderator')
+}
+
+/** Which moderation duties I have. A site moderator holds all four; an admin holds the ones in their grant. */
+export function useModerationCaps() {
+  const { access } = useAdminAccess()
+  const { data: site } = useMySiteRoles()
+  const mod = !!site?.includes('moderator')
+  return {
+    reports: mod || hasPerm(access, 'moderation_reports'),
+    hide: mod || hasPerm(access, 'moderation_hide'),
+    slowmode: mod || hasPerm(access, 'moderation_slowmode'),
+    meetups: mod || hasPerm(access, 'moderation_meetups'),
+    any: mod || hasAnyPerm(access, ['moderation_*']),
+  }
 }
 
 export function useManagedEvents() {
   const { data: me } = useMyProfile()
   const { data: staff } = useMyStaffEvents()
+  const { access, isLoading: accessLoading } = useAdminAccess()
+  // an admin sees the events their permissions reach; everyone else only the events they have a role on
+  const eventAdmin = hasAnyPerm(access, ['events_*', 'money_*', 'messages_*'])
   return useQuery({
-    queryKey: ['managed-events', me?.id, me?.is_admin, staff?.map((s) => `${s.event_id}:${s.role}`).join()],
-    enabled: !!me && staff !== undefined,
+    queryKey: ['managed-events', me?.id, eventAdmin, access.full, access.permissions.join(), staff?.map((s) => `${s.event_id}:${s.role}`).join()],
+    enabled: !!me && staff !== undefined && !accessLoading,
     queryFn: async () => {
       let q = supabase.from('events').select('*').order('starts_at', { ascending: false })
-      if (!me!.is_admin) q = q.in('id', [...new Set(staff!.map((s) => s.event_id))])
+      if (!eventAdmin) q = q.in('id', [...new Set(staff!.map((s) => s.event_id))])
       const { data, error } = await q
       if (error) throw error
       return (data as EventRow[]).map((e) => {
-        const roles = me!.is_admin ? [] : rolesOnEvent(staff!, e.id)
-        return { event: e, roles, caps: capsFor(!!me!.is_admin, roles) }
+        const roles = rolesOnEvent(staff!, e.id)
+        return { event: e, roles: eventAdmin ? [] : roles, caps: capsForAccess(access, roles) }
       })
     },
   })
@@ -44,12 +64,13 @@ export function useManagedEvents() {
 
 /** What I may do on one event (null when I have no role there). */
 export function useEventCaps(eventId: string | undefined): Caps | null {
-  const { data: me } = useMyProfile()
   const { data: staff } = useMyStaffEvents()
-  if (me?.is_admin) return capsFor(true, [])
-  if (!eventId || !staff) return null
-  const roles = rolesOnEvent(staff, eventId)
-  return roles.length ? capsFor(false, roles) : null
+  const { access } = useAdminAccess()
+  if (!eventId) return null
+  // an admin's permissions do not depend on the event roles being loaded yet
+  if (!staff && !access.is_admin) return null
+  const caps = capsForAccess(access, staff ? rolesOnEvent(staff, eventId) : [])
+  return Object.values(caps).some(Boolean) ? caps : null
 }
 
 export function useAdminEvent(slug: string) {

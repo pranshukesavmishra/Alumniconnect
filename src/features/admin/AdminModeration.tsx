@@ -11,7 +11,8 @@ import { relativeTime } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
 import { Field, Select } from '../../components/ui/Form'
-import { useIsModerator } from './queries'
+import { useAdminAccess } from './access'
+import { useModerationCaps } from './queries'
 
 interface ReportRow {
   target_type: 'post' | 'comment' | 'message' | 'profile' | 'job' | 'help' | 'business'
@@ -49,8 +50,9 @@ export function useOpenReportCount(enabled: boolean) {
 export function AdminModeration() {
   const { isLoading: meLoading } = useMyProfile()
   const [status, setStatus] = useState<'open' | 'actioned' | 'dismissed'>('open')
-  const moderator = useIsModerator()
-  const { data, isLoading, error } = useReports(status, moderator)
+  const caps = useModerationCaps()
+  const { isLoading: accessLoading } = useAdminAccess()
+  const { data, isLoading, error } = useReports(status, caps.reports)
   const qc = useQueryClient()
 
   const act = useMutation({
@@ -72,8 +74,8 @@ export function AdminModeration() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-reports'] }),
   })
 
-  if (meLoading) return <PageSkeleton />
-  if (!moderator) return <Navigate to="/" replace />
+  if (meLoading || accessLoading) return <PageSkeleton />
+  if (!caps.any) return <Navigate to="/" replace />
 
   const tabs: { id: typeof status; label: string }[] = [
     { id: 'open', label: 'Open' },
@@ -84,15 +86,16 @@ export function AdminModeration() {
     <div>
       <PageHeader title="Reports" subtitle="What members have flagged" back="/admin" />
       <Page className="space-y-4">
-        <div role="tablist" className="flex gap-2">
+        {caps.reports && <div role="tablist" className="flex gap-2">
           {tabs.map((t) => (
             <button key={t.id} role="tab" aria-selected={status === t.id} onClick={() => setStatus(t.id)} className={`min-h-11 rounded-full px-4 text-sm font-semibold ${status === t.id ? 'bg-primary text-on-primary' : 'border border-border bg-surface'}`}>
               {t.label}
             </button>
           ))}
-        </div>
+        </div>}
+        {!caps.reports && <Notice tone="info" title="You can use slow mode only">Reading reports is not part of your permissions. Ask a super admin if you need it.</Notice>}
         {error && <Notice tone="danger" title={friendlyError(error)} />}
-        {isLoading ? (
+        {!caps.reports ? null : isLoading ? (
           <PageSkeleton />
         ) : !data?.length ? (
           <EmptyState icon={<ShieldCheck />} title={status === 'open' ? 'Nothing to review' : 'No reports here'}>
@@ -117,7 +120,7 @@ export function AdminModeration() {
                   </p>
                   {status === 'open' && (
                     <div className="flex flex-wrap gap-2">
-                      {r.target_type !== 'profile' && !r.removed && (
+                      {caps.hide && r.target_type !== 'profile' && !r.removed && (
                         <Button
                           variant="danger"
                           icon={<Trash2 className="size-4" />}
@@ -134,7 +137,7 @@ export function AdminModeration() {
                       </Button>
                     </div>
                   )}
-                  {status === 'actioned' && r.removed && ['post', 'comment', 'job', 'help', 'business'].includes(r.target_type) && (
+                  {status === 'actioned' && caps.hide && r.removed && ['post', 'comment', 'job', 'help', 'business'].includes(r.target_type) && (
                     <Button
                       variant="secondary"
                       loading={act.isPending && act.variables?.r === r && act.variables.action === 'restore'}
@@ -150,7 +153,7 @@ export function AdminModeration() {
             ))}
           </ul>
         )}
-        <SlowMode />
+        {caps.slowmode && <SlowMode />}
       </Page>
     </div>
   )

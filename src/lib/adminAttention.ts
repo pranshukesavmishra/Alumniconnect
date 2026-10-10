@@ -18,11 +18,11 @@ export interface AttentionEvent {
   missing_upi: boolean
 }
 
-/** Admins get every field; a moderator only gets reports_open. */
+/** Each field is present only when the viewer's permissions let them act on it. */
 export interface AttentionGlobal {
   members_pending?: number
   oldest_member_pending_at?: string | null
-  reports_open: number
+  reports_open?: number
   circles_waiting?: number
   jobs_expiring?: number
   messages_to_approve?: number
@@ -105,8 +105,8 @@ export function buildQueue(a: Attention, now: number = Date.now()): QueueItem[] 
   }
   const g = a.global
   if (g) {
-    if (g.reports_open > 0) {
-      out.push({ id: 'reports', tone: 'danger', count: g.reports_open, title: `${plural(g.reports_open, 'report', 'reports')} to review`, detail: 'Posts, comments and messages members flagged', href: '/admin/reports' })
+    if ((g.reports_open ?? 0) > 0) {
+      out.push({ id: 'reports', tone: 'danger', count: g.reports_open!, title: `${plural(g.reports_open!, 'report', 'reports')} to review`, detail: 'Posts, comments and messages members flagged', href: '/admin/reports' })
     }
     if ((g.messages_to_approve ?? 0) > 0) {
       out.push({
@@ -142,5 +142,5 @@ export function buildQueue(a: Attention, now: number = Date.now()): QueueItem[] 
 /** Total number of things waiting, for the badge on the admin entry point. */
 export function attentionTotal(a: Attention | undefined): number {
   if (!a) return 0
-  return a.events.reduce((n, e) => n + e.payments_to_verify, 0) + (a.global ? (a.global.members_pending ?? 0) + a.global.reports_open + (a.global.circles_waiting ?? 0) + (a.global.messages_to_approve ?? 0) : 0)
+  return a.events.reduce((n, e) => n + e.payments_to_verify, 0) + (a.global ? (a.global.members_pending ?? 0) + (a.global.reports_open ?? 0) + (a.global.circles_waiting ?? 0) + (a.global.messages_to_approve ?? 0) : 0)
 }

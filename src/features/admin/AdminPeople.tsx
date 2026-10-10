@@ -1,3 +1,4 @@
+import type { Caps } from '../../lib/roles'
 import clsx from 'clsx'
 import { Download, Phone, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -27,7 +28,7 @@ const FILTERS: { id: RegistrationStatus | 'all'; label: string }[] = [
   { id: 'cancelled', label: 'Cancelled' },
 ]
 
-export function AdminPeople({ event, data, manager, initialQuery = '' }: { event: EventRow; data: AdminData; manager: boolean; initialQuery?: string }) {
+export function AdminPeople({ event, data, manager, caps, initialQuery = '' }: { event: EventRow; data: AdminData; manager: boolean; caps?: Caps; initialQuery?: string }) {
   const [q, setQ] = useState(initialQuery)
   const [filter, setFilter] = useState<RegistrationStatus | 'all'>('all')
   const [openId, setOpenId] = useState<string | null>(() => data.registrations.find((r) => initialQuery && r.code.toLowerCase() === initialQuery.toLowerCase())?.id ?? null)
@@ -102,12 +103,12 @@ export function AdminPeople({ event, data, manager, initialQuery = '' }: { event
         </ul>
       )}
       {paged.hidden > 0 && <Button variant="secondary" block onClick={paged.more}>Show {Math.min(100, paged.hidden)} more ({paged.hidden} not shown)</Button>}
-      {open && <Detail reg={open} data={data} manager={manager} event={event} onClose={() => setOpenId(null)} />}
+      {open && <Detail reg={open} data={data} manager={manager} caps={caps} event={event} onClose={() => setOpenId(null)} />}
     </div>
   )
 }
 
-function Detail({ reg, data, manager, event, onClose }: { reg: Registration; data: AdminData; manager: boolean; event: EventRow; onClose: () => void }) {
+function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registration; data: AdminData; manager: boolean; caps?: Caps; event: EventRow; onClose: () => void }) {
   const eventId = event.id
   const items = data.items.filter((i) => i.registration_id === reg.id)
   const payments = data.payments.filter((p) => p.registration_id === reg.id)
@@ -179,8 +180,8 @@ function Detail({ reg, data, manager, event, onClose }: { reg: Registration; dat
 
         <AdminReunionDetail event={event} reg={reg} manager={manager} />
 
-        {manager && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
-        {manager && <RegistrationAdjustments key={`adj:${reg.id}:${reg.updated_at}`} reg={reg} payments={payments} due={due} onClose={onClose} />}
+        {manager && (caps?.registrations ?? true) && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
+        {manager && <RegistrationAdjustments key={`adj:${reg.id}:${reg.updated_at}`} reg={reg} payments={payments} due={due} onClose={onClose} canTransfer={caps?.registrations ?? true} canMoney={caps?.refunds ?? true} />}
 
         {manager && (
           <>

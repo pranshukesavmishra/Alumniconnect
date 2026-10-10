@@ -6,12 +6,15 @@ import { auditCount, loginPage, makeEvent, makeUser, register, ts, type TestUser
 test.describe.configure({ mode: 'serial' })
 const tag = `sr${ts}`.slice(0, 9)
 
-let boss: TestUser, ev: ReturnType<typeof makeEvent>, evTitle: string
+let boss: TestUser, sup: TestUser, ev: ReturnType<typeof makeEvent>, evTitle: string
 const people: Record<string, TestUser> = {}
 const nameOf = (k: string) => `Sfty ${k} ${tag}`
 
 test.beforeAll(async () => {
   boss = await makeUser(`${tag}boss`, { admin: true, name: nameOf('Boss') })
+  // admin access has its own door now: a super admin makes and removes admins (everything else an ordinary admin still does)
+  sup = await makeUser(`${tag}sup`, { admin: true, name: nameOf('Sup') })
+  sql(`update profiles set is_super_admin = true where id = '${sup.id}'`)
   for (const k of ['Tre', 'Con', 'Chk', 'Mod', 'Adm']) people[k] = await makeUser(`${tag}${k}`, { name: nameOf(k) })
   ev = makeEvent(`${tag}r`)
   evTitle = sql(`select title from events where id = '${ev.id}'`)
@@ -36,7 +39,7 @@ test('grant: dismissing the confirmation changes nothing; accepting writes the r
   expect(sql(`select count(*) from event_staff where user_id = '${t.id}'`)).toBe('0')
   expect(auditCount(`action = 'role_grant' and target_id = '${t.id}'`)).toBe(0)
 
-  const grants: [string, string, boolean][] = [['treasurer', 'Tre', true], ['content', 'Con', true], ['checkin', 'Chk', true], ['moderator', 'Mod', false], ['admin', 'Adm', false]]
+  const grants: [string, string, boolean][] = [['treasurer', 'Tre', true], ['content', 'Con', true], ['checkin', 'Chk', true], ['moderator', 'Mod', false]]
   for (const [role, who, evRole] of grants) {
     await give(page, role, who, { event: evRole, accept: true })
     await expect(page.getByText(/is now|already had/).first()).toBeVisible()
@@ -47,13 +50,19 @@ test('grant: dismissing the confirmation changes nothing; accepting writes the r
     expect(auditCount(`action = 'role_grant' and target_id = '${u.id}' and details->>'role' = '${role}' and actor = '${boss.id}'`)).toBe(1)
     if (evRole) expect(sql(`select details->>'event' from admin_audit where action = 'role_grant' and target_id = '${u.id}'`)).toBe(evTitle)
   }
+  // admin access is not a role any more: an ordinary admin cannot give it, a super admin does, with its own log entry
+  expect((await boss.db.rpc('admin_grant_role', { p_user: people.Adm!.id, p_role: 'admin', p_event: null, p_note: null })).error?.code).toBe('42501')
+  expect((await sup.db.rpc('admin_set_admin', { p_user: people.Adm!.id, p_enabled: true, p_permissions: null, p_note: null })).error).toBeNull()
+  expect(sql(`select is_admin from profiles where id = '${people.Adm!.id}'`)).toBe('t')
+  expect(auditCount(`action = 'admin_granted' and target_id = '${people.Adm!.id}' and actor = '${sup.id}'`)).toBe(1)
   // giving the same role again is harmless: no second row, no second audit entry
   await give(page, 'treasurer', 'Tre', { event: true, accept: true })
   await expect(page.getByText(/already had this role/)).toBeVisible()
   expect(sql(`select count(*) from event_staff where user_id = '${t.id}'`)).toBe('1')
   expect(auditCount(`action = 'role_grant' and target_id = '${t.id}'`)).toBe(1)
 
-  // the page lists everyone
+  // the page lists everyone (reload: the new admin was made through the function while the page was open)
+  await page.reload()
   await expect(page.getByTestId('admins-list')).toContainText(nameOf('Adm'))
   await expect(page.getByTestId('moderators-list')).toContainText(nameOf('Mod'))
   const team = page.getByTestId('event-team').filter({ hasText: evTitle })
@@ -127,7 +136,7 @@ test('the new role holders see exactly their screens, and the database lets them
 })
 
 test('revoke: dismissing keeps the role, accepting removes it, the audit logs it, and the person loses access at once', async ({ page, browser }) => {
-  await loginPage(page, boss, '/admin/roles')
+  await loginPage(page, sup, '/admin/roles')
   const T = people.Tre!, C = people.Con!, K = people.Chk!, M = people.Mod!, A = people.Adm!
 
   // keep: dismiss the confirmation
@@ -140,7 +149,7 @@ test('revoke: dismissing keeps the role, accepting removes it, the audit logs it
     await page.getByRole('button', { name: `Remove ${label} role from ${nameOf(who)} on ${evTitle}` }).click()
     await expect(page.getByText('Role removed').first()).toBeVisible()
     expect(sql(`select count(*) from event_staff where user_id = '${u.id}'`)).toBe('0')
-    expect(auditCount(`action = 'role_revoke' and target_id = '${u.id}' and actor = '${boss.id}'`)).toBe(1)
+    expect(auditCount(`action = 'role_revoke' and target_id = '${u.id}' and actor = '${sup.id}'`)).toBe(1)
   }
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: `Remove moderator role from ${nameOf('Mod')}` }).click()
@@ -152,8 +161,8 @@ test('revoke: dismissing keeps the role, accepting removes it, the audit logs it
   await page.getByRole('button', { name: `Remove admin access from ${nameOf('Adm')}` }).click()
   await expect(page.getByTestId('admins-list')).not.toContainText(nameOf('Adm'))
   expect(sql(`select is_admin from profiles where id = '${A.id}'`)).toBe('f')
-  expect(auditCount(`action = 'role_revoke' and target_id = '${A.id}' and details->>'role' = 'admin'`)).toBe(1)
-  await expect(page.getByRole('button', { name: `Remove admin access from ${nameOf('Boss')}` })).toHaveCount(0)
+  expect(auditCount(`action = 'admin_removed' and target_id = '${A.id}' and actor = '${sup.id}'`)).toBe(1)
+  await expect(page.getByRole('button', { name: `Remove admin access from ${nameOf('Sup')}` })).toHaveCount(0)
 
   // the people who lost a role are locked out, by screen and by database
   const buyer = await makeUser(`${tag}buy2`)
@@ -178,19 +187,20 @@ test('revoke: dismissing keeps the role, accepting removes it, the audit logs it
 })
 
 test('the last admin and yourself are protected in the database, whatever the screen says', async () => {
-  // yourself
+  // yourself: an ordinary admin has no door at all, a super admin cannot use it on themselves
   const self = await boss.db.rpc('admin_revoke_role', { p_user: boss.id, p_role: 'admin', p_event: null, p_note: null })
-  expect(self.error?.message).toContain('your own admin access')
+  expect(self.error?.message).toContain('super admin only')
+  expect((await sup.db.rpc('admin_set_admin', { p_user: sup.id, p_enabled: false, p_permissions: null, p_note: null })).error?.message).toContain('super admin')
   expect(sql(`select is_admin from profiles where id = '${boss.id}'`)).toBe('t')
   // the last admin: even a direct update by the table owner is refused (one -c string = one transaction, so the first update is rolled back too)
   let message = ''
   try {
-    sql(`update profiles set is_admin = false where is_admin and id <> '${boss.id}'; update profiles set is_admin = false where id = '${boss.id}'`)
+    sql(`update profiles set is_admin = false where is_admin and not is_super_admin and id <> '${sup.id}'; update profiles set is_admin = false where id = '${sup.id}'`)
   } catch (e) {
     message = String((e as { stderr?: string }).stderr ?? e)
   }
-  expect(message).toContain('There must always be at least one admin')
-  expect(sql(`select is_admin from profiles where id = '${boss.id}'`)).toBe('t')
+  expect(message).toMatch(/There must always be at least one admin|profiles_super_is_admin/) // (an owner is an admin: the database refuses either way)
+  expect(sql(`select is_admin from profiles where id = '${sup.id}'`)).toBe('t')
   expect(Number(sql(`select count(*) from profiles where is_admin`))).toBeGreaterThanOrEqual(1)
 })
 

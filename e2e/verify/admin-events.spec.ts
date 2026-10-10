@@ -150,7 +150,7 @@ test('registrations: search, edit tickets / food / phone with a reason, cancel, 
   expect(sql(`select status from event_registrations where id = '${reg.id}'`)).toBe('cancelled')
   // dialog closes? the cancelled reg is filtered out of "All": open via Cancelled filter
   await page.keyboard.press('Escape')
-  if (await dlg.isVisible()) await dlg.getByRole('button', { name: 'Close' }).click()
+  if (await dlg.isVisible()) await dlg.getByRole('button', { name: 'Close' }).dispatchEvent('click') // a toast may still sit over the button
   await page.getByRole('button', { name: /^Cancelled · / }).click()
   await page.getByRole('button', { name: new RegExp(reg.code) }).click()
   await page.getByRole('dialog').getByRole('button', { name: 'Reopen registration' }).click()

@@ -16,12 +16,22 @@ import { cleanFilter, describeFilter, extraFilterCount, filterFromParams, filter
 import { supabase } from '../../lib/supabase'
 import type { Profile, VerificationStatus } from '../../lib/types'
 import { useMyProfile } from '../auth/AuthProvider'
+import { RequirePerm, useAdminAccess } from './access'
 import { exportMembers, type MemberExportRow } from './export'
 import { attentionKey, fetchMemberIds, useMemberList, useMemberViews, type MemberView } from './queries'
 
 const EXTRA_FILTERS = ['onboarded', 'older', 'signin', 'branch', 'batch_from', 'batch_to', 'city', 'type', 'sort'] as const
 
 export function AdminMembers() {
+  return (
+    <RequirePerm any={['members_view']} what="The members list">
+      <AdminMembersPage />
+    </RequirePerm>
+  )
+}
+
+function AdminMembersPage() {
+  const { can, isSuper } = useAdminAccess()
   const { data: me, isLoading } = useMyProfile()
   const qc = useQueryClient()
   const [params, setParams] = useSearchParams()
@@ -107,12 +117,12 @@ export function AdminMembers() {
         title="Members"
         subtitle="Find, verify and look after every member"
         back="/admin"
-        action={<Button size="sm" icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>Add member</Button>}
+        action={can('members_import') && <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setAdding(true)}>Add member</Button>}
       />
       <Page wide className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <ButtonLink to="/admin/members/import" size="sm" variant="secondary" icon={<Upload className="size-4" />}>Import from CSV</ButtonLink>
-          <ButtonLink to="/admin/members/duplicates" size="sm" variant="secondary" icon={<Users className="size-4" />}>Find duplicates</ButtonLink>
+          {can('members_import') && <ButtonLink to="/admin/members/import" size="sm" variant="secondary" icon={<Upload className="size-4" />}>Import from CSV</ButtonLink>}
+          {can('members_merge') && <ButtonLink to="/admin/members/duplicates" size="sm" variant="secondary" icon={<Users className="size-4" />}>Find duplicates</ButtonLink>}
         </div>
         <div className="grid gap-2 sm:grid-cols-[1fr_14rem_auto]">
           <div className="relative">
@@ -163,7 +173,7 @@ export function AdminMembers() {
           {words.length > 0 && (
             <Button size="sm" variant="ghost" onClick={() => { setQ(''); setFilter({}) }}>Clear filters</Button>
           )}
-          {total > 0 && (
+          {total > 0 && can('members_export') && (
             <Button size="sm" variant="ghost" icon={<Download className="size-4" />} onClick={() => setExporting(true)}>
               {selected.size ? `Export ${selected.size}` : 'Export'}
             </Button>
@@ -225,7 +235,7 @@ export function AdminMembers() {
           </Button>
         )}
 
-        {selected.size > 0 && (
+        {selected.size > 0 && can('members_verify') && (
           <div role="region" aria-label="Bulk actions" className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="font-semibold">{selected.size} selected</p>
@@ -260,7 +270,7 @@ export function AdminMembers() {
         }}
       />
       <ExportSheet open={exporting} onClose={() => setExporting(false)} ids={[...selected]} filter={rpcFilter} total={total} />
-      {openId && <MemberEditor id={openId} isSelf={openId === me.id} onClose={() => setOpenId(null)} />}
+      {openId && <MemberEditor id={openId} isSelf={openId === me.id} canEdit={can('members_edit')} canVerify={can('members_verify')} isSuper={isSuper} onClose={() => setOpenId(null)} />}
     </div>
   )
 }
@@ -494,7 +504,7 @@ function FiltersSheet({ open, onClose, filter, views, onApply }: { open: boolean
   )
 }
 
-function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; onClose: () => void }) {
+function MemberEditor({ id, isSelf, canEdit, canVerify, isSuper, onClose }: { id: string; isSelf: boolean; canEdit: boolean; canVerify: boolean; isSuper: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['admin-member', id],
@@ -573,7 +583,7 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
         ) : (
           <div className="space-y-5">
             <div className="flex flex-wrap gap-2">
-              {p.verification !== 'verified' ? (
+              {canVerify && (p.verification !== 'verified' ? (
                 <Button size="sm" variant="success" icon={<BadgeCheck className="size-4" />} onClick={() => setFlags(null, 'verified', `Verify ${p.full_name} as a genuine JECian? They will see the member directory.`)}>
                   Verify member
                 </Button>
@@ -581,30 +591,28 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
                 <Button size="sm" variant="secondary" onClick={() => setFlags(null, 'pending', `Remove ${p.full_name}'s verification? They will lose access to the directory.`)}>
                   Remove verification
                 </Button>
-              )}
-              {p.verification !== 'rejected' && (
+              ))}
+              {canVerify && p.verification !== 'rejected' && (
                 <Button size="sm" variant="danger-ghost" onClick={() => setFlags(null, 'rejected', `Mark ${p.full_name} as NOT a JECian?`)}>
                   Reject
                 </Button>
               )}
-              {!isSelf &&
-                (p.is_admin ? (
-                  <Button size="sm" variant="danger-ghost" onClick={() => setFlags(false, null, `Remove admin access from ${p.full_name}?`)}>
-                    Remove admin
-                  </Button>
-                ) : (
-                  <Button size="sm" variant="secondary" icon={<ShieldCheck className="size-4" />} onClick={() => setFlags(true, null, `Make ${p.full_name} an ADMIN? Admins can see and change everything.`)}>
-                    Make admin
-                  </Button>
-                ))}
+              {p.is_admin && <Badge tone="primary"><ShieldCheck className="size-3" aria-hidden /> Admin</Badge>}
+              {isSuper && !isSelf && (
+                <ButtonLink to={`/admin/roles?admin=${id}`} size="sm" variant="secondary" icon={<ShieldCheck className="size-4" />}>
+                  {p.is_admin ? 'Manage admin access' : 'Make admin'}
+                </ButtonLink>
+              )}
             </div>
+            {!canEdit && <Notice tone="info" title="You can look but not change this member">Your admin permissions do not include editing members. Ask a super admin for access.</Notice>}
 
             <div className="flex flex-wrap gap-2">
               <ButtonLink to={`/admin/members/${id}`} size="sm" variant="secondary" icon={<History className="size-4" />}>History</ButtonLink>
               <ButtonLink to={`/admin/members/duplicates?q=${encodeURIComponent(p.full_name)}`} size="sm" variant="secondary" icon={<Users className="size-4" />}>Look for duplicates</ButtonLink>
             </div>
-            <MemberNotes id={id} />
+            <MemberNotes id={id} canWrite={canEdit} />
 
+            <fieldset disabled={!canEdit} className="min-w-0 space-y-5 border-0 p-0">
             <Field label="Full name">{(x) => <Input {...x} value={f.full_name} onChange={set('full_name')} />}</Field>
             <ChoiceGroup label="Member type" columns={3} options={MEMBER_TYPES.map((m) => ({ value: m.value, label: m.label.split(' /')[0]! }))} value={(f.member_type || null) as never} onChange={(v) => setF({ ...f, member_type: v })} />
             <Field label="Branch">
@@ -647,9 +655,12 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
             <Field label="LinkedIn profile link">{(x) => <Input {...x} type="url" inputMode="url" value={f.linkedin_url} onChange={set('linkedin_url')} placeholder="https://www.linkedin.com/in/…" />}</Field>
             <Field label="Website">{(x) => <Input {...x} type="url" inputMode="url" value={f.website_url} onChange={set('website_url')} />}</Field>
             <Field label="Skills" hint="Separate with commas">{(x) => <Input {...x} value={f.skills} onChange={set('skills')} />}</Field>
-            <Button size="lg" block loading={busy} onClick={save}>
-              Save changes
-            </Button>
+            </fieldset>
+            {canEdit && (
+              <Button size="lg" block loading={busy} onClick={save}>
+                Save changes
+              </Button>
+            )}
             <p className="text-center text-xs text-muted">Every change is recorded in the activity log with your name.</p>
           </div>
         )}
@@ -659,7 +670,7 @@ function MemberEditor({ id, isSelf, onClose }: { id: string; isSelf: boolean; on
 }
 
 /** Private committee notes about one member. Members never see them; adding and removing is logged. */
-export function MemberNotes({ id }: { id: string }) {
+export function MemberNotes({ id, canWrite = true }: { id: string; canWrite?: boolean }) {
   const qc = useQueryClient()
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
@@ -703,13 +714,15 @@ export function MemberNotes({ id }: { id: string }) {
             <p className="whitespace-pre-wrap break-words text-[15px]">{n.body}</p>
             <p className="text-xs text-muted">{n.author?.full_name ?? 'An admin'} · {formatDateTime(n.created_at)}</p>
           </div>
-          <button type="button" aria-label="Remove note" className="grid size-11 shrink-0 place-items-center rounded-full text-danger hover:bg-danger-soft" onClick={() => remove(n.id)}>
-            <Trash2 className="size-4" />
-          </button>
+          {canWrite && (
+            <button type="button" aria-label="Remove note" className="grid size-11 shrink-0 place-items-center rounded-full text-danger hover:bg-danger-soft" onClick={() => remove(n.id)}>
+              <Trash2 className="size-4" />
+            </button>
+          )}
         </div>
       ))}
-      <Textarea aria-label="New private note" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} placeholder="e.g. Called on 3 Oct, sending ID proof" rows={2} />
-      <Button size="sm" variant="secondary" loading={busy} disabled={!body.trim()} onClick={add}>Add note</Button>
+      {canWrite && <Textarea aria-label="New private note" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} placeholder="e.g. Called on 3 Oct, sending ID proof" rows={2} />}
+      {canWrite && <Button size="sm" variant="secondary" loading={busy} disabled={!body.trim()} onClick={add}>Add note</Button>}
     </section>
   )
 }
