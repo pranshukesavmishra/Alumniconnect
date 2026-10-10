@@ -34,9 +34,9 @@ begin
 end $$;
 
 select pg_temp.patch('_permission_catalog', $$    ('admins', 'Admins', 'See who$$,
-$$    ('funds_manage', 'Funds', 'Campaigns and funds', 'Create, edit, publish and pause fund appeals, items, milestones, updates, the "where the money went" log and the fund settings.', 67),
-    ('funds_verify', 'Funds', 'Verify donations', 'Verify or reject donations, record cash and bank gifts, record refunds. Sees donor names even for anonymous gifts.', 68),
-    ('funds_reports', 'Funds', 'Fund reports', 'Fund totals by campaign, batch, department, month and donor, and CSV downloads.', 69),
+$$    ('funds_manage', 'Funds', 'Campaigns and funds', 'Create, edit, publish and pause fund appeals, items, milestones, updates, the "where the money went" log and the fund settings.', 74),
+    ('funds_verify', 'Funds', 'Verify donations', 'Verify or reject donations, record cash and bank gifts, record refunds. Sees donor names even for anonymous gifts.', 75),
+    ('funds_reports', 'Funds', 'Fund reports', 'Fund totals by campaign, batch, department, month and donor, and CSV downloads.', 76),
     ('admins', 'Admins', 'See who$$);
 
 -- ------------------------------------------------------------------ settings
@@ -266,7 +266,7 @@ begin
     if v_raised * 100 >= c.goal_paise * m.percent then
       update public.giving_milestones set reached_at = now() where id = m.id;
       insert into public.notifications (user_id, kind, actor_id, target_id, body)
-        select distinct d.user_id, 'giving_milestone', null, c.id, left(m.percent || '% ' || m.title, 200)
+        select distinct d.user_id, 'giving_milestone', null::uuid, c.id, left(m.percent || '% ' || m.title, 200)
           from public.giving_donations d where d.campaign_id = p_campaign and d.status = 'verified' and d.user_id is not null;
     end if;
   end loop;
@@ -297,7 +297,7 @@ begin
               and ends_at <= now() + interval '3 days' and ending_notified_at is null loop
     update public.giving_campaigns set ending_notified_at = now() where id = c.id;
     insert into public.notifications (user_id, kind, actor_id, target_id, body)
-      select u, 'giving_ending', null, c.id, left(c.title, 200) from (
+      select u, 'giving_ending', null::uuid, c.id, left(c.title, 200) from (
         select d.user_id as u from public.giving_donations d where d.campaign_id = c.id and d.status in ('submitted', 'verified') and d.user_id is not null
         union select pl.user_id from public.giving_pledges pl where pl.campaign_id = c.id and pl.active) x;
     n := n + 1;
@@ -753,7 +753,7 @@ begin
   perform public._audit('giving_update_post', 'giving_campaigns', p_campaign, jsonb_build_object('title', c.title));
   if c.status <> 'draft' then
     insert into public.notifications (user_id, kind, actor_id, target_id, body)
-      select distinct d.user_id, 'giving_update', null, c.id, left(coalesce(nullif(btrim(p_title), ''), c.title), 200)
+      select distinct d.user_id, 'giving_update', null::uuid, c.id, left(coalesce(nullif(btrim(p_title), ''), c.title), 200)
         from public.giving_donations d where d.campaign_id = c.id and d.status = 'verified' and d.user_id is not null;
   end if;
   return v_id;
@@ -1013,7 +1013,7 @@ begin
   elsif p_kind = 'month' then
     return coalesce((select jsonb_agg(r order by r ->> 'month' desc) from (
       select jsonb_build_object('month', to_char(d.verified_at at time zone 'Asia/Kolkata', 'YYYY-MM'), 'raised_paise', sum(d.amount_paise)::bigint, 'gifts', count(*)) as r
-        from public.giving_donations d where d.status = 'verified' and (p_campaign is null or d.campaign_id = p_campaign) group by 1) t), '[]'::jsonb);
+        from public.giving_donations d where d.status = 'verified' and (p_campaign is null or d.campaign_id = p_campaign) group by to_char(d.verified_at at time zone 'Asia/Kolkata', 'YYYY-MM')) t), '[]'::jsonb);
   elsif p_kind = 'donor' then
     return coalesce((select jsonb_agg(r order by (r ->> 'total_paise')::bigint desc) from (
       select jsonb_build_object('name', case when d.is_anonymous and not v_names then 'A JECian' else coalesce(p.full_name, d.donor_name, 'A JECian') end,

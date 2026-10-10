@@ -18,7 +18,7 @@ begin
 end $$;
 
 select pg_temp.patch('_permission_catalog', $$    ('admins', 'Admins', 'See who$$,
-$$    ('sponsors_manage', 'Funds', 'Sponsors', 'Sponsor packages, the sponsor pipeline (leads to delivered), the sponsor wall, proposals and agreements.', 69),
+$$    ('sponsors_manage', 'Funds', 'Sponsors', 'Sponsor packages, the sponsor pipeline (leads to delivered), the sponsor wall, proposals and agreements.', 77),
     ('admins', 'Admins', 'See who$$);
 
 
@@ -55,7 +55,7 @@ create table public.sponsors (
   package_id uuid references public.sponsor_packages (id) on delete set null,
   name text not null check (char_length(name) between 2 and 120),
   logo_path text check (logo_path like 'giving/%'),
-  website text check (website ~ '^https?://[^\s]{3,280}$'),
+  website text check (website ~ '^https?://[^\s]{3,255}$'),
   blurb text check (char_length(blurb) <= 300),
   contact_name text check (char_length(contact_name) <= 120),
   contact_email text check (char_length(contact_email) <= 200),
@@ -366,7 +366,7 @@ begin
   if v_event is null and v_camp is null then raise exception 'Choose the event or appeal being sponsored.'; end if;
   if v_event is not null and v_camp is not null then raise exception 'Choose the event or the appeal, not both.'; end if;
   if v_logo is not null and v_logo not like 'giving/%' then raise exception 'Invalid logo.'; end if;
-  if v_web is not null and v_web !~ '^https?://[^\s]{3,280}$' then raise exception 'The website must start with https:// (or http://).'; end if;
+  if v_web is not null and v_web !~ '^https?://[^\s]{3,255}$' then raise exception 'The website must start with https:// (or http://).'; end if;
   if v_pkg is not null and not exists (select 1 from public.sponsor_packages where id = v_pkg and event_id is not distinct from v_event and campaign_id is not distinct from v_camp) then
     raise exception 'That package belongs to something else.';
   end if;
