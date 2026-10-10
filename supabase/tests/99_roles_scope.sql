@@ -49,7 +49,8 @@ begin
   assert (select scope_kind from public.admin_role_templates where key = 'department_head') = 'department'
      and (select scope_kind from public.admin_role_templates where key = 'batch_rep') = 'batch', 'scoped roles';
   assert public._expand_permissions(array['money_*']) @> array['money_payments', 'money_refunds', 'money_finance', 'money_exports'], 'families expand';
-  assert public._expand_permissions(array['funds_*', 'nonsense']) = '{}', 'unknown keys and empty families expand to nothing';
+  assert public._expand_permissions(array['zzz_*', 'nonsense']) = '{}', 'unknown keys and empty families expand to nothing';
+  assert public._expand_permissions(array['funds_*', 'sponsors_*']) @> array['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'], 'the Give Back families expand';
   -- every non-empty template only names real permissions
   assert not exists (select 1 from public.admin_role_templates t, unnest(t.permissions) k
                       where k not like '%*' and k not in (select key from public._permission_catalog())), 'templates name real permissions';
