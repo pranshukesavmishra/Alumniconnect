@@ -4,26 +4,7 @@ import { FacebookIcon, InstagramIcon } from '../../components/ui/Icons'
 import { Field, Input, Select } from '../../components/ui/Form'
 import { SectionTitle } from '../../components/ui/Display'
 import { useT } from '../../i18n'
-import { normalizeSocialUrl, SOCIAL_VISIBILITIES, type SocialKind, type SocialVisibility } from '../../lib/social'
-
-export interface SocialDraft {
-  instagram: string
-  facebook: string
-  instagram_visibility: SocialVisibility
-  facebook_visibility: SocialVisibility
-}
-
-/** Returns the canonical urls to save (null = empty), or the kinds that are invalid. */
-export function validateSocial(d: SocialDraft): { instagram_url: string | null; facebook_url: string | null; errors: Partial<Record<SocialKind, true>> } {
-  const errors: Partial<Record<SocialKind, true>> = {}
-  const one = (kind: SocialKind, v: string) => {
-    if (!v.trim()) return null
-    const n = normalizeSocialUrl(kind, v)
-    if (!n) errors[kind] = true
-    return n
-  }
-  return { instagram_url: one('instagram', d.instagram), facebook_url: one('facebook', d.facebook), errors }
-}
+import { normalizeSocialUrl, SOCIAL_VISIBILITIES, type SocialDraft, type SocialKind, type SocialVisibility } from '../../lib/social'
 
 function Row({ kind, value, visibility, onValue, onVisibility, showError }: {
   kind: SocialKind

@@ -109,6 +109,25 @@ export function socialHandle(kind: SocialKind, url: string): string {
   }
 }
 
+export interface SocialDraft {
+  instagram: string
+  facebook: string
+  instagram_visibility: SocialVisibility
+  facebook_visibility: SocialVisibility
+}
+
+/** Checks what is typed in the edit form: the canonical urls to save (null = left empty), and which networks are invalid. */
+export function validateSocial(d: SocialDraft): { instagram_url: string | null; facebook_url: string | null; errors: Partial<Record<SocialKind, true>> } {
+  const errors: Partial<Record<SocialKind, true>> = {}
+  const one = (kind: SocialKind, v: string) => {
+    if (!v.trim()) return null
+    const n = normalizeSocialUrl(kind, v)
+    if (!n) errors[kind] = true
+    return n
+  }
+  return { instagram_url: one('instagram', d.instagram), facebook_url: one('facebook', d.facebook), errors }
+}
+
 /** What the edit form shows for a stored link: the handle without the web address. */
 export function socialInputValue(kind: SocialKind, url: string | null | undefined): string {
   if (!url) return ''

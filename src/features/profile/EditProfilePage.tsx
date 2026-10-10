@@ -17,9 +17,9 @@ import { normalizePhone } from '../../lib/phone'
 import { supabase } from '../../lib/supabase'
 import type { Experience } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
-import { SocialLinksEditor, validateSocial, type SocialDraft } from './SocialLinksEditor'
+import { SocialLinksEditor } from './SocialLinksEditor'
 import { useMySocialLinks, useSaveSocialLinks } from './socialQueries'
-import { socialInputValue } from '../../lib/social'
+import { socialInputValue, validateSocial, type SocialDraft } from '../../lib/social'
 import { PhotoImportError, useImportProviderPhoto, useMember, useMyPrivate, useRemoveAvatar, useUpdateProfile, useUploadAvatar, type PhotoProvider } from './queries'
 
 export function EditProfilePage() {
