@@ -92,7 +92,7 @@ The app collects and records money; **the committee carries the legal responsibi
 
 ## For developers
 
-* Migrations `20261015000041_giving.sql` (appeals, donations, pledges, expenses, settings, functions) and `20261015000042_sponsorship.sql`
+* Migrations `20261017000060_giving.sql` (appeals, donations, pledges, expenses, settings, functions) and `20261017000061_sponsorship.sql`
   (packages, sponsors, pipeline, deliverables, sponsorship payments through `giving_donations`).
 * No table is readable or writable through the API: every read and write is a SECURITY DEFINER function with `search_path = ''`
   (`giving_*` for members, `admin_giving_*` and `admin_sponsor_*` for the committee) that checks `_admin_can(...)` and writes `_audit`.
