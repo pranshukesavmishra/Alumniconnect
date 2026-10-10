@@ -48,13 +48,17 @@ The screens only hide what you cannot use. Anyone who opens a screen they have n
 | `community_batches` | Set batch sizes |
 | `photos_moderate` | Event photos: approve, hide, delete and reorder them, choose whether member photos show at once or need approval, open a best-photo vote, download an event photo ZIP (logged). Also lets the person hide and dismiss reports about photos |
 | `gallery_manage` | The college gallery: add photos (from an event's photos or by upload), edit, feature, pair "Then & Now", remove, manage albums and filter chips, approve or decline member suggestions |
+| `funds_manage` | Fund appeals: create, edit, publish, pause, feature; items, milestones, updates to donors, the "where the money went" expense log, and the fund settings (UPI id, receipt footer, tax text, foreign-donor notice) |
+| `funds_verify` | Verify or reject donations (bulk, bank-statement matching), record cash, cheque and bank gifts, record refunds. Also sees the names of anonymous donors |
+| `funds_reports` | Fund totals by appeal, batch, department, month and donor, sponsorship reports, and CSV downloads (logged in the activity log) |
+| `sponsors_manage` | Sponsor packages, the sponsor pipeline (lead, contacted, proposal sent, committed, paid, delivered), contact details of sponsors, the sponsor wall, proposals, agreements and invoices. Verifying a sponsor's payment needs `funds_verify` |
 | `analytics` | Growth and activity numbers |
 | `audit` | Read and download the activity log |
 | `health` | Backups, errors, storage, site health |
 | `admins` | See the list of admins and owners (changing it is for super admins only) |
 
 Ready-made sets when you make an admin: **Full admin**, **Finance & events**, **Content & community**, **Moderation only**,
-**Members & verification**, **Photos & gallery**, or **Custom** (tick exactly what you want). The "Review" step lists what they will and will not be able to do.
+**Members & verification**, **Photos & gallery**, **Funds & treasury** (all four fund permissions), or **Custom** (tick exactly what you want). The "Review" step lists what they will and will not be able to do.
 
 Notes on how the pieces fit:
 - Seeing a member's phone number needs `members_view`; changing it needs `members_edit` (and the member editor itself opens from the members list, so give both together).
