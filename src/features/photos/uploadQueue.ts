@@ -14,13 +14,18 @@ export interface QueueItem<T> {
   error?: string
   /** a human step label while working, e.g. "Sending original" */
   stage?: string
+  /** 0-100 while a big file is on its way */
+  progress?: number
 }
 
 export interface QueueOptions<T> {
   concurrency: number
   maxAttempts?: number
   /** resolves 'done' | 'duplicate'; throws on failure */
-  run: (item: QueueItem<T>, setStage: (s: string) => void) => Promise<'done' | 'duplicate'>
+  run: (item: QueueItem<T>, setStage: (s: string) => void, setProgress: (percent: number) => void) => Promise<'done' | 'duplicate'>
+  /** big files (videos): at most `maxHeavy` of them at a time, while photos carry on in the other slots */
+  isHeavy?: (item: QueueItem<T>) => boolean
+  maxHeavy?: number
   /** false = do not retry automatically (bad format, no permission, rate limit ...) */
   isRetryable?: (e: unknown) => boolean
   messageOf?: (e: unknown) => string
@@ -32,12 +37,15 @@ export interface QueueOptions<T> {
 export class UploadQueue<T> {
   items: QueueItem<T>[] = []
   private active = 0
+  private activeHeavy = 0
   private paused = false
   private o: Required<Omit<QueueOptions<T>, 'onChange'>> & Pick<QueueOptions<T>, 'onChange'>
 
   constructor(o: QueueOptions<T>) {
     this.o = {
       maxAttempts: 4,
+      isHeavy: () => false,
+      maxHeavy: 1,
       isRetryable: () => true,
       messageOf: (e) => (e instanceof Error ? e.message : String(e)),
       sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -71,6 +79,12 @@ export class UploadQueue<T> {
     if (!p) this.pump()
   }
 
+  /** takes a waiting or failed file out of the queue (a running one is stopped by the caller, which makes its run() throw) */
+  remove(key: string) {
+    this.items = this.items.filter((i) => i.key !== key || i.state === 'working')
+    this.emit()
+  }
+
   clearFinished() {
     this.items = this.items.filter((i) => i.state === 'queued' || i.state === 'working' || i.state === 'failed')
     this.emit()
@@ -92,13 +106,16 @@ export class UploadQueue<T> {
 
   private pump() {
     while (!this.paused && this.active < this.o.concurrency) {
-      const next = this.items.find((i) => i.state === 'queued')
+      const next = this.items.find((i) => i.state === 'queued' && (!this.o.isHeavy(i) || this.activeHeavy < this.o.maxHeavy))
       if (!next) return
+      const heavy = this.o.isHeavy(next)
       next.state = 'working'
       this.active++
+      if (heavy) this.activeHeavy++
       this.emit()
       void this.work(next).finally(() => {
         this.active--
+        if (heavy) this.activeHeavy--
         this.pump()
       })
     }
@@ -110,13 +127,24 @@ export class UploadQueue<T> {
       try {
         it.state = 'working'
         it.stage = undefined
-        const result = await this.o.run(it, (s) => {
-          it.stage = s
-          this.emit()
-        })
+        it.progress = undefined
+        const result = await this.o.run(
+          it,
+          (s) => {
+            it.stage = s
+            this.emit()
+          },
+          (percent) => {
+            const p = Math.max(0, Math.min(100, Math.round(percent)))
+            if (p === it.progress) return
+            it.progress = p
+            this.emit()
+          },
+        )
         it.state = result
         it.error = undefined
         it.stage = undefined
+        it.progress = undefined
         this.emit()
         return
       } catch (e) {
@@ -130,6 +158,7 @@ export class UploadQueue<T> {
         it.state = 'failed'
         it.error = this.o.messageOf(e)
         it.stage = undefined
+        it.progress = undefined
         this.emit()
         return
       }

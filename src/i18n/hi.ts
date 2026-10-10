@@ -2,6 +2,7 @@
 // Style: respectful "आप", plain spoken Hindi, brand names (JEC, Alumni Connect, Alumni Meet) stay in English,
 // numbers/dates/codes stay in Western digits 0-9. Hindi treats 0 and 1 as singular (`_one`).
 import type { en } from './en'
+import { mediaHi } from './mediaHi'
 
 export const hi = {
   // registration form
@@ -1311,4 +1312,5 @@ export const hi = {
   'phone.errDigits': '{country} के नंबर में +{dial} के बाद {n} अंक होते हैं। कृपया जाँच लें।',
   'phone.errRange': '{country} के नंबर में +{dial} के बाद {min} से {max} अंक होते हैं। कृपया जाँच लें।',
   'phone.errStartIn': 'भारतीय मोबाइल नंबर में 10 अंक होते हैं और वह 6, 7, 8 या 9 से शुरू होता है।',
+  ...mediaHi,
 } as const satisfies Record<keyof typeof en, string>

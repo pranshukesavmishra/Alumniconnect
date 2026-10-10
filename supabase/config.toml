@@ -431,3 +431,7 @@ verify_jwt = false
 # called only by the database trigger, with a shared secret
 [functions.push-send]
 verify_jwt = false
+
+# plays Drive videos in a <video> tag: members pass their token in the query, glimpses are public; the function checks access itself
+[functions.drive-media]
+verify_jwt = false

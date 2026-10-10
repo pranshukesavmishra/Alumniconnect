@@ -31,7 +31,15 @@ export interface PhotoRow {
   tag_count: number
   report_count: number
   tagged_me: boolean
+  media_kind: 'photo' | 'video'
+  duration_ms: number | null
+  mime_type: string | null
+  size_bytes: number | null
+  /** a photo, or a video whose file is in Drive (an unfinished upload is not playable) */
+  playable: boolean
 }
+
+export const isVideo = (p: { media_kind: string }) => p.media_kind === 'video'
 
 export interface PhotoCaps {
   view: boolean
@@ -39,13 +47,16 @@ export interface PhotoCaps {
   official: boolean
   /** may curate the college gallery */
   gallery: boolean
-  member_uploads: 'immediate' | 'approval'
+  member_uploads: 'immediate' | 'approval' | 'off'
+  /** the event has a Drive archive folder, so videos can be sent */
+  drive: boolean
 }
 
 export interface PhotoSummary {
   total: number
   official: number
   members: number
+  videos: number
   pending: number | null
   hidden: number | null
   reported: number | null
@@ -56,6 +67,7 @@ export interface PhotoFilter {
   scope: PhotoScope
   kind?: 'event' | 'throwback' | null
   source?: 'official' | 'member' | null
+  media?: 'photo' | 'video' | null
   batch?: number | null
   order?: 'curated' | 'new'
 }
@@ -74,7 +86,7 @@ export function captionOf(p: { caption: string | null; caption_hi: string | null
 /** Errors from the photo functions carry a hint that names a translated message; everything else goes through friendlyError. */
 export function photoError(e: unknown): string {
   const hint = (e as { hint?: string } | null)?.hint
-  if (hint && /^(photos|gallery)\.err/.test(hint)) return tr(hint as MsgKey)
+  if (hint && /^(photos|gallery|glimpses|meets)\.err/.test(hint)) return tr(hint as MsgKey)
   return friendlyError(e)
 }
 
@@ -99,6 +111,7 @@ export async function fetchPhotos(eventId: string | null, f: PhotoFilter, offset
     p_kind: f.kind ?? null,
     p_source: f.source ?? null,
     p_batch: f.batch ?? null,
+    p_media: f.media ?? null,
     p_order: f.order ?? 'curated',
     p_id: id ?? null,
     p_limit: limit,
@@ -193,6 +206,11 @@ export interface GalleryPhoto {
   taken_on: string | null
   pair_of: string | null
   created_at: string
+  media_kind: 'photo' | 'video'
+  duration_ms: number | null
+  mime_type: string | null
+  size_bytes: number | null
+  drive_file_id: string | null
   event?: { slug: string; title: string } | null
 }
 export const galleryUrl = (path: string) => publicUrl('gallery', path) ?? ''
@@ -282,6 +300,7 @@ export function useOnThisDay(enabled: boolean) {
 }
 
 export interface GallerySuggestion {
+  media_kind: 'photo' | 'video'
   id: string
   photo_id: string
   event_id: string
@@ -319,6 +338,10 @@ export interface GalleryMeta {
   suggestion_id?: string | null
   is_featured?: boolean
   taken_on?: string | null
+  media_kind?: 'photo' | 'video'
+  mime_type?: string
+  size_bytes?: number
+  duration_ms?: number | null
 }
 
 /** Puts an image (a file from the device, or a copy of an event photo) into the gallery bucket and adds it to the gallery. */
@@ -351,4 +374,47 @@ export async function addEventPhotoToGallery(p: PhotoRow, meta: GalleryMeta): Pr
   const res = await fetch(photoUrl(p))
   if (!res.ok) throw new Error(tr('gallery.errCopy'))
   return addToGallery(await res.blob(), { ...meta, event_id: p.event_id, source_photo_id: p.id, alt_text: meta.alt_text ?? p.alt_text ?? undefined })
+}
+
+/** A gallery video: the poster goes into the gallery bucket, the row is made, then the video is sent to Drive (the caller does that with the returned id). */
+export async function addGalleryVideoRow(poster: Blob & { type: string }, ext: string, meta: GalleryMeta & { width?: number | null; height?: number | null }): Promise<{ id: string; remove: () => Promise<void> }> {
+  const id = crypto.randomUUID()
+  const tpath = `gallery/${id}_t.${ext}`
+  const up = await supabase.storage.from('gallery').upload(tpath, poster, { contentType: poster.type })
+  if (up.error) throw up.error
+  const { data, error } = await supabase.rpc('admin_gallery_add', {
+    p: { ...meta, media_kind: 'video', storage_path: `gallery/${id}.vid`, thumb_path: tpath },
+  } as never)
+  if (error) {
+    void supabase.storage.from('gallery').remove([tpath])
+    throw error
+  }
+  const rowId = data as unknown as string
+  return {
+    id: rowId,
+    remove: async () => {
+      await supabase.rpc('admin_gallery_remove', { p_id: rowId })
+      await supabase.storage.from('gallery').remove([tpath])
+    },
+  }
+}
+
+/** An event video goes into the gallery without copying the video (the same Drive file), only its poster is copied. */
+export async function addEventVideoToGallery(p: PhotoRow, meta: GalleryMeta): Promise<string> {
+  const res = await fetch(thumbUrl(p))
+  if (!res.ok) throw new Error(tr('gallery.errCopy'))
+  const poster = await res.blob()
+  const ext = poster.type === 'image/jpeg' ? 'jpg' : 'webp'
+  const id = crypto.randomUUID()
+  const tpath = `gallery/${id}_t.${ext}`
+  const up = await supabase.storage.from('gallery').upload(tpath, poster, { contentType: poster.type || 'image/webp' })
+  if (up.error) throw up.error
+  const { data, error } = await supabase.rpc('admin_gallery_add', {
+    p: { ...meta, media_kind: 'video', storage_path: `gallery/${id}.vid`, thumb_path: tpath, event_id: p.event_id, source_photo_id: p.id, width: p.width, height: p.height, alt_text: meta.alt_text ?? p.alt_text ?? undefined },
+  } as never)
+  if (error) {
+    void supabase.storage.from('gallery').remove([tpath])
+    throw error
+  }
+  return data as unknown as string
 }

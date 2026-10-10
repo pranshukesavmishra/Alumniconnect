@@ -39,7 +39,7 @@ export function PhotoSlideshow() {
     queryKey: ['slideshow', event?.id],
     enabled: !!event,
     refetchInterval: 5000,
-    queryFn: () => fetchPhotos(event!.id, { scope: 'approved', order: 'new' }, 0, 200),
+    queryFn: () => fetchPhotos(event!.id, { scope: 'approved', order: 'new', media: 'photo' }, 0, 200),
   })
 
   useEffect(() => {

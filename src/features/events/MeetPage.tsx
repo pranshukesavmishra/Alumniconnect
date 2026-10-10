@@ -1,4 +1,4 @@
-import { CalendarDays, Clock, Images, MapPin, Phone, Pin, Ticket } from 'lucide-react'
+import { CalendarDays, Clock, History, Images, MapPin, Phone, Pin, Ticket } from 'lucide-react'
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { ButtonLink } from '../../components/ui/Button'
@@ -15,6 +15,7 @@ import { registrationOpen, useEvent, useMyRegistration, useTicketTypes } from '.
 import { StatusBadge } from './StatusBadge'
 import { WaitlistCard } from './WaitlistCard'
 import { formatPhone, telHref } from '../../lib/phone'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 export function MeetPage() {
   const tx = useT()
@@ -85,6 +86,14 @@ export function MeetPage() {
       </section>
 
       <Page className="space-y-6">
+        <GlimpseCarousel className="-mt-2" />
+        <Link to="/meets" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40" data-testid="meet-past-link">
+          <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><History className="size-5" aria-hidden /></span>
+          <span className="min-w-0">
+            <span className="block font-semibold">{tx('meets.relive')}</span>
+            <span className="block truncate text-sm text-muted">{tx('meets.reliveHint')}</span>
+          </span>
+        </Link>
         {active && (
           <Card className="flex items-center justify-between gap-3 p-4">
             <div className="min-w-0">

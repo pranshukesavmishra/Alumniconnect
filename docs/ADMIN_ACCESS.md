@@ -46,8 +46,8 @@ The screens only hide what you cannot use. Anyone who opens a screen they have n
 | `community_circles` | Approve circles, manage groups and channels |
 | `community_spotlight` | Choose the members in the spotlight |
 | `community_batches` | Set batch sizes |
-| `photos_moderate` | Event photos: approve, hide, delete and reorder them, choose whether member photos show at once or need approval, open a best-photo vote, download an event photo ZIP (logged). Also lets the person hide and dismiss reports about photos |
-| `gallery_manage` | The college gallery: add photos (from an event's photos or by upload), edit, feature, pair "Then & Now", remove, manage albums and filter chips, approve or decline member suggestions |
+| `photos_moderate` | Event photos: approve, hide, delete and reorder them, choose whether member photos show at once or need approval, open a best-photo vote, download an event photo ZIP (logged). Also lets the person hide and dismiss reports about photos. Everything above applies to **videos** in the event photo area too, and the person can set an event's member uploads to *Only the team* (used by past-meet archives) |
+| `gallery_manage` | The college gallery: add photos and **videos** (from an event's photos or videos, by upload, or from a pasted Drive link), edit, feature, pair "Then & Now", remove, manage albums and filter chips, approve or decline member suggestions. Also **Organise, Content**: the **glimpse videos** (add, replace, reorder, show or hide, up to 4 shown on Home, the Meet page, the registration page and the sign-in page) and the **past meets** archive (create, edit, publish, delete) |
 | `funds_manage` | Fund appeals: create, edit, publish, pause, feature; items, milestones, updates to donors, the "where the money went" expense log, and the fund settings (UPI id, receipt footer, tax text, foreign-donor notice) |
 | `funds_verify` | Verify or reject donations (bulk, bank-statement matching), record cash, cheque and bank gifts, record refunds. Also sees the names of anonymous donors |
 | `funds_reports` | Fund totals by appeal, batch, department, month and donor, sponsorship reports, and CSV downloads (logged in the activity log) |
@@ -70,7 +70,7 @@ When you make an admin you pick a **role**. A role is a ready-made set of the pe
 | Communications officer | Announcements and messages to registrants | `messages_*` | everyone |
 | Moderator | Reports, hiding content, slow mode, meetups | `moderation_*` | everyone |
 | Community manager | Circles, groups, spotlight, batch sizes | `community_*` | everyone |
-| Photographer / gallery curator | Event photos and the college gallery | `photos_moderate`, `gallery_manage` | everyone |
+| Photographer / gallery curator | Event photos and videos, the college gallery, glimpses and past meets | `photos_moderate`, `gallery_manage` | everyone |
 | Funds and sponsorship manager | Fundraising and sponsors (hidden until the Give Back module adds `funds_*` / `sponsors_*` permissions) | `funds_*`, `sponsors_*` | everyone |
 | Membership officer | The member list | `members_view/edit/verify/import/export` | everyone |
 | Auditor / viewer | Read-only insight | `analytics`, `audit`, `health` | everyone |
@@ -179,3 +179,11 @@ To see who holds which permissions: `select p.full_name, g.template_key, g.scope
 - `profiles.is_super_admin` and `public.admin_grants` are never writable from the client; only `admin_set_admin(user, enabled, permissions, note, template, scope_kind, scope_value)` (SECURITY DEFINER, owners only) changes the grants. Nothing in the app changes `is_super_admin`.
 - Scope helpers: `_scope_is_all()`, `_scope_ok(branch, grad_year)`, `_scope_ok_member(id)`, `_require_scope(id)`, `_require_scope_all()`. Any new member-facing admin function must call one of them (and refuse owners if it writes to a profile).
 - Tests: `supabase/tests/99_safety_matrix.sql` calls every admin function as one limited admin per permission; `supabase/tests/99_super_admin.sql` proves the owner lock; `supabase/tests/99_roles_scope.sql` covers templates and scope; `e2e/verify/admin-super.spec.ts` drives the screens.
+
+## Videos, glimpses and past meets
+
+- No new permission key: **`gallery_manage`** covers the glimpses and the past-meets archive (Organise, Content); **`photos_moderate`** covers moderating event videos exactly like photos (approve, hide, delete, reorder, hearts, tags and reports).
+- Anyone, signed in or not, can see the glimpses an admin has made visible and the past meets an admin has published. Drafts are for people with `gallery_manage`. The photos and videos of a past meet are for verified members only, like every event's photos.
+- Every past meet has an **archive event** (made when it is saved, listed with the events). Its photo setting follows "Members can add": on means member uploads wait for approval, off means only the team adds. The row for *Alumni Meet 2025* is a draft with only a title and a year; an admin fills it in and publishes it.
+- Glimpse and gallery files can be attached from a pasted Drive link only by someone with `gallery_manage`, and only if the file is an MP4, MOV or WebM video.
+- `drive_roots` (the Drive folders for the gallery and the glimpses) is invisible to the app; only the edge functions read it. Tests: `supabase/tests/99_video_media.sql`, `99_glimpses_meets.sql` and the new functions in `99_safety_matrix.sql`.

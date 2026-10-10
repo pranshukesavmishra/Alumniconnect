@@ -1,16 +1,30 @@
-// Archives the full-quality original of an event photo to the committee's Google Drive.
+// Sends files to the committee's Google Drive. Google lets the phone upload straight to Drive (resumable upload); this function only
+// hands out the one-time upload link and, afterwards, checks the file and records it.
+//
+//   Event photos and videos (the caller is the row's uploader, checked with their own JWT through row-level security):
 //   POST {action: "start", photo_id, mime_type, size}  -> {upload_url} (or {skipped: true} if Drive isn't set up)
 //   POST {action: "finish", photo_id, file_id}         -> {ok: true}   (records drive_file_id after verifying the file)
-//   POST {action: "create_root", event_id}                 -> {folder_id} (admins: creates the event's archive folder)
-// The caller must be the photo's uploader (checked with their own JWT through row-level security).
-// Google only lets this app see folders and files it created itself ("drive.file"), so the archive
-// folder is always created by the app, never picked from the existing Drive.
+//   Gallery videos and glimpses (the caller needs the gallery_manage permission; the row exists already):
+//   POST {action: "start"  | "finish", kind: "gallery" | "glimpse", id, mime_type, size | file_id}
+//   POST {action: "create_root", event_id}             -> {folder_id} (admins: creates the event's archive folder)
+//
+// Photos: originals are archived (best effort). Videos: the Drive file IS the video (played back by the drive-media function), so a video
+// becomes playable only when "finish" has verified the Drive file (made for this row, with the size announced at "start").
+// Google only lets this app see folders and files it created itself ("drive.file"), so folders are always created by the app.
 import { asService, asUser, currentUser, eq } from '../_shared/db.ts'
-import { createFolder, driveConfigured, ensureFolder, fileInfo, startResumableUpload } from '../_shared/google.ts'
+import { createFolder, driveConfigured, DriveFileError, ensureFolder, fileInfo, fileMeta, startResumableUpload } from '../_shared/google.ts'
+import { parseDriveRef } from '../_shared/driveRef.ts'
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts'
 
-const MAX_BYTES = 25 * 1024 * 1024
-const MIME = /^image\/(jpeg|png|webp|heic|heif)$/
+const MAX_PHOTO_BYTES = 25 * 1024 * 1024
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024
+const PHOTO_MIME = /^image\/(jpeg|png|webp|heic|heif)$/
+const VIDEO_MIME = /^video\/(mp4|quicktime|webm)$/
+const VIDEO_EXT: Record<string, string> = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' }
+const UUID = /^[0-9a-f-]{36}$/
+const clean = (s: string) => s.replace(/[\\/:*?"<>|]/g, '')
+
+type Body = { action?: string; kind?: string; id?: string; file_ref?: string; photo_id?: string; mime_type?: string; size?: number; file_id?: string; event_id?: string }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) })
@@ -20,20 +34,26 @@ Deno.serve(async (req) => {
   const user = await currentUser(auth)
   if (!user) return json(req, { error: 'Please sign in again.' }, 401)
 
-  let body: { action?: string; photo_id?: string; mime_type?: string; size?: number; file_id?: string; event_id?: string }
+  let body: Body
   try {
     body = await req.json()
   } catch {
     return json(req, { error: 'Invalid request' }, 400)
   }
 
-  // Row-level security: the member can only read photos they may see; we additionally require ownership.
   if (body.action === 'create_root') return createRoot(req, user.id, body.event_id)
+  if (body.kind === 'gallery' || body.kind === 'glimpse') return curated(req, auth, user.id, body.kind, body)
+  return eventMedia(req, auth, user.id, body)
+})
 
-  if (!body.photo_id || !/^[0-9a-f-]{36}$/.test(body.photo_id)) return json(req, { error: 'Photo not found' }, 404)
-  const [photo] = await asUser(auth).select<{ id: string; event_id: string; uploaded_by: string; kind: string; source: string | null }>(
-    'event_photos', `select=id,event_id,uploaded_by,kind,source&id=${eq(body.photo_id)}`)
-  if (!photo || photo.uploaded_by !== user.id) return json(req, { error: 'Photo not found' }, 404)
+// ------------------------------------------------------------------ event photos and videos
+async function eventMedia(req: Request, auth: string, userId: string, body: Body): Promise<Response> {
+  // Row-level security: the member can only read photos they may see; we additionally require ownership.
+  if (!body.photo_id || !UUID.test(body.photo_id)) return json(req, { error: 'Photo not found' }, 404)
+  const [photo] = await asUser(auth).select<{ id: string; event_id: string; uploaded_by: string; kind: string; source: string | null; media_kind: string; size_bytes: number | null; mime_type: string | null }>(
+    'event_photos', `select=id,event_id,uploaded_by,kind,source,media_kind,size_bytes,mime_type&id=${eq(body.photo_id)}`)
+  if (!photo || photo.uploaded_by !== userId) return json(req, { error: 'Photo not found' }, 404)
+  const video = photo.media_kind === 'video'
 
   const admin = asService()
   const [ev] = await admin.select<{ slug: string; title: string }>('events', `select=slug,title&id=${eq(photo.event_id)}`)
@@ -45,13 +65,22 @@ Deno.serve(async (req) => {
     if (body.action === 'start') {
       const origin = req.headers.get('Origin')
       if (!isAllowedOrigin(origin)) return json(req, { error: 'Origin not allowed' }, 403)
-      if (!body.mime_type || !MIME.test(body.mime_type)) return json(req, { error: 'Only photos can be archived' }, 400)
-      if (!body.size || body.size <= 0 || body.size > MAX_BYTES) return json(req, { error: 'Photo too large (max 25 MB)' }, 400)
+      if (video) {
+        if (!body.mime_type || !VIDEO_MIME.test(body.mime_type)) return json(req, { error: 'Only MP4, MOV and WebM videos can be sent' }, 400)
+        if (!body.size || body.size <= 0 || body.size > MAX_VIDEO_BYTES) return json(req, { error: 'Video too large (max 500 MB)' }, 400)
+        if (body.size !== photo.size_bytes || body.mime_type !== photo.mime_type) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      } else {
+        if (!body.mime_type || !PHOTO_MIME.test(body.mime_type)) return json(req, { error: 'Only photos can be archived' }, 400)
+        if (!body.size || body.size <= 0 || body.size > MAX_PHOTO_BYTES) return json(req, { error: 'Photo too large (max 25 MB)' }, 400)
+      }
       // the committee's photographer uploads go to their own folder; members' photos keep the old two
-      const sub = await ensureFolder(photo.source === 'official' ? 'Official photos' : photo.kind === 'throwback' ? 'Then (college days)' : 'Now (at the meet)', event.drive_folder_id)
-      const [profile] = await admin.select<{ full_name: string; grad_year: number | null }>('profiles', `select=full_name,grad_year&id=${eq(user.id)}`)
-      const who = `${profile?.full_name ?? 'Member'}${profile?.grad_year ? ` ${profile.grad_year}` : ''}`.replace(/[\\/:*?"<>|]/g, '')
-      const ext = body.mime_type.split('/')[1]!.replace('jpeg', 'jpg')
+      const folderName = video
+        ? (photo.source === 'official' ? 'Official videos' : 'Videos from members')
+        : photo.source === 'official' ? 'Official photos' : photo.kind === 'throwback' ? 'Then (college days)' : 'Now (at the meet)'
+      const sub = await ensureFolder(folderName, event.drive_folder_id)
+      const [profile] = await admin.select<{ full_name: string; grad_year: number | null }>('profiles', `select=full_name,grad_year&id=${eq(userId)}`)
+      const who = clean(`${profile?.full_name ?? 'Member'}${profile?.grad_year ? ` ${profile.grad_year}` : ''}`)
+      const ext = video ? VIDEO_EXT[body.mime_type]! : body.mime_type.split('/')[1]!.replace('jpeg', 'jpg')
       const upload_url = await startResumableUpload({
         name: `${who} - ${photo.id.slice(0, 8)}.${ext}`,
         parent: sub,
@@ -69,15 +98,123 @@ Deno.serve(async (req) => {
       // The file must be the one created for THIS photo (tag set in "start", which only the server can set).
       const info = await fileInfo(body.file_id)
       if (info.appProperties.jec_photo_id !== photo.id) return json(req, { error: 'File does not belong to this photo' }, 400)
+      if (video && info.size !== photo.size_bytes) return json(req, { error: 'The upload is incomplete. Please send the video again.' }, 409)
       await admin.update('event_photos', `id=${eq(photo.id)}`, { drive_file_id: body.file_id })
       return json(req, { ok: true })
     }
     return json(req, { error: 'Unknown action' }, 400)
   } catch (e) {
     console.error(e)
-    return json(req, { error: 'Archiving to Drive failed. The photo is still saved in the app.' }, 502)
+    return json(req, { error: video ? 'Sending the video to Drive failed. Please try again.' : 'Archiving to Drive failed. The photo is still saved in the app.' }, 502)
   }
-})
+}
+
+// ------------------------------------------------------------------ gallery videos and glimpses
+async function canCurate(auth: string): Promise<boolean> {
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/rest/v1/rpc/_admin_can`, {
+    method: 'POST',
+    headers: { apikey: Deno.env.get('SUPABASE_ANON_KEY')!, Authorization: auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_perm: 'gallery_manage' }),
+  })
+  return res.ok && (await res.json()) === true
+}
+
+/** The Drive folder for the gallery or the glimpses: made once by the app, remembered in drive_roots. */
+async function curatedFolder(kind: 'gallery' | 'glimpse'): Promise<string> {
+  const admin = asService()
+  const key = kind === 'gallery' ? 'gallery' : 'glimpses'
+  const [row] = await admin.select<{ folder_id: string }>('drive_roots', `select=folder_id&key=${eq(key)}`)
+  if (row) return row.folder_id
+  const folder = await createFolder(kind === 'gallery' ? 'JEC Alumni Connect - College gallery videos' : 'JEC Alumni Connect - Glimpses')
+  await admin.upsert('drive_roots', { key, folder_id: folder })
+  return folder
+}
+
+const LIMIT = { gallery: MAX_VIDEO_BYTES, glimpse: 60 * 1024 * 1024 }
+const REF_PROBLEM = {
+  empty: 'Paste the Drive link or the file id of the video.',
+  folder: 'That is a folder link. Open the video itself in Drive and copy its link.',
+  invalid: 'That does not look like a Google Drive link or file id.',
+}
+
+/** A video the committee already has in Drive: checked here, never trusted from the browser. */
+async function driveVideo(ref: string | undefined, kind: 'gallery' | 'glimpse'): Promise<{ ok: true; id: string; name: string; mime: string; size: number } | { ok: false; status: number; error: string }> {
+  const parsed = parseDriveRef(ref)
+  if ('error' in parsed) return { ok: false, status: 400, error: REF_PROBLEM[parsed.error] }
+  try {
+    const f = await fileMeta(parsed.id)
+    if (f.trashed) return { ok: false, status: 422, error: 'That file is in the Drive bin.' }
+    if (!VIDEO_MIME.test(f.mimeType)) return { ok: false, status: 422, error: 'That file is not an MP4, MOV or WebM video.' }
+    if (!f.size || f.size > LIMIT[kind]) return { ok: false, status: 422, error: `That video is larger than ${LIMIT[kind] / 1024 / 1024} MB.` }
+    return { ok: true, id: f.id, name: f.name, mime: f.mimeType, size: f.size }
+  } catch (e) {
+    if (e instanceof DriveFileError && (e.status === 404 || e.status === 403)) {
+      return { ok: false, status: 422, error: 'The app cannot open that file. Check the link, and that the Drive account the app uses can read it (see the setup guide: "Use files already in Drive").' }
+    }
+    throw e
+  }
+}
+
+async function curated(req: Request, auth: string, userId: string, kind: 'gallery' | 'glimpse', body: Body): Promise<Response> {
+  if (!(await canCurate(auth))) return json(req, { error: 'You do not have permission to do this. Ask a super admin for access.' }, 403)
+  if (body.action === 'inspect') {
+    if (!driveConfigured()) return json(req, { skipped: true })
+    try {
+      const v = await driveVideo(body.file_ref, kind)
+      return v.ok ? json(req, { file_id: v.id, name: v.name, mime_type: v.mime, size_bytes: v.size }) : json(req, { error: v.error }, v.status)
+    } catch (e) {
+      console.error(e)
+      return json(req, { error: 'Could not reach Drive. Please try again.' }, 502)
+    }
+  }
+  if (!body.id || !UUID.test(body.id)) return json(req, { error: 'Video not found' }, 404)
+  const table = kind === 'gallery' ? 'gallery_photos' : 'glimpses'
+  const admin = asService()
+  const [row] = await admin.select<{ id: string; media_kind?: string; mime_type: string | null; size_bytes: number | null; drive_file_id: string | null }>(
+    table, `select=id,mime_type,size_bytes,drive_file_id${kind === 'gallery' ? ',media_kind' : ''}&id=${eq(body.id)}`)
+  if (!row || (kind === 'gallery' && row.media_kind !== 'video') || !row.mime_type || !row.size_bytes) return json(req, { error: 'Video not found' }, 404)
+  if (!driveConfigured()) return json(req, { skipped: true })
+  const tag = kind === 'gallery' ? 'jec_gallery_id' : 'jec_glimpse_id'
+
+  try {
+    if (body.action === 'start') {
+      const origin = req.headers.get('Origin')
+      if (!isAllowedOrigin(origin)) return json(req, { error: 'Origin not allowed' }, 403)
+      if (!body.mime_type || !VIDEO_MIME.test(body.mime_type) || body.mime_type !== row.mime_type) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      if (!body.size || body.size !== row.size_bytes || body.size > MAX_VIDEO_BYTES) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      const upload_url = await startResumableUpload({
+        name: `${kind === 'gallery' ? 'Gallery' : 'Glimpse'} - ${row.id.slice(0, 8)}.${VIDEO_EXT[body.mime_type]}`,
+        parent: await curatedFolder(kind),
+        mimeType: body.mime_type,
+        size: body.size,
+        origin,
+        description: `Added via JEC Alumni Connect (${kind})`,
+        appProperties: { [tag]: row.id },
+      })
+      return json(req, { upload_url })
+    }
+    if (body.action === 'attach') {
+      // an existing Drive video is used where it is (nothing is copied): it must be readable by the app and match the row that was saved
+      const v = await driveVideo(body.file_ref, kind)
+      if (!v.ok) return json(req, { error: v.error }, v.status)
+      if (v.mime !== row.mime_type || v.size !== row.size_bytes) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      await admin.update(table, `id=${eq(row.id)}`, { drive_file_id: v.id })
+      return json(req, { ok: true })
+    }
+    if (body.action === 'finish') {
+      if (!body.file_id || !/^[A-Za-z0-9_-]{10,200}$/.test(body.file_id)) return json(req, { error: 'Invalid file' }, 400)
+      const info = await fileInfo(body.file_id)
+      if (info.appProperties[tag] !== row.id) return json(req, { error: 'File does not belong to this video' }, 400)
+      if (info.size !== row.size_bytes) return json(req, { error: 'The upload is incomplete. Please send the video again.' }, 409)
+      await admin.update(table, `id=${eq(row.id)}`, { drive_file_id: body.file_id })
+      return json(req, { ok: true })
+    }
+    return json(req, { error: 'Unknown action' }, 400)
+  } catch (e) {
+    console.error(e, userId)
+    return json(req, { error: 'Sending the video to Drive failed. Please try again.' }, 502)
+  }
+}
 
 async function createRoot(req: Request, userId: string, eventId: string | undefined): Promise<Response> {
   const admin = asService()

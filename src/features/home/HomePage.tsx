@@ -14,6 +14,8 @@ import { useAuth, useMyProfile } from '../auth/AuthProvider'
 import { useEvent, useMyRegistration } from '../events/queries'
 import { FeaturedGiveCard } from '../giving/FeaturedGiveCard'
 import { GalleryStrips } from '../photos/GalleryStrips'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
+import { PastMeetsStrip } from '../meets/PastMeetsStrip'
 import { StatusBadge } from '../events/StatusBadge'
 import { supabase } from '../../lib/supabase'
 import { useT, type MsgKey } from '../../i18n'
@@ -61,6 +63,7 @@ function Landing() {
           <p className="mt-4 max-w-xl text-lg text-hero-text">
             {tx('home.landingBody')}
           </p>
+          <GlimpseCarousel className="mt-6" />
           <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:text-hero">
             <ButtonLink to="/signin" size="lg">
               {tx('home.signInOrJoin')}
@@ -141,6 +144,8 @@ export function HomePage() {
         <NotificationBell />
       </header>
 
+      <GlimpseCarousel />
+
       {event && (
         <Link to={reg ? '/meet/my' : '/meet'} className="block overflow-hidden rounded-3xl bg-gradient-to-br from-hero to-hero-2 text-white shadow-pop">
           <div className="relative p-5">
@@ -164,6 +169,7 @@ export function HomePage() {
       )}
 
       <QuickActions />
+      <PastMeetsStrip />
 
       {comp.next && (
         <Card className="p-4">

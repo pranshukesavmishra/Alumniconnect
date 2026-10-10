@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { AlertTriangle, CheckCircle2, ImagePlus, Loader2, RotateCw, Stamp, WifiOff } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Film, ImagePlus, Loader2, RotateCw, Stamp, WifiOff, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
@@ -15,8 +15,10 @@ import { supabase } from '../../lib/supabase'
 import type { EventRow } from '../../lib/types'
 import { useUserId } from '../auth/AuthProvider'
 import { photoError, photoQueryKey, type PhotoCaps } from './api'
+import { UploadAborted, UploadRefused, sendVideoToDrive } from './driveUpload'
 import { sha256Hex } from './hash'
 import { UploadQueue, type QueueItem } from './uploadQueue'
+import { MAX_VIDEO_BYTES, MB, extOf, formatSize, isVideoFile, readVideoInfo, videoFingerprint, videoMime, videoProblem } from './video'
 
 export const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024
 const CONCURRENCY = 3
@@ -38,6 +40,8 @@ export function isImageFile(f: File): boolean {
 export function isTransient(e: unknown): boolean {
   if (e instanceof FatalUpload) return false
   const x = e as { code?: string; status?: number; statusCode?: string | number; message?: string; name?: string } | null
+  if (e instanceof UploadAborted || x?.name === 'AbortError') return false
+  if (e instanceof UploadRefused) return e.status >= 500
   if (x?.code && /^(42|P0|22|23)/.test(x.code)) return false
   const status = Number(x?.status ?? x?.statusCode ?? 0)
   if (status >= 400 && status < 500 && status !== 408 && status !== 429) return false
@@ -72,6 +76,17 @@ interface Payload {
   id: string
   kind: 'event' | 'throwback'
   caption: string
+  isVideo: boolean
+  abort?: AbortController
+  /** the Drive upload link and how far it got, kept so a retry carries on instead of starting over */
+  session?: { url?: string; offset?: number }
+}
+
+function uploadMessage(e: unknown): string {
+  if (e instanceof FatalUpload) return e.message
+  if (e instanceof UploadAborted) return tr('photos.cancelled')
+  if (e instanceof UploadRefused) return e.message === 'drive-not-set-up' ? tr('photos.errVideoNoDrive') : e.message
+  return photoError(e)
 }
 
 export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps }) {
@@ -84,8 +99,8 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
   const [items, setItems] = useState<readonly QueueItem<Payload>[]>([])
   const hashes = useRef(new Map<string, string>()) // hash -> queue key, so the same photo picked twice is added once
   const announced = useRef(false)
-  const ctx = useRef({ uid, eventId: event.id, official: caps.official })
-  ctx.current = { uid, eventId: event.id, official: caps.official }
+  const ctx = useRef({ uid, eventId: event.id, official: caps.official, drive: caps.drive })
+  ctx.current = { uid, eventId: event.id, official: caps.official, drive: caps.drive }
 
   const [queue] = useState(
     () =>
@@ -93,12 +108,15 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
         concurrency: CONCURRENCY,
         online: waitOnline,
         isRetryable: isTransient,
-        messageOf: (e) => (e instanceof FatalUpload ? e.message : photoError(e)),
+        isHeavy: (item) => item.payload.isVideo,
+        maxHeavy: 1,
+        messageOf: uploadMessage,
         onChange: setItems,
-        run: async (item, setStage) => {
-          const { uid, eventId, official } = ctx.current
+        run: async (item, setStage, setProgress) => {
+          const { uid, eventId, official, drive } = ctx.current
           const { file, id, kind, caption } = item.payload
           if (!uid) throw new FatalUpload('err.session')
+          if (item.payload.isVideo) return await sendVideo(item, setStage, setProgress, { uid, eventId, drive })
           if (!isImageFile(file)) throw new FatalUpload('photos.errNotImage')
           if (file.size > MAX_ORIGINAL_BYTES) throw new FatalUpload('photos.errTooBig', { mb: 25 })
           if (item.attempts > 1) {
@@ -157,6 +175,77 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
       }),
   )
 
+  /** Videos: poster and row first (so the video shows as "sending"), then the file goes to Drive in chunks. */
+  async function sendVideo(item: QueueItem<Payload>, setStage: (s: string) => void, setProgress: (p: number) => void, c: { uid: string; eventId: string; drive: boolean }): Promise<'done' | 'duplicate'> {
+    const { file, id, kind, caption } = item.payload
+    const mime = videoMime(file)
+    const problem = videoProblem(file)
+    if (problem === 'format' || !mime) throw new FatalUpload('photos.errVideoFormat')
+    if (problem === 'empty') throw new FatalUpload('photos.errVideoEmpty')
+    if (problem === 'tooBig') throw new FatalUpload('photos.errVideoBig', { mb: MAX_VIDEO_BYTES / MB })
+    if (!c.drive) throw new FatalUpload('photos.errVideoNoDrive')
+    const ext = extOf(mime)
+    const path = `${c.uid}/${c.eventId}/${id}.${ext}`
+    let tpath = `${c.uid}/${c.eventId}/${id}_t.webp`
+    const abort = (item.payload.abort = new AbortController())
+    try {
+      const saved = await supabase.from('event_photos').select('id, drive_file_id, thumb_path').eq('id', id).maybeSingle()
+      if (saved.data?.drive_file_id) return 'done'
+      if (saved.data) tpath = saved.data.thumb_path
+      else {
+        setStage('checking')
+        const hash = await videoFingerprint(file)
+        if (hash) {
+          const first = hashes.current.get(hash)
+          if (first && first !== item.key) return 'duplicate'
+          hashes.current.set(hash, item.key)
+          const taken = await supabase.rpc('photo_hashes_taken', { p_event: c.eventId, p_hashes: [hash] })
+          if (taken.error) throw taken.error
+          if ((taken.data as string[] | null)?.length) return 'duplicate'
+        }
+        setStage('poster')
+        const info = await readVideoInfo(file)
+        tpath = `${c.uid}/${c.eventId}/${id}_t.${info.poster.ext}`
+        const up = await supabase.storage.from('event-photos').upload(tpath, info.poster.blob, { contentType: info.poster.type })
+        if (up.error && !/already exists|Duplicate/i.test(up.error.message)) throw up.error
+        const ins = await supabase.from('event_photos').insert({
+          id, event_id: c.eventId, uploaded_by: c.uid, storage_path: path, thumb_path: tpath, width: info.width, height: info.height, kind, caption: caption.trim() || null,
+          content_hash: hash, media_kind: 'video', mime_type: mime, size_bytes: file.size, duration_ms: info.duration_ms,
+        })
+        if (ins.error && ins.error.code !== '23505') {
+          void supabase.storage.from('event-photos').remove([tpath])
+          throw ins.error
+        }
+        if (ins.error && /hash/.test(ins.error.message)) {
+          void supabase.storage.from('event-photos').remove([tpath])
+          return 'duplicate'
+        }
+      }
+      setStage('sending')
+      setProgress(0)
+      item.payload.session ??= {}
+      await sendVideoToDrive({
+        target: { kind: 'event', photoId: id }, file, mime, signal: abort.signal, session: item.payload.session, online: waitOnline,
+        onProgress: (sent, total) => setProgress((sent / total) * 100),
+      })
+      return 'done'
+    } catch (e) {
+      if (e instanceof UploadAborted) {
+        // cancelled: take the half-made video away again
+        await supabase.from('event_photos').delete().eq('id', id)
+        void supabase.storage.from('event-photos').remove([tpath])
+      }
+      throw e
+    }
+  }
+
+  function cancel(key: string) {
+    const it = queue.items.find((i) => i.key === key)
+    if (!it) return
+    if (it.state === 'working') it.payload.abort?.abort()
+    else queue.remove(key)
+  }
+
   const stats = queue.stats
   const finished = stats.done + stats.duplicate + stats.failed
   const busy = stats.queued + stats.working > 0
@@ -184,12 +273,13 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
 
   function pick(files: FileList) {
     const list = Array.from(files)
-    queue.add(list.map((file) => ({ key: crypto.randomUUID(), name: file.name, size: file.size, payload: { file, id: crypto.randomUUID(), kind, caption } })))
+    queue.add(list.map((file) => ({ key: crypto.randomUUID(), name: file.name, size: file.size, payload: { file, id: crypto.randomUUID(), kind, caption, isVideo: isVideoFile(file) } })))
     setCaption('')
   }
 
   const failed = items.filter((i) => i.state === 'failed')
   const working = items.filter((i) => i.state === 'working').slice(0, CONCURRENCY)
+  const videos = items.filter((i) => i.payload.isVideo && (i.state === 'queued' || i.state === 'working'))
   const pct = stats.total ? Math.round((finished / stats.total) * 100) : 0
 
   return (
@@ -199,7 +289,7 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
           <span className="inline-flex items-center gap-1.5"><Stamp className="size-4" aria-hidden />{tx('photos.officialUploadBody')}</span>
         </Notice>
       ) : (
-        <Notice tone="info">{caps.member_uploads === 'approval' ? tx('photos.memberApprovalNote') : tx('photos.memberImmediateNote')}</Notice>
+        <Notice tone="info">{caps.member_uploads === 'approval' ? tx('photos.memberApprovalNote') : caps.member_uploads === 'off' ? tx('photos.uploadsOffNote') : tx('photos.memberImmediateNote')}</Notice>
       )}
 
       <div role="tablist" aria-label={tx('photos.kindLabel')} className="grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1">
@@ -219,7 +309,7 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
         {tx('photos.addPhotos')}
         <input
           type="file"
-          accept="image/*,.heic,.heif"
+          accept="image/*,.heic,.heif,video/*,.mov,.mp4,.m4v,.webm"
           multiple
           className="sr-only"
           onChange={(e) => {
@@ -229,6 +319,7 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
         />
       </label>
       <p className="text-center text-sm text-muted">{tx('photos.pickHint', { mb: 25 })}</p>
+      <p className="flex items-center justify-center gap-1.5 text-center text-sm text-muted"><Film className="size-4 shrink-0" aria-hidden />{caps.drive ? tx('photos.videoHint', { mb: MAX_VIDEO_BYTES / MB }) : tx('photos.videoNoDriveHint')}</p>
 
       {!online && busy && (
         <Notice tone="warning" title={tx('photos.offlineTitle')}>
@@ -249,12 +340,26 @@ export function PhotoUpload({ event, caps }: { event: EventRow; caps: PhotoCaps 
             <CheckCircle2 className="mr-1 inline size-4 text-success" aria-hidden />
             {tx('photos.countsLine', { done: stats.done, dup: stats.duplicate, failed: stats.failed })}
           </p>
-          {working.map((w) => (
+          {working.filter((w) => !w.payload.isVideo).map((w) => (
             <p key={w.key} className="flex items-center gap-2 truncate text-sm text-muted">
               <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
               <span className="truncate">{w.name}</span>
               {w.stage && <span className="shrink-0">· {tx(`photos.stage_${w.stage}` as MsgKey)}</span>}
             </p>
+          ))}
+          {videos.map((v) => (
+            <div key={v.key} className="space-y-1.5 rounded-xl bg-surface-2 p-3" data-testid="video-item">
+              <div className="flex items-center gap-2 text-sm">
+                {v.state === 'working' ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : <Film className="size-4 shrink-0 text-muted" aria-hidden />}
+                <span className="min-w-0 flex-1 truncate font-medium">{v.name}</span>
+                <span className="shrink-0 text-muted">{formatSize(v.size)}</span>
+                <button type="button" className="grid size-11 shrink-0 place-items-center rounded-full text-muted hover:bg-surface" aria-label={tx('photos.cancelUpload', { name: v.name })} onClick={() => cancel(v.key)}><X className="size-5" aria-hidden /></button>
+              </div>
+              <p className="text-xs text-muted">{v.state === 'queued' ? tx('photos.videoWaiting') : v.stage ? tx(`photos.stage_${v.stage}` as MsgKey) : ''}{v.state === 'working' && v.progress !== undefined ? ` · ${v.progress}%` : ''}</p>
+              <div className="h-1.5 overflow-hidden rounded-full bg-surface" role="progressbar" aria-label={v.name} aria-valuemin={0} aria-valuemax={100} aria-valuenow={v.progress ?? 0}>
+                <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${v.progress ?? 0}%` }} />
+              </div>
+            </div>
           ))}
           {failed.length > 0 && (
             <div className="space-y-2 border-t border-border pt-3">

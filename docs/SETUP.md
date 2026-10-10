@@ -81,12 +81,32 @@ The app writes to **one Google account's Drive**, using the permission `drive.fi
    npx supabase secrets set GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... GOOGLE_DRIVE_REFRESH_TOKEN=... \
      APP_ORIGINS=https://<your-address> BACKUP_SECRET=<long-random-string>
    npx supabase functions deploy drive-upload
+   npx supabase functions deploy drive-media --no-verify-jwt
    npx supabase functions deploy import-avatar
    npx supabase functions deploy nightly-backup --no-verify-jwt
    ```
 5. After the first admin exists (step 8), go to **Organise → the event → Settings → Create the Drive folder**.
    - The app creates "JEC Alumni Connect - <event>" with *Then*, *Now* and *Backups* subfolders.
    - You may move this folder into your own "02 Alumni Meet 2026" folder; the app keeps working.
+
+### 5b. Videos, glimpses and past meets (read this if you deploy the video update)
+
+**All videos live in Drive**, none in Supabase Storage (only the small poster pictures do). A member's phone sends the video straight to Drive in 8 MB pieces with a resumable upload; the app plays it inside the page through the `drive-media` function. Limits: videos up to **500 MB** (MP4, MOV, WebM), glimpses up to **60 MB and 90 seconds**.
+
+After pulling this update:
+
+1. Apply the new migrations (`20261018000071_video_media.sql`, `..72_glimpses.sql`, `..73_past_meets.sql`): `npx supabase db push`.
+2. **Redeploy `drive-upload`** (it now also handles videos, gallery videos, glimpses, and "use a file already in Drive") and **deploy the new `drive-media`**. `drive-media` must be deployed with `--no-verify-jwt` (already set in `supabase/config.toml`): a `<video>` tag cannot send a sign-in header, so the function checks access itself (members pass their short-lived token in the address; **glimpses are public** and need no token). No new secret is needed.
+3. Videos need the event's Drive folder (**Organise, the event, Settings, Create the Drive folder**). Gallery videos and glimpses use two folders the app creates by itself on first use ("JEC Alumni Connect - College gallery videos" and "... - Glimpses").
+
+How playback works and what it costs:
+
+- `drive-media` checks who may see the video (the same rules as photos, enforced by row-level security), then streams the file from Drive and passes HTTP **Range** requests on, so seeking works and a phone only downloads what it plays. It serves only files named by a visible database row, never an arbitrary Drive id.
+- **Bandwidth is the thing to watch.** Every second of video played passes through the function, which counts against the Supabase free plan's egress (5 GB a month) and its function invocations. Posters are tiny; videos are not. Keep glimpses short and compressed (a 20-second 720p clip is 3 to 6 MB); members' videos only download when someone presses play (`preload="metadata"`). On a busy day consider the Pro plan or moving the video proxy to a Cloudflare Worker.
+- iPhone videos: Settings, Camera, Formats, **Most Compatible** gives H.264 files every device can play. HEVC `.mov` plays on Apple devices and recent Chrome but not everywhere; the upload still works, the poster is a plain card when the browser cannot read a frame.
+- Glimpse playback honours **reduced motion**, **Data Saver** and slow connections (poster only, tap to play), plays one clip at a time, and pauses when off screen or the tab is hidden.
+
+**Use files already in Drive (glimpses and gallery videos).** The admin can paste a Drive link or file id instead of uploading, so a video the committee already put in Drive is used where it is (nothing is copied or uploaded again). The app's Drive login only has the `drive.file` permission, which sees just files the app made. To let it open files you put there by hand, authorise the Drive account with **both** scopes in step 5.3: `https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly`, replace `GOOGLE_DRIVE_REFRESH_TOKEN`, and add `drive.readonly` to the OAuth consent screen. Only video files (MP4, MOV, WebM) can be attached, never other file types, and only by an admin who holds *College gallery*. Without the extra scope the admin sees "The app cannot open that file".
 
 ## 6. Hosting (Cloudflare Pages, free)
 

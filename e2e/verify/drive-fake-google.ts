@@ -23,6 +23,8 @@ interface Session {
   origin: string | null
   fields: string | null
   used: boolean
+  chunks: Uint8Array[]
+  received: number
 }
 
 export const CLIENT = { id: 'fake-client-id.apps.googleusercontent.com', secret: 'fake-secret', refresh: 'fake-refresh-token' }
@@ -106,13 +108,20 @@ export class FakeGoogle {
     return out
   }
 
+  private assemble(s: Session): Uint8Array {
+    const out = new Uint8Array(s.received)
+    let o = 0
+    for (const c of s.chunks) { out.set(c, o); o += c.length }
+    return out
+  }
+
   private visible(id: string): FakeFile | undefined {
     const f = this.files.get(id)
     return f && f.ownedByApp ? f : undefined
   }
 
   private project(f: FakeFile, fields: string | null) {
-    const all: Record<string, unknown> = { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, appProperties: f.appProperties, description: f.description }
+    const all: Record<string, unknown> = { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType, parents: f.parents, appProperties: f.appProperties, description: f.description, size: f.content ? String(f.content.length) : undefined, trashed: f.trashed }
     if (!fields) return { kind: 'drive#file', id: f.id, name: f.name, mimeType: f.mimeType }
     const o: Record<string, unknown> = {}
     for (const k of fields.split(',').map((s) => s.trim())) if (k in all && all[k] !== undefined && !(k === 'appProperties' && !Object.keys(f.appProperties).length)) o[k] = all[k]
@@ -159,12 +168,37 @@ export class FakeGoogle {
       if (req.method !== 'PUT') return this.err(405, 'PUT only')
       if (s.used) return this.err(400, 'session already completed')
       const len = raw?.length ?? 0
+      const cr = req.headers.get('Content-Range')
+      const finish = (bytes: Uint8Array) => {
+        s.used = true
+        const id = this.newId('up')
+        const f: FakeFile = { id, name: s.meta.name, mimeType: s.contentType, parents: s.meta.parents, appProperties: s.meta.appProperties ?? {}, description: s.meta.description, content: bytes, trashed: false, ownedByApp: true }
+        this.files.set(id, f)
+        return Response.json(this.project(f, s.fields), { headers: this.cors(s.origin) })
+      }
+      if (cr) {
+        // chunked resumable upload: "bytes a-b/total", or "bytes */total" to ask how much arrived
+        const m = /^bytes (?:(\d+)-(\d+)|\*)\/(\d+)$/.exec(cr)
+        if (!m) return this.err(400, `bad Content-Range ${cr}`, this.cors(s.origin))
+        if (Number(m[3]) !== s.contentLength) return this.err(400, 'Content-Range total does not match X-Upload-Content-Length', this.cors(s.origin))
+        const incomplete = () => new Response(null, { status: 308, headers: { ...this.cors(s.origin), ...(s.received > 0 ? { Range: `bytes=0-${s.received - 1}` } : {}) } })
+        if (m[1] === undefined) {
+          if (s.received === s.contentLength) return finish(this.assemble(s))
+          return incomplete()
+        }
+        const a = Number(m[1])
+        const b = Number(m[2])
+        if (b - a + 1 !== len) return this.err(400, 'Content-Range does not match the body length', this.cors(s.origin))
+        if (a !== s.received) return this.err(400, `expected the chunk to start at ${s.received}`, this.cors(s.origin))
+        if (a % 262144 !== 0) return this.err(400, 'chunks must start on a 256 KiB boundary', this.cors(s.origin))
+        if (b + 1 < s.contentLength && len % 262144 !== 0) return this.err(400, 'chunks must be a multiple of 256 KiB', this.cors(s.origin))
+        s.chunks.push(raw!)
+        s.received += len
+        if (s.received === s.contentLength) return finish(this.assemble(s))
+        return incomplete()
+      }
       if (len !== s.contentLength) return this.err(400, `Content length ${len} does not match X-Upload-Content-Length ${s.contentLength}`, this.cors(s.origin))
-      s.used = true
-      const id = this.newId('up')
-      const f: FakeFile = { id, name: s.meta.name, mimeType: s.contentType, parents: s.meta.parents, appProperties: s.meta.appProperties ?? {}, description: s.meta.description, content: raw, trashed: false, ownedByApp: true }
-      this.files.set(id, f)
-      return Response.json(this.project(f, s.fields), { headers: this.cors(s.origin) })
+      return finish(raw!)
     }
 
     if (!this.authed(req)) return this.err(401, 'Request had invalid authentication credentials.')
@@ -181,7 +215,7 @@ export class FakeGoogle {
         for (const p of meta.parents ?? []) if (!this.visible(p)) return this.err(404, `File not found: ${p}.`)
         for (const [k, v] of Object.entries(meta.appProperties ?? {})) if (typeof v !== 'string' || (k.length + String(v).length) > 124) return this.err(400, 'bad appProperties')
         const sid = crypto.randomUUID()
-        this.sessions.set(sid, { meta, contentType: ct, contentLength: cl, origin: req.headers.get('Origin'), fields: url.searchParams.get('fields'), used: false })
+        this.sessions.set(sid, { meta, contentType: ct, contentLength: cl, origin: req.headers.get('Origin'), fields: url.searchParams.get('fields'), used: false, chunks: [], received: 0 })
         return new Response(null, { status: 200, headers: { Location: `${this.base}/upload-session/${sid}?upload_id=${sid}` } })
       }
       if (type === 'multipart') {
@@ -236,6 +270,19 @@ export class FakeGoogle {
     if (fm && req.method === 'GET') {
       const f = this.visible(decodeURIComponent(fm[1]!))
       if (!f) return this.err(404, `File not found: ${fm[1]}.`)
+      if (url.searchParams.get('alt') === 'media') {
+        const bytes = f.content ?? new Uint8Array()
+        const rng = req.headers.get('Range')
+        if (!rng) return new Response(bytes, { status: 200, headers: { 'Content-Type': f.mimeType, 'Content-Length': String(bytes.length), 'Accept-Ranges': 'bytes' } })
+        const rm = /^bytes=(\d*)-(\d*)$/.exec(rng)
+        if (!rm || (rm[1] === '' && rm[2] === '')) return this.err(400, 'bad Range')
+        let a = rm[1] === '' ? bytes.length - Number(rm[2]) : Number(rm[1])
+        let b = rm[1] === '' || rm[2] === '' ? bytes.length - 1 : Math.min(Number(rm[2]), bytes.length - 1)
+        if (a >= bytes.length || a > b) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${bytes.length}` } })
+        a = Math.max(a, 0)
+        b = Math.max(b, a)
+        return new Response(bytes.slice(a, b + 1), { status: 206, headers: { 'Content-Type': f.mimeType, 'Content-Range': `bytes ${a}-${b}/${bytes.length}`, 'Content-Length': String(b - a + 1), 'Accept-Ranges': 'bytes' } })
+      }
       return Response.json(this.project(f, url.searchParams.get('fields')))
     }
     return this.err(404, `no fake route ${req.method} ${path}`)

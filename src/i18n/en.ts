@@ -1,5 +1,6 @@
 // English: the source of truth for every message. hi.ts must define exactly the same keys.
 // Plural messages use `key_one` / `key_other` and are called as t('key', { count }).
+import { mediaEn } from './mediaEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1292,4 +1293,5 @@ export const en = {
   'phone.errDigits': 'Numbers in {country} have {n} digits after +{dial}. Please check yours.',
   'phone.errRange': 'Numbers in {country} have {min} to {max} digits after +{dial}. Please check yours.',
   'phone.errStartIn': 'An Indian mobile number has 10 digits and starts with 6, 7, 8 or 9.',
+  ...mediaEn,
 } as const satisfies Record<string, string>
