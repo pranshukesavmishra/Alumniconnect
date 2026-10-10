@@ -22,6 +22,9 @@ const PhotosPage = lazy(() => import('./features/events/PhotosPage').then((m) =>
 const PhotoUploadPage = lazy(() => import('./features/events/PhotosPage').then((m) => ({ default: m.PhotoUploadPage })))
 const PhotoSlideshow = lazy(() => import('./features/photos/PhotoSlideshow').then((m) => ({ default: m.PhotoSlideshow })))
 const PhotoLink = lazy(() => import('./features/photos/PhotoLink').then((m) => ({ default: m.PhotoLink })))
+const MeetsPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetsPage })))
+const MeetDetailPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetDetailPage })))
+const AdminContent = lazy(() => import('./features/meets/admin/AdminContent').then((m) => ({ default: m.AdminContent })))
 const GalleryPage = lazy(() => import('./features/photos/GalleryPage').then((m) => ({ default: m.GalleryPage })))
 const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const EditProfilePage = lazy(() => import('./features/profile/EditProfilePage').then((m) => ({ default: m.EditProfilePage })))
@@ -182,6 +185,9 @@ export function App() {
             <Route path="events/:slug/photos/slideshow" element={m(<PhotoSlideshow />)} />
             <Route path="photo/:id" element={m(<PhotoLink />)} />
             <Route path="gallery" element={m(<GalleryPage />)} />
+            <Route path="meets" element={<MeetsPage />} />
+            <Route path="meets/:slug" element={<MeetDetailPage />} />
+            <Route path="admin/content" element={m(<RequirePerm any={['gallery_manage']} what="Glimpses and past meets"><AdminContent /></RequirePerm>)} />
             <Route path="groups" element={m(<GroupsPage />)} />
             <Route path="groups/:slug" element={m(<GroupPage />)} />
             <Route path="chat" element={m(<ChatListPage />)} />

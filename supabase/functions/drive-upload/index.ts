@@ -12,7 +12,8 @@
 // becomes playable only when "finish" has verified the Drive file (made for this row, with the size announced at "start").
 // Google only lets this app see folders and files it created itself ("drive.file"), so folders are always created by the app.
 import { asService, asUser, currentUser, eq } from '../_shared/db.ts'
-import { createFolder, driveConfigured, ensureFolder, fileInfo, startResumableUpload } from '../_shared/google.ts'
+import { createFolder, driveConfigured, DriveFileError, ensureFolder, fileInfo, fileMeta, startResumableUpload } from '../_shared/google.ts'
+import { parseDriveRef } from '../_shared/driveRef.ts'
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts'
 
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
@@ -23,7 +24,7 @@ const VIDEO_EXT: Record<string, string> = { 'video/mp4': 'mp4', 'video/quicktime
 const UUID = /^[0-9a-f-]{36}$/
 const clean = (s: string) => s.replace(/[\\/:*?"<>|]/g, '')
 
-type Body = { action?: string; kind?: string; id?: string; photo_id?: string; mime_type?: string; size?: number; file_id?: string; event_id?: string }
+type Body = { action?: string; kind?: string; id?: string; file_ref?: string; photo_id?: string; mime_type?: string; size?: number; file_id?: string; event_id?: string }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders(req) })
@@ -129,9 +130,44 @@ async function curatedFolder(kind: 'gallery' | 'glimpse'): Promise<string> {
   return folder
 }
 
+const LIMIT = { gallery: MAX_VIDEO_BYTES, glimpse: 60 * 1024 * 1024 }
+const REF_PROBLEM = {
+  empty: 'Paste the Drive link or the file id of the video.',
+  folder: 'That is a folder link. Open the video itself in Drive and copy its link.',
+  invalid: 'That does not look like a Google Drive link or file id.',
+}
+
+/** A video the committee already has in Drive: checked here, never trusted from the browser. */
+async function driveVideo(ref: string | undefined, kind: 'gallery' | 'glimpse'): Promise<{ ok: true; id: string; name: string; mime: string; size: number } | { ok: false; status: number; error: string }> {
+  const parsed = parseDriveRef(ref)
+  if ('error' in parsed) return { ok: false, status: 400, error: REF_PROBLEM[parsed.error] }
+  try {
+    const f = await fileMeta(parsed.id)
+    if (f.trashed) return { ok: false, status: 422, error: 'That file is in the Drive bin.' }
+    if (!VIDEO_MIME.test(f.mimeType)) return { ok: false, status: 422, error: 'That file is not an MP4, MOV or WebM video.' }
+    if (!f.size || f.size > LIMIT[kind]) return { ok: false, status: 422, error: `That video is larger than ${LIMIT[kind] / 1024 / 1024} MB.` }
+    return { ok: true, id: f.id, name: f.name, mime: f.mimeType, size: f.size }
+  } catch (e) {
+    if (e instanceof DriveFileError && (e.status === 404 || e.status === 403)) {
+      return { ok: false, status: 422, error: 'The app cannot open that file. Check the link, and that the Drive account the app uses can read it (see the setup guide: "Use files already in Drive").' }
+    }
+    throw e
+  }
+}
+
 async function curated(req: Request, auth: string, userId: string, kind: 'gallery' | 'glimpse', body: Body): Promise<Response> {
-  if (!body.id || !UUID.test(body.id)) return json(req, { error: 'Video not found' }, 404)
   if (!(await canCurate(auth))) return json(req, { error: 'You do not have permission to do this. Ask a super admin for access.' }, 403)
+  if (body.action === 'inspect') {
+    if (!driveConfigured()) return json(req, { skipped: true })
+    try {
+      const v = await driveVideo(body.file_ref, kind)
+      return v.ok ? json(req, { file_id: v.id, name: v.name, mime_type: v.mime, size_bytes: v.size }) : json(req, { error: v.error }, v.status)
+    } catch (e) {
+      console.error(e)
+      return json(req, { error: 'Could not reach Drive. Please try again.' }, 502)
+    }
+  }
+  if (!body.id || !UUID.test(body.id)) return json(req, { error: 'Video not found' }, 404)
   const table = kind === 'gallery' ? 'gallery_photos' : 'glimpses'
   const admin = asService()
   const [row] = await admin.select<{ id: string; media_kind?: string; mime_type: string | null; size_bytes: number | null; drive_file_id: string | null }>(
@@ -156,6 +192,14 @@ async function curated(req: Request, auth: string, userId: string, kind: 'galler
         appProperties: { [tag]: row.id },
       })
       return json(req, { upload_url })
+    }
+    if (body.action === 'attach') {
+      // an existing Drive video is used where it is (nothing is copied): it must be readable by the app and match the row that was saved
+      const v = await driveVideo(body.file_ref, kind)
+      if (!v.ok) return json(req, { error: v.error }, v.status)
+      if (v.mime !== row.mime_type || v.size !== row.size_bytes) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      await admin.update(table, `id=${eq(row.id)}`, { drive_file_id: v.id })
+      return json(req, { ok: true })
     }
     if (body.action === 'finish') {
       if (!body.file_id || !/^[A-Za-z0-9_-]{10,200}$/.test(body.file_id)) return json(req, { error: 'Invalid file' }, 400)

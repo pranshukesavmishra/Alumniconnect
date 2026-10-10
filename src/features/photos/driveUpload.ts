@@ -233,3 +233,29 @@ export async function sendVideoToDrive(o: SendOptions): Promise<void> {
   }
   throw new UploadRefused(502, await functionMessage(lastError))
 }
+
+// ------------------------------------------------------------------ a video that is already in Drive (pasted link or id)
+export interface DriveVideoInfo {
+  file_id: string
+  name: string
+  mime_type: string
+  size_bytes: number
+}
+
+async function curatedCall<T>(body: Record<string, unknown>): Promise<T> {
+  const r = await supabase.functions.invoke('drive-upload', { body })
+  if (r.error) throw new UploadRefused(Number((r.error as { context?: Response }).context?.status ?? 502), await functionMessage(r.error))
+  const data = r.data as (T & { skipped?: boolean }) | null
+  if (!data || data.skipped) throw new UploadRefused(503, 'drive-not-set-up')
+  return data
+}
+
+/** Asks the edge function whether the app can open this Drive video (link or id); nothing is changed. */
+export function inspectDriveVideo(kind: 'gallery' | 'glimpse', ref: string): Promise<DriveVideoInfo> {
+  return curatedCall<DriveVideoInfo>({ action: 'inspect', kind, file_ref: ref })
+}
+
+/** Points a saved gallery / glimpse row at that Drive video (the file is used where it is). */
+export async function attachDriveVideo(kind: 'gallery' | 'glimpse', id: string, ref: string): Promise<void> {
+  await curatedCall<{ ok: boolean }>({ action: 'attach', kind, id, file_ref: ref })
+}

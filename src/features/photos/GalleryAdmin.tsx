@@ -3,15 +3,17 @@ import { ArrowDown, ArrowUp, ImagePlus, Trash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '../../components/ui/Button'
-import { Badge, EmptyState, Skeleton } from '../../components/ui/Display'
+import { Badge, EmptyState, Notice, Skeleton } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { Sheet } from '../../components/ui/Sheet'
 import { useLang, useT } from '../../i18n'
 import { supabase } from '../../lib/supabase'
 import { addGalleryVideoRow, addToGallery, albumTitle, chipLabel, galleryUrl, photoError, useGalleryAlbums, useGalleryCategories, useGallerySuggestions, type GalleryPhoto, type PhotoRow } from './api'
 import { GalleryAddSheet } from './PhotoSheets'
-import { sendVideoToDrive, UploadAborted } from './driveUpload'
-import { MAX_VIDEO_BYTES, MB, isVideoFile, readVideoInfo, videoMime, videoProblem } from './video'
+import { attachDriveVideo, inspectDriveVideo, sendVideoToDrive, UploadAborted } from './driveUpload'
+import { parseDriveRef } from './driveRef'
+import { compressImageSizes, THUMB_SIZE } from '../../lib/image'
+import { MAX_VIDEO_BYTES, MB, isVideoFile, placeholderPoster, readVideoInfo, videoMime, videoProblem } from './video'
 import { FatalUpload } from './PhotoUpload'
 
 /** One video into the gallery: the poster and the row first, then the file to Drive in chunks. A failure takes the half-made row away again. */
@@ -360,4 +362,57 @@ export function SuggestionsSheet({ onClose }: { onClose: () => void }) {
 
 export function PendingBadge({ n }: { n: number }) {
   return n > 0 ? <Badge tone="warning">{n}</Badge> : null
+}
+
+/** A video that is already in the committee's Drive: paste its link or id; the file is used where it is (nothing is uploaded again). */
+export function GalleryDriveSheet({ onClose }: { onClose: () => void }) {
+  const tx = useT()
+  const qc = useQueryClient()
+  const [link, setLink] = useState('')
+  const [title, setTitle] = useState('')
+  const [poster, setPoster] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function go() {
+    setError(null)
+    const parsed = parseDriveRef(link)
+    if ('error' in parsed) return setError(tx(parsed.error === 'folder' ? 'glimpse.errFolder' : parsed.error === 'empty' ? 'glimpse.errNoLink' : 'glimpse.errLink'))
+    setBusy(true)
+    try {
+      const found = await inspectDriveVideo('gallery', link)
+      const [img] = poster ? await compressImageSizes(poster, [{ maxSide: THUMB_SIZE, quality: 0.75 }]) : [await placeholderPoster()]
+      const row = await addGalleryVideoRow(img!.blob, img!.ext, { title: title || undefined, mime_type: found.mime_type, size_bytes: found.size_bytes })
+      try {
+        await attachDriveVideo('gallery', row.id, link)
+      } catch (e) {
+        await row.remove().catch(() => {})
+        throw e
+      }
+      refreshGallery(qc)
+      toast.success(tx('gallery.addedToast', { count: 1 }))
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error && !('code' in e) ? (e.message === 'drive-not-set-up' ? tx('photos.errVideoNoDrive') : e.message) : photoError(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <Sheet open onClose={() => !busy && onClose()} label={tx('gallery.driveTitle')}>
+      <div className="space-y-4 p-5">
+        <h2 className="text-lg font-bold">{tx('gallery.driveTitle')}</h2>
+        <p className="text-sm text-muted">{tx('gallery.driveHelp')}</p>
+        <Field label={tx('glimpse.driveLink')} hint={tx('glimpse.driveLinkHint')}>
+          {(p) => <Input {...p} value={link} disabled={busy} autoComplete="off" placeholder="https://drive.google.com/file/d/…" onChange={(e) => setLink(e.target.value)} data-testid="gallery-drive-link" />}
+        </Field>
+        <Field label={tx('gallery.titleLabel')} optional>{(p) => <Input {...p} value={title} maxLength={120} disabled={busy} onChange={(e) => setTitle(e.target.value)} />}</Field>
+        <Field label={tx('glimpse.posterFile')} optional hint={tx('glimpse.posterHint')}>{(p) => <Input {...p} type="file" accept="image/*" disabled={busy} onChange={(e) => setPoster(e.target.files?.[0] ?? null)} />}</Field>
+        {error && <Notice tone="danger" title={error} />}
+        <div className="flex gap-2">
+          <Button block variant="secondary" disabled={busy} onClick={onClose}>{tx('common.cancel')}</Button>
+          <Button block loading={busy} onClick={go}>{tx('gallery.addToGallery')}</Button>
+        </div>
+      </div>
+    </Sheet>
+  )
 }

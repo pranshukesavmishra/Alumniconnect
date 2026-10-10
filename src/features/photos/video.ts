@@ -206,3 +206,8 @@ export function glimpseAutoplays(env: { reducedMotion: boolean; saveData?: boole
   if (env.reducedMotion || env.saveData) return false
   return !(env.effectiveType === 'slow-2g' || env.effectiveType === '2g' || env.effectiveType === '3g')
 }
+
+/** The plain dark poster for a video nobody could take a frame from (a file that is only in Drive). */
+export function placeholderPoster(): Promise<CompressedImage> {
+  return posterFrom(placeholderCanvas())
+}

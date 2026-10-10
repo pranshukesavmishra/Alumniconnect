@@ -97,6 +97,28 @@ export async function fileInfo(fileId: string): Promise<{ parents: string[]; app
   return { parents: f.parents ?? [], appProperties: f.appProperties ?? {}, size: f.size ? Number(f.size) : null }
 }
 
+export class DriveFileError extends Error {
+  status: number
+  constructor(status: number, message: string) {
+    super(message)
+    this.status = status
+  }
+}
+
+/** What the app's Drive account can see of ANY file by id (with only the drive.file permission that is just the files the app made;
+ *  to use files the committee put into Drive by hand, the account is authorised with read access too: see docs/SETUP.md). */
+export async function fileMeta(fileId: string): Promise<{ id: string; name: string; mimeType: string; size: number | null; trashed: boolean }> {
+  const res = await fetch(`${API}/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,size,trashed&supportsAllDrives=true`, {
+    headers: { Authorization: `Bearer ${await accessToken()}` },
+  })
+  if (!res.ok) {
+    await res.body?.cancel()
+    throw new DriveFileError(res.status, `Drive answered ${res.status}`)
+  }
+  const f = (await res.json()) as { id: string; name?: string; mimeType?: string; size?: string; trashed?: boolean }
+  return { id: f.id, name: f.name ?? '', mimeType: f.mimeType ?? '', size: f.size ? Number(f.size) : null, trashed: !!f.trashed }
+}
+
 /** The bytes of a file the app created, optionally a byte range (the response is passed on as is: 200, 206 or 416). */
 export async function driveMedia(fileId: string, range: string | null): Promise<Response> {
   return await fetch(`${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Folders, ImagePlus, Inbox, Link2, Pencil, Play, Star, Tags, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Film, Folders, ImagePlus, Inbox, Link2, Pencil, Play, Star, Tags, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
@@ -17,7 +17,7 @@ import { albumTitle, chipLabel, fetchGalleryPhoto, galleryTitle, galleryUrl, use
 import { BeforeAfter } from './BeforeAfter'
 import { DriveVideo } from './DriveVideo'
 import { formatDuration } from './video'
-import { AlbumsSheet, ChipsSheet, GalleryEditSheet, GalleryUploadSheet, SuggestionsSheet } from './GalleryAdmin'
+import { AlbumsSheet, ChipsSheet, GalleryDriveSheet, GalleryEditSheet, GalleryUploadSheet, SuggestionsSheet } from './GalleryAdmin'
 
 function usePairBases(photos: GalleryPhoto[]) {
   const ids = [...new Set(photos.map((p) => p.pair_of).filter((x): x is string => !!x))].sort()
@@ -52,7 +52,7 @@ export function GalleryPage() {
   const list = useMemo(() => photos.data?.pages.flat() ?? [], [photos.data])
   const bases = usePairBases(list)
   const [files, setFiles] = useState<File[] | null>(null)
-  const [sheet, setSheet] = useState<'chips' | 'albums' | 'suggestions' | null>(null)
+  const [sheet, setSheet] = useState<'chips' | 'albums' | 'suggestions' | 'drive' | null>(null)
   const [editing, setEditing] = useState<GalleryPhoto | null>(null)
   const set = (k: string, v: string | null) => {
     const n = new URLSearchParams(sp)
@@ -99,6 +99,7 @@ export function GalleryPage() {
               <ImagePlus className="size-4" aria-hidden />{tx('gallery.addPhotos')}
               <input type="file" accept="image/*,video/*,.mov,.mp4,.m4v,.webm" multiple className="sr-only" onChange={(e) => { if (e.target.files?.length) setFiles(Array.from(e.target.files)); e.target.value = '' }} />
             </label>
+            <Button size="sm" variant="secondary" icon={<Film className="size-4" />} onClick={() => setSheet('drive')}>{tx('gallery.driveTitle')}</Button>
             <Button size="sm" variant="secondary" icon={<Tags className="size-4" />} onClick={() => setSheet('chips')}>{tx('gallery.chipsTitle')}</Button>
             <Button size="sm" variant="secondary" icon={<Folders className="size-4" />} onClick={() => setSheet('albums')}>{tx('gallery.albumsTitle')}</Button>
             <Button size="sm" variant="secondary" icon={<Inbox className="size-4" />} onClick={() => setSheet('suggestions')}>
@@ -198,6 +199,7 @@ export function GalleryPage() {
         />
       )}
       {files && <GalleryUploadSheet files={files} onClose={() => setFiles(null)} />}
+      {sheet === 'drive' && <GalleryDriveSheet onClose={() => setSheet(null)} />}
       {sheet === 'chips' && <ChipsSheet onClose={() => setSheet(null)} />}
       {sheet === 'albums' && <AlbumsSheet onClose={() => setSheet(null)} />}
       {sheet === 'suggestions' && <SuggestionsSheet onClose={() => setSheet(null)} />}

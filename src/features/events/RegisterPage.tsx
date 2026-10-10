@@ -20,6 +20,7 @@ import { useMyPrivate } from '../profile/queries'
 import { registrationOpen, useEvent, useEventQuestions, useMyExperiences, useMyRegistration, useTicketTypes, useUpsertRegistration } from './queries'
 import { FundPicker, MultiChoice, ProfileCard, QuestionField, YesNo, boolToYn, ynToBool, type YN } from './RegisterParts'
 import { answerText, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 interface GuestDraft {
   name: string
@@ -459,6 +460,7 @@ export function RegisterPage() {
     <div ref={topRef} className="scroll-mt-0">
       <PageHeader title={locked ? tx('reg.updateTitle') : tx('reg.title')} subtitle={event.title} back="/meet" />
       <Page className="space-y-6">
+        <GlimpseCarousel />
         {/* step indicator */}
         <div>
           <ol className="flex items-center gap-1.5" aria-label={tx('reg.progress')}>

@@ -86,7 +86,7 @@ export function captionOf(p: { caption: string | null; caption_hi: string | null
 /** Errors from the photo functions carry a hint that names a translated message; everything else goes through friendlyError. */
 export function photoError(e: unknown): string {
   const hint = (e as { hint?: string } | null)?.hint
-  if (hint && /^(photos|gallery)\.err/.test(hint)) return tr(hint as MsgKey)
+  if (hint && /^(photos|gallery|glimpses|meets)\.err/.test(hint)) return tr(hint as MsgKey)
   return friendlyError(e)
 }
 

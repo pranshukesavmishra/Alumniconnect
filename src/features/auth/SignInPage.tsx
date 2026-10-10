@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from './AuthProvider'
 import { useT } from '../../i18n'
 import { LanguageSwitch } from '../../i18n/LanguageSwitch'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 
 function GoogleLogo() {
@@ -112,6 +113,7 @@ export function SignInPage() {
               <li key={k} className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{tx(k)}</li>
             ))}
           </ul>
+          <GlimpseCarousel className="mt-6" />
         </div>
       </section>
 
