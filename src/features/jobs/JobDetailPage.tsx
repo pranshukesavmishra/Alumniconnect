@@ -12,6 +12,7 @@ import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
 import { startDm } from '../chat/queries'
+import { SocialLinks } from '../profile/SocialLinks'
 import { Linkified } from '../community/PostCard'
 import { modeLabel, typeLabel, useDeleteMyJob, useJob, useJobSaved, useToggleSave, useUpdateMyJob } from './queries'
 
@@ -128,6 +129,7 @@ export function JobDetailPage() {
                 </span>
               </span>
             </Link>
+            <SocialLinks userId={job.poster.id} name={job.poster.full_name} variant="compact" className="mt-3" />
             {!mine && (
               <Button
                 variant="secondary"

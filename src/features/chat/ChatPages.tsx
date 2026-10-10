@@ -18,6 +18,7 @@ import { PushToggle } from '../community/PushToggle'
 import { useJoinGroup } from '../community/queries'
 import { ChatComposer } from './Composer'
 import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, PollCard, VoicePlayer, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
+import { SocialLinks } from '../profile/SocialLinks'
 import { firstUnreadIndex, isContinuation, previewOf, type Attachment, type Message, type ReplyPreview } from './merge'
 import {
   chatKeys,
@@ -646,6 +647,9 @@ export function ChatThreadPage() {
             </button>
           )}
         </div>
+        {chat?.kind === 'dm' && chat.other_id && (
+          <SocialLinks userId={chat.other_id} name={chat.title} variant="compact" className="mx-auto max-w-3xl px-4 pb-2" />
+        )}
       </header>
 
       {searching && <ChatSearch chatId={id} onClose={() => setSearching(false)} onPick={(mid) => { setSearching(false); void jumpTo(mid) }} />}

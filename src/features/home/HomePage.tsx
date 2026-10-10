@@ -23,6 +23,7 @@ import { LanguageSwitch } from '../../i18n/LanguageSwitch'
 import { Composer } from '../community/Composer'
 import { FeedList } from '../community/FeedList'
 import { useGroups, useNotifications } from '../community/queries'
+import { useMySocialLinks } from '../profile/socialQueries'
 import { LocationPromptCard } from '../location/LocationSharing'
 import { useVisibleMenu } from '../../components/layout/useMenuCtx'
 
@@ -31,7 +32,8 @@ function greeting(): MsgKey {
   return h < 12 ? 'home.morning' : h < 17 ? 'home.afternoon' : 'home.evening'
 }
 
-export function profileCompleteness(p: Profile): { percent: number; next: { label: MsgKey; to: string } | null } {
+/** `hasSocial` (an Instagram or Facebook link) is a pure bonus: it is not in the total, so nobody's score goes down, and it is capped at 100. */
+export function profileCompleteness(p: Profile, hasSocial = false): { percent: number; next: { label: MsgKey; to: string } | null } {
   const checks: [boolean, MsgKey, string][] = [
     [!!p.avatar_url, 'home.stepPhoto', '/me/edit'],
     [!!p.headline || !!p.current_title, 'home.stepRole', '/me/import'],
@@ -43,7 +45,7 @@ export function profileCompleteness(p: Profile): { percent: number; next: { labe
   const done = checks.filter((c) => c[0]).length + 2 // name + batch from onboarding
   const total = checks.length + 2
   const first = checks.find((c) => !c[0])
-  return { percent: Math.round((done / total) * 100), next: first ? { label: first[1], to: first[2] } : null }
+  return { percent: Math.min(100, Math.round(((done + (hasSocial ? 1 : 0)) / total) * 100)), next: first ? { label: first[1], to: first[2] } : null }
 }
 
 function Landing() {
@@ -119,13 +121,14 @@ export function HomePage() {
   const { data: event } = useEvent(MEET_SLUG)
   const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
   const { data: groups } = useGroups()
+  const { data: social } = useMySocialLinks()
 
   if (loading || (session && isLoading)) return <PageSkeleton />
   if (!session || !profile) return <Landing />
   if (!profile.onboarded) return <Navigate to="/welcome?next=/" replace />
 
   const first = profile.full_name.split(' ')[0] || tx('home.there')
-  const comp = profileCompleteness(profile)
+  const comp = profileCompleteness(profile, !!(social?.instagram_url || social?.facebook_url))
   const days = daysUntil(event?.starts_at ?? null)
   const reg = mine?.registration && mine.registration.status !== 'cancelled' ? mine.registration : null
 

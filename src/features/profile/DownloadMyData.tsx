@@ -33,6 +33,7 @@ export async function collectMyData(uid: string) {
         supabase.from('event_payments').select('*').in('registration_id', regIds).then((r) => r.data ?? []),
       ])
     : [[], []]
+  const social = await own('profile_social_links', 'user_id')
   const { data: loc } = await supabase.rpc('my_location')
   const { data: trips } = await supabase.rpc('my_trips')
   const { data: meetups } = await supabase.from('groups').select('id, name, description, created_at').eq('created_by', uid).eq('kind', 'meetup')
@@ -42,6 +43,7 @@ export async function collectMyData(uid: string) {
     note: 'This is the information JEC Alumni Connect holds about you. Photos and files you uploaded are not included in this file.',
     profile: profile[0] ?? null,
     contact_details: contact[0] ?? null,
+    social_links: social[0] ?? null,
     experiences,
     educations,
     posts,

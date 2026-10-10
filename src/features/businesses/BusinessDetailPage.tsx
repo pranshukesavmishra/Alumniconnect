@@ -12,6 +12,7 @@ import { formatDate } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
 import { useUserId } from '../auth/AuthProvider'
 import { startDm } from '../chat/queries'
+import { SocialLinks } from '../profile/SocialLinks'
 import { Linkified } from '../community/PostCard'
 import { formatPhone } from '../../lib/phone'
 import { telHref, useBusiness, useDeleteBusiness, whatsappDigits } from './queries'
@@ -108,6 +109,7 @@ export function BusinessDetailPage() {
                 <span className="block truncate text-sm text-muted">{[b.owner.grad_year && `Batch ${b.owner.grad_year}`, b.owner.branch].filter(Boolean).join(' · ')}</span>
               </span>
             </Link>
+            <SocialLinks userId={b.owner.id} name={b.owner.full_name} variant="compact" className="mt-3" />
             {!mine && (
               <Button
                 variant="secondary"

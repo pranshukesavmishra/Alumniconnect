@@ -12,6 +12,7 @@ import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../lib/types'
 import { useMyProfile } from '../auth/AuthProvider'
+import { SocialLinks } from '../profile/SocialLinks'
 import { useT } from '../../i18n'
 
 const PAGE = 30
@@ -141,8 +142,8 @@ export function DirectoryPage() {
             ) : (
               <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
                 {people.map((p) => (
-                  <li key={p.id}>
-                    <Link to={`/people/${p.id}`} className="flex items-center gap-3 p-3.5 hover:bg-surface-2">
+                  <li key={p.id} className="flex items-center hover:bg-surface-2">
+                    <Link to={`/people/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 p-3.5">
                       <Avatar src={p.avatar_url} name={p.full_name} size={48} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{p.full_name}</p>
@@ -151,6 +152,7 @@ export function DirectoryPage() {
                       </div>
                       {p.help_tags.includes('Referrals') && <Badge tone="accent">Referrals</Badge>}
                     </Link>
+                    <SocialLinks userId={p.id} name={p.full_name} variant="compact" className="shrink-0 flex-nowrap pr-3" />
                   </li>
                 ))}
               </ul>

@@ -9,6 +9,7 @@ import { Avatar, Badge, Card, EmptyState, Notice, Skeleton } from '../../compone
 import { Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { Sheet } from '../../components/ui/Sheet'
 import { friendlyError } from '../../lib/errors'
+import { SocialLinks } from '../profile/SocialLinks'
 import { relativeTime } from '../../lib/format'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import {
@@ -160,6 +161,7 @@ function MentorCard({ m, mine, canRequest, onRequest }: { m: MentorRow; mine: bo
           {(m.current_title || m.current_company || m.headline) && <p className="truncate text-sm text-muted">{m.current_title ? [m.current_title, m.current_company].filter(Boolean).join(' at ') : (m.current_company ?? m.headline)}</p>}
         </div>
       </div>
+      <SocialLinks userId={m.user_id} name={m.full_name} variant="compact" />
       <p className="whitespace-pre-line break-words text-[15px] [overflow-wrap:anywhere]">{m.bio}</p>
       <div className="flex flex-wrap gap-1.5">
         {m.topics.map((t) => (

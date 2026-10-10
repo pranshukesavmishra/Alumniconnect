@@ -17,6 +17,9 @@ import { normalizePhone } from '../../lib/phone'
 import { supabase } from '../../lib/supabase'
 import type { Experience } from '../../lib/types'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
+import { SocialLinksEditor, validateSocial, type SocialDraft } from './SocialLinksEditor'
+import { useMySocialLinks, useSaveSocialLinks } from './socialQueries'
+import { socialInputValue } from '../../lib/social'
 import { PhotoImportError, useImportProviderPhoto, useMember, useMyPrivate, useRemoveAvatar, useUpdateProfile, useUploadAvatar, type PhotoProvider } from './queries'
 
 export function EditProfilePage() {
@@ -62,9 +65,19 @@ export function EditProfilePage() {
   const [skillInput, setSkillInput] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [ready, setReady] = useState(false)
+  const { data: socialSaved } = useMySocialLinks()
+  const saveSocial = useSaveSocialLinks()
+  const [social, setSocial] = useState<SocialDraft>({ instagram: '', facebook: '', instagram_visibility: 'verified', facebook_visibility: 'verified' })
+  const [showSocialErrors, setShowSocialErrors] = useState(false)
 
   useEffect(() => {
-    if (profile && priv && !ready) {
+    if (profile && priv && socialSaved && !ready) {
+      setSocial({
+        instagram: socialInputValue('instagram', socialSaved.instagram_url),
+        facebook: socialInputValue('facebook', socialSaved.facebook_url),
+        instagram_visibility: socialSaved.instagram_visibility,
+        facebook_visibility: socialSaved.facebook_visibility,
+      })
       setF({
         full_name: profile.full_name,
         headline: profile.headline ?? '',
@@ -87,7 +100,7 @@ export function EditProfilePage() {
       setSkills(profile.skills)
       setReady(true)
     }
-  }, [profile, priv, ready])
+  }, [profile, priv, socialSaved, ready])
 
   if (isLoading || !profile || !ready) return <PageSkeleton />
   const set = (k: string) => (e: { target: { value: string } }) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -118,9 +131,11 @@ export function EditProfilePage() {
     }
     if ((f.birth_day && !f.birth_month) || (!f.birth_day && f.birth_month)) errs.birth_day = 'Please choose both the day and the month.'
     else if (f.birth_day && f.birth_month && Number(f.birth_day) > maxBirthDay(Number(f.birth_month))) errs.birth_day = 'That date doesn’t exist. Please check the day and month.'
+    const sv = validateSocial(social)
+    setShowSocialErrors(true)
     setErrors(errs)
-    if (Object.keys(errs).length) return
-    const n = (v?: string) => (v?.trim() ? v.trim() : null)
+    if (Object.keys(errs).length || Object.keys(sv.errors).length) return
+    const n =(v?: string) => (v?.trim() ? v.trim() : null)
     try {
       await update.mutateAsync({
         profile: {
@@ -143,6 +158,12 @@ export function EditProfilePage() {
           message_policy: (f.message_policy || 'jec') as 'jec',
         },
         phone: n(normalizePhone(f.phone)),
+      })
+      await saveSocial.mutateAsync({
+        instagram_url: sv.instagram_url,
+        facebook_url: sv.facebook_url,
+        instagram_visibility: social.instagram_visibility,
+        facebook_visibility: social.facebook_visibility,
       })
       toast.success('Profile saved')
       navigate('/me')
@@ -355,7 +376,9 @@ export function EditProfilePage() {
             </Field>
           </section>
 
-          {update.error && <Notice tone="danger" title={friendlyError(update.error)} />}
+          <SocialLinksEditor draft={social} onChange={setSocial} showErrors={showSocialErrors} />
+
+          {(update.error || saveSocial.error) && <Notice tone="danger" title={friendlyError(update.error ?? saveSocial.error)} />}
           <div className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom))] -mx-4 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur md:bottom-0">
             <Button type="submit" size="lg" block loading={update.isPending}>
               Save profile

@@ -10,6 +10,7 @@ import { useT } from '../../i18n'
 import { shortBranch, CURRENT_YEAR, yearRange } from '../../lib/constants'
 import { useMyProfile } from '../auth/AuthProvider'
 import { startDm } from '../chat/queries'
+import { SocialLinks } from '../profile/SocialLinks'
 import { CityPicker, useDebounced } from './CityPicker'
 import { CityTrips } from './CityPage'
 import { LocationPromptCard } from './LocationSharing'
@@ -39,6 +40,7 @@ function PersonRow({ r, originCity }: { r: NearbyRow; originCity: string | null 
           </p>
         </div>
       </Link>
+      <SocialLinks userId={r.user_id} name={r.full_name} variant="compact" className="shrink-0 flex-nowrap" />
       <Button
         variant="secondary"
         size="sm"

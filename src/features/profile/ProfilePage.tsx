@@ -13,6 +13,8 @@ import { LocationSettings } from '../location/LocationSharing'
 import { TripChips } from '../location/TripChips'
 import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
+import { SocialLinks } from './SocialLinks'
+import { useMySocialLinks } from './socialQueries'
 import { profileCompleteness } from '../home/HomePage'
 import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
@@ -64,6 +66,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const isMe = id === uid
   const { data, isLoading, error } = useMember(id)
   const { data: me } = useMyProfile()
+  const { data: mySocial } = useMySocialLinks()
   const navigate = useNavigate()
   const organiser = useIsOrganiser()
   const { hash } = useLocation()
@@ -87,7 +90,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   }
 
   const { profile: p, experiences, educations } = data
-  const comp = profileCompleteness(p)
+  const comp = profileCompleteness(p, !!(mySocial?.instagram_url || mySocial?.facebook_url))
   const role = p.current_title && p.current_company ? `${p.current_title} at ${p.current_company}` : p.headline
   return (
     <div>
@@ -152,6 +155,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
               )
             )}
           </div>
+          <SocialLinks userId={p.id} name={p.full_name} className="mt-2" />
         </section>
 
         <BadgesRow memberId={p.id} />
