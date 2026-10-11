@@ -79,6 +79,13 @@ insert into storage.objects (bucket_id, name, owner) select 'payment-proofs', v.
   ('93000000-0000-0000-0000-0000000000c1/proof1.jpg'), ('93000000-0000-0000-0000-0000000000c2/proof2.jpg')) v(n)
   where exists (select 1 from storage.buckets where id = 'payment-proofs');
 
+-- an official story for an event nobody is registered for, and an official highlight holding it: only the story team reads them
+insert into public.events (id, slug, title, is_published) values ('93000000-0000-0000-0000-0000000000e4', 'm93-stories', 'M93 Stories', false);
+insert into public.stories (id, owner_id, is_official, kind, audience, event_id, text_body, bg_key)
+  values ('93000000-0000-0000-0000-0000000000f5', '93000000-0000-0000-0000-0000000000a1', true, 'text', 'event', '93000000-0000-0000-0000-0000000000e4', 'Matrix story', 'teal');
+insert into public.story_highlights (id, owner_id, is_official, title) values ('93000000-0000-0000-0000-0000000000f6', '93000000-0000-0000-0000-0000000000a1', true, 'Matrix highlight');
+insert into public.story_highlight_items (highlight_id, story_id) values ('93000000-0000-0000-0000-0000000000f6', '93000000-0000-0000-0000-0000000000f5');
+
 -- ---------------------------------------------------------------- the matrix
 -- fields: label (function name), call, who may call it. Letters: a admin, m moderator, t treasurer of event 1, c content manager of event 1, v volunteer of event 1.
 -- allowed: letters of the role-holders who may call it (a legacy full admin, s super admin, m moderator, t treasurer, c content, v volunteer);
@@ -242,7 +249,18 @@ insert into public.t93_cases values
   ('admin_sponsor_import_lead', $q$select public.admin_sponsor_import_lead(gen_random_uuid())$q$, 'a', 'sponsors_manage'),
   ('admin_sponsor_record_payment', $q$select public.admin_sponsor_record_payment(gen_random_uuid(), 1000, 'upi', '123456789012', null)$q$, 'a', 'sponsors_manage'),
   ('admin_sponsor_document', $q$select public.admin_sponsor_document(gen_random_uuid())$q$, 'a', 'sponsors_manage,funds_verify'),
-  ('admin_sponsor_report', $q$select public.admin_sponsor_report('tier')$q$, 'a', 'funds_reports');
+  ('admin_sponsor_report', $q$select public.admin_sponsor_report('tier')$q$, 'a', 'funds_reports'),
+  -- stories and highlights: official ones need stories_post (members' own stories need no permission and are tested in 99_stories.sql)
+  ('admin_story_list', $q$select public.admin_story_list('all')$q$, 'a', 'stories_post'),
+  ('admin_story_audience_count', $q$select public.admin_story_audience_count('all')$q$, 'a', 'stories_post'),
+  ('admin_story_notify', $q$select public.admin_story_notify(gen_random_uuid())$q$, 'a', 'stories_post'),
+  ('admin_stories_cleanup', $q$select public.admin_stories_cleanup()$q$, 'a', 'stories_post'),
+  ('admin_highlight_save', $q$select public.admin_highlight_save(null, 'Matrix highlight')$q$, 'a', 'stories_post'),
+  ('admin_highlight_items', $q$select public.admin_highlight_items(gen_random_uuid(), array[]::uuid[])$q$, 'a', 'stories_post'),
+  ('admin_highlight_delete', $q$select public.admin_highlight_delete(gen_random_uuid())$q$, 'a', 'stories_post'),
+  ('admin_highlight_reorder', $q$select public.admin_highlight_reorder(array[]::uuid[])$q$, 'a', 'stories_post'),
+  ('create_story', $q$select public.create_story('{"kind":"text","text_body":"matrix","official":true,"audience":"all"}'::jsonb)$q$, 'a', 'stories_post'),
+  ('add_story_to_highlight', $q$select public.add_story_to_highlight('93000000-0000-0000-0000-0000000000f6', '93000000-0000-0000-0000-0000000000f5')$q$, 'a', 'stories_post');
 
 
 -- callers: anon, a plain member, each event role, a moderator, a legacy full admin (no grants row), a super admin, and one limited admin per permission
@@ -471,6 +489,7 @@ insert into public.t93_rls values
   ('select * from public.groups where id = ''93000000-0000-0000-0000-0000000000a8''', 'community_circles,' || pg_temp.fam('moderation_'), false),
   ('select * from public.event_staff', 'admins,events_team', false),
   ('select * from public.site_roles where user_id = ''93000000-0000-0000-0000-0000000000b3''', 'admins,' || pg_temp.fam('moderation_'), false),
+  ('select * from public.stories where id = ''93000000-0000-0000-0000-0000000000f5''', 'stories_post', false),
   ('update public.events set title = title where id = ''93000000-0000-0000-0000-0000000000e1''', 'events_edit', true),
   ('insert into public.events (slug, title) values (''m93-new'', ''New'')', 'events_create', true),
   ('delete from public.events where id = ''93000000-0000-0000-0000-0000000000e3''', 'events_create', true),

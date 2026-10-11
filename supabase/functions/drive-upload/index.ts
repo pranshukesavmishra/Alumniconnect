@@ -6,6 +6,8 @@
 //   POST {action: "finish", photo_id, file_id}         -> {ok: true}   (records drive_file_id after verifying the file)
 //   Gallery videos and glimpses (the caller needs the gallery_manage permission; the row exists already):
 //   POST {action: "start"  | "finish", kind: "gallery" | "glimpse", id, mime_type, size | file_id}
+//   Story videos (the caller is the story's owner, checked with their own JWT through row-level security; the story row exists already):
+//   POST {action: "start" | "finish", kind: "story", id, mime_type, size | file_id}   (up to 40 MB and 60 s; the folder is made on first use)
 //   POST {action: "create_root", event_id}             -> {folder_id} (admins: creates the event's archive folder)
 //
 // Photos: originals are archived (best effort). Videos: the Drive file IS the video (played back by the drive-media function), so a video
@@ -18,6 +20,8 @@ import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts'
 
 const MAX_PHOTO_BYTES = 25 * 1024 * 1024
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024
+const MAX_STORY_BYTES = 40 * 1024 * 1024
+const MAX_STORY_MS = 61_000
 const PHOTO_MIME = /^image\/(jpeg|png|webp|heic|heif)$/
 const VIDEO_MIME = /^video\/(mp4|quicktime|webm)$/
 const VIDEO_EXT: Record<string, string> = { 'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm' }
@@ -42,6 +46,7 @@ Deno.serve(async (req) => {
   }
 
   if (body.action === 'create_root') return createRoot(req, user.id, body.event_id)
+  if (body.kind === 'story') return storyVideo(req, auth, user.id, body)
   if (body.kind === 'gallery' || body.kind === 'glimpse') return curated(req, auth, user.id, body.kind, body)
   return eventMedia(req, auth, user.id, body)
 })
@@ -120,12 +125,12 @@ async function canCurate(auth: string): Promise<boolean> {
 }
 
 /** The Drive folder for the gallery or the glimpses: made once by the app, remembered in drive_roots. */
-async function curatedFolder(kind: 'gallery' | 'glimpse'): Promise<string> {
+async function curatedFolder(kind: 'gallery' | 'glimpse' | 'story'): Promise<string> {
   const admin = asService()
-  const key = kind === 'gallery' ? 'gallery' : 'glimpses'
+  const key = kind === 'gallery' ? 'gallery' : kind === 'story' ? 'stories' : 'glimpses'
   const [row] = await admin.select<{ folder_id: string }>('drive_roots', `select=folder_id&key=${eq(key)}`)
   if (row) return row.folder_id
-  const folder = await createFolder(kind === 'gallery' ? 'JEC Alumni Connect - College gallery videos' : 'JEC Alumni Connect - Glimpses')
+  const folder = await createFolder(kind === 'gallery' ? 'JEC Alumni Connect - College gallery videos' : kind === 'story' ? 'JEC Alumni Connect - Stories' : 'JEC Alumni Connect - Glimpses')
   await admin.upsert('drive_roots', { key, folder_id: folder })
   return folder
 }
@@ -212,6 +217,55 @@ async function curated(req: Request, auth: string, userId: string, kind: 'galler
     return json(req, { error: 'Unknown action' }, 400)
   } catch (e) {
     console.error(e, userId)
+    return json(req, { error: 'Sending the video to Drive failed. Please try again.' }, 502)
+  }
+}
+
+// ------------------------------------------------------------------ story videos (<= 40 MB, <= 60 s)
+async function storyVideo(req: Request, auth: string, userId: string, body: Body): Promise<Response> {
+  if (!body.id || !UUID.test(body.id)) return json(req, { error: 'Story not found' }, 404)
+  // row-level security lets the owner read their own story, whatever its state; nobody else's draft is visible here
+  const [row] = await asUser(auth).select<{ id: string; owner_id: string; kind: string; mime_type: string | null; size_bytes: number | null; duration_ms: number | null; drive_file_id: string | null }>(
+    'stories', `select=id,owner_id,kind,mime_type,size_bytes,duration_ms,drive_file_id&id=${eq(body.id)}`)
+  if (!row || row.owner_id !== userId || row.kind !== 'video' || !row.mime_type || !row.size_bytes) return json(req, { error: 'Story not found' }, 404)
+  if (!driveConfigured()) return json(req, { skipped: true })
+  const admin = asService()
+  try {
+    if (body.action === 'start') {
+      const origin = req.headers.get('Origin')
+      if (!isAllowedOrigin(origin)) return json(req, { error: 'Origin not allowed' }, 403)
+      if (row.drive_file_id) return json(req, { error: 'This story video was already sent' }, 409)
+      if (!body.mime_type || !VIDEO_MIME.test(body.mime_type) || body.mime_type !== row.mime_type) return json(req, { error: 'This file does not match the video that was saved' }, 400)
+      if (!body.size || body.size !== row.size_bytes || body.size > MAX_STORY_BYTES) return json(req, { error: 'Story videos can be up to 40 MB' }, 400)
+      if (!row.duration_ms || row.duration_ms > MAX_STORY_MS) return json(req, { error: 'Story videos can be up to 60 seconds' }, 400)
+      const upload_url = await startResumableUpload({
+        name: `Story - ${row.id.slice(0, 8)}.${VIDEO_EXT[body.mime_type]}`,
+        parent: await curatedFolder('story'),
+        mimeType: body.mime_type,
+        size: body.size,
+        origin,
+        description: 'Story added via JEC Alumni Connect',
+        appProperties: { jec_story_id: row.id },
+      })
+      return json(req, { upload_url })
+    }
+    if (body.action === 'finish') {
+      if (!body.file_id || !/^[A-Za-z0-9_-]{10,200}$/.test(body.file_id)) return json(req, { error: 'Invalid file' }, 400)
+      if (row.drive_file_id) return json(req, { ok: true, already: true })
+      const info = await fileInfo(body.file_id)
+      if (info.appProperties.jec_story_id !== row.id) return json(req, { error: 'File does not belong to this story' }, 400)
+      if (info.size !== row.size_bytes) return json(req, { error: 'The upload is incomplete. Please send the video again.' }, 409)
+      // Drive reads the real length a little after the upload; when it is already known it must agree with the 60 second rule
+      if (info.durationMs !== null && info.durationMs > MAX_STORY_MS) {
+        await admin.remove('stories', `id=${eq(row.id)}`)
+        return json(req, { error: 'Story videos can be up to 60 seconds' }, 422)
+      }
+      await admin.update('stories', `id=${eq(row.id)}`, { drive_file_id: body.file_id })
+      return json(req, { ok: true })
+    }
+    return json(req, { error: 'Unknown action' }, 400)
+  } catch (e) {
+    console.error(e)
     return json(req, { error: 'Sending the video to Drive failed. Please try again.' }, 502)
   }
 }

@@ -52,6 +52,7 @@ The screens only hide what you cannot use. Anyone who opens a screen they have n
 | `funds_verify` | Verify or reject donations (bulk, bank-statement matching), record cash, cheque and bank gifts, record refunds. Also sees the names of anonymous donors |
 | `funds_reports` | Fund totals by appeal, batch, department, month and donor, sponsorship reports, and CSV downloads (logged in the activity log) |
 | `sponsors_manage` | Sponsor packages, the sponsor pipeline (lead, contacted, proposal sent, committed, paid, delivered), contact details of sponsors, the sponsor wall, proposals, agreements and invoices. Verifying a sponsor's payment needs `funds_verify` |
+| `stories_post` | Official **stories and highlights**: post photo, short video or text stories for all verified members, for the people registered for one event, or for a batch, department or group; see how many people watched and who; add them to official highlights (create, rename, reorder, delete); send **one notification an hour** about a story; clean up old stories. Listed right after `photos_moderate`. Owners and full admins hold it implicitly |
 | `analytics` | Growth and activity numbers |
 | `audit` | Read and download the activity log |
 | `health` | Backups, errors, storage, site health |
@@ -67,7 +68,8 @@ When you make an admin you pick a **role**. A role is a ready-made set of the pe
 | Treasurer | Payments, refunds, finance ledger, money exports (and funds, once the Give Back module is installed) | `money_*`, `funds_*` | everyone |
 | Event manager | Runs events end to end | `events_*`, `photos_moderate` | everyone |
 | Registration desk | Works the door | `events_checkin`, `events_registrations` | everyone |
-| Communications officer | Announcements and messages to registrants | `messages_*` | everyone |
+| Communications officer | Announcements, messages to registrants and official stories | `messages_*`, `stories_post` | everyone |
+| Content manager | What members read and watch: official stories and highlights, announcements, event photos, the college gallery | `stories_post`, `messages_announcements`, `photos_moderate`, `gallery_manage` | everyone |
 | Moderator | Reports, hiding content, slow mode, meetups | `moderation_*` | everyone |
 | Community manager | Circles, groups, spotlight, batch sizes | `community_*` | everyone |
 | Photographer / gallery curator | Event photos and videos, the college gallery, glimpses and past meets | `photos_moderate`, `gallery_manage` | everyone |
@@ -77,7 +79,7 @@ When you make an admin you pick a **role**. A role is a ready-made set of the pe
 | Department head | Sees and verifies only the members of one department; runs that department's groups and announcements | `members_view`, `members_verify` | **one department** (a branch name) |
 | Batch representative | Sees only the members of one batch year; runs that batch's groups | `members_view` | **one batch year** |
 
-The roles live in the table `admin_role_templates` (a family such as `money_*` expands to every matching permission, so a role grows when a permission is added). The "Registration desk" role has no read-only registrations permission to use: it holds `events_registrations`, which also allows editing registrations.
+The roles live in the table `admin_role_templates` (a family such as `money_*` expands to every matching permission, so a role grows when a permission is added; people who were made admin before `stories_post` existed keep the permissions they were given: add it to them with *Change role*). The "Registration desk" role has no read-only registrations permission to use: it holds `events_registrations`, which also allows editing registrations.
 
 **Scope is enforced by the database.** An admin whose scope is a department or a batch only ever sees or changes members inside it: the member list and ids, search, a member's timeline, "view as member", a member's e-mail, verifying (one by one or in bulk: one outsider in a bulk selection refuses the whole selection), the "needs your attention" counts, and the members' private details (phone) and notes. Whole-list tools (export, import, merge, duplicates, saved views) are for admins of everyone. Registrations and payments are not part of a scoped member role. A department head or batch rep also administers the groups whose department or batch matches their scope.
 
@@ -187,3 +189,11 @@ To see who holds which permissions: `select p.full_name, g.template_key, g.scope
 - Every past meet has an **archive event** (made when it is saved, listed with the events). Its photo setting follows "Members can add": on means member uploads wait for approval, off means only the team adds. The row for *Alumni Meet 2025* is a draft with only a title and a year; an admin fills it in and publishes it.
 - Glimpse and gallery files can be attached from a pasted Drive link only by someone with `gallery_manage`, and only if the file is an MP4, MOV or WebM video.
 - `drive_roots` (the Drive folders for the gallery and the glimpses) is invisible to the app; only the edge functions read it. Tests: `supabase/tests/99_video_media.sql`, `99_glimpses_meets.sql` and the new functions in `99_safety_matrix.sql`.
+
+## Stories and highlights
+
+- Permission **`stories_post`** (Organise, Stories). Official stories show first in every member's story row with the JEC crest and an "Official" badge. Audiences: all verified members, only people registered for a chosen event (confirmed or payment under review; the database refuses everyone else the story, its picture and its video), or the members of a batch, department or other group.
+- Members post personal stories (no permission needed) for all JEC members or only their connections (default). Blocks work both ways; unverified or rejected owners are hidden; 20 stories a day.
+- Expiry is enforced by `expires_at` in every query and policy (no job). Stories in a highlight keep working afterwards; `stories_cleanup()` (and the *Clean up now* button) never removes them.
+- Moderation: members report stories into the normal Reports queue (type *Story*); three reports hide a story; moderators hide or restore it there.
+- Tests: `supabase/tests/99_stories.sql` (visibility matrix, rate limit, highlights, links), the new functions in `99_safety_matrix.sql`, `e2e/stories.spec.ts`.

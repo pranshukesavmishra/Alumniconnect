@@ -4,6 +4,8 @@
 //   GET /drive-media?k=event&id=<photo id>&t=<member access token>     a member who may see that event photo / video
 //   GET /drive-media?k=gallery&id=<gallery id>&t=<access token>        a verified member (the college gallery)
 //   GET /drive-media?k=glimpse&id=<glimpse id>                         anyone: ONLY a glimpse an admin has made visible
+//   GET /drive-media?k=story&id=<story id>&t=<access token>            a member who may watch that story RIGHT NOW (story_media_ref asks the
+//                                                                      same database rule as the story lists: audience, event, group, blocks, expiry, highlights)
 //
 // A <video> element cannot send an Authorization header, so members pass their access token in the query (it is short lived and only
 // ever sent to this function over HTTPS). The rows are read with that token, so row-level security decides, exactly as for the lists.
@@ -35,9 +37,14 @@ async function lookup(k: string, id: string, token: string | null): Promise<{ ro
     const [row] = await asService().select<Row>('glimpses', `select=drive_file_id,mime_type&id=${eq(id)}&is_visible=eq.true&drive_file_id=not.is.null`)
     return { row: row ?? null, status: row ? 200 : 404 }
   }
-  if (k !== 'event' && k !== 'gallery') return { row: null, status: 400 }
+  if (k !== 'event' && k !== 'gallery' && k !== 'story') return { row: null, status: 400 }
   const auth = token ? `Bearer ${token}` : ''
   if (!(await currentUser(auth))) return { row: null, status: 401 }
+  if (k === 'story') {
+    const [ref] = await asUser(auth).rpc<{ drive_file_id: string | null; mime_type: string | null }[]>('story_media_ref', { p_story: id })
+    const ok = !!ref?.drive_file_id
+    return { row: ok ? { drive_file_id: ref!.drive_file_id, mime_type: ref!.mime_type } : null, status: ok ? 200 : 404 }
+  }
   const [row] = await asUser(auth).select<Row>(k === 'event' ? 'event_photos' : 'gallery_photos', `select=drive_file_id,mime_type,media_kind&id=${eq(id)}`)
   const ok = !!row && row.media_kind === 'video' && !!row.drive_file_id
   return { row: ok ? row : null, status: ok ? 200 : 404 }
@@ -71,7 +78,7 @@ Deno.serve(async (req) => {
     'Accept-Ranges': 'bytes',
     'Content-Disposition': url.searchParams.get('dl') === '1' ? `attachment; filename="jec-video.${(row.mime_type ?? '').includes('webm') ? 'webm' : (row.mime_type ?? '').includes('quicktime') ? 'mov' : 'mp4'}"` : 'inline',
     // glimpses are public and the same for everyone: browsers and shared caches may keep them; member videos stay private to the browser
-    'Cache-Control': k === 'glimpse' ? 'public, max-age=86400' : 'private, max-age=3600',
+    'Cache-Control': k === 'glimpse' ? 'public, max-age=86400' : k === 'story' ? 'private, max-age=600' : 'private, max-age=3600',
   }
   for (const h of ['Content-Length', 'Content-Range']) {
     const v = res.headers.get(h)

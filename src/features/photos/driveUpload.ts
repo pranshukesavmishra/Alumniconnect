@@ -170,7 +170,7 @@ export const xhrTransport: ChunkTransport = {
 }
 
 // ------------------------------------------------------------------ the whole round trip with the edge function
-export type DriveTarget = { kind: 'event'; photoId: string } | { kind: 'gallery' | 'glimpse'; id: string }
+export type DriveTarget = { kind: 'event'; photoId: string } | { kind: 'gallery' | 'glimpse' | 'story'; id: string }
 
 /** The message an edge function sent back with an error status, else the error's own text. */
 export async function functionMessage(error: unknown): Promise<string> {

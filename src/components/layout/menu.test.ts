@@ -29,7 +29,8 @@ describe('menu registry', () => {
   it('lists Past meets under Events & memories for everyone, signed in or not, and Content only for gallery curators', () => {
     const events = (c: MenuCtx) => visibleMenu(c).find((x) => x.id === 'events')!.items.map((i) => i.id)
     expect(events({ ...member, signedIn: false, verified: false })).toContain('past-meets')
-    expect(events(member)).toEqual(['meet', 'reunion-photos', 'gallery', 'programme', 'past-meets'])
+    expect(events(member)).toEqual(['meet', 'reunion-photos', 'gallery', 'programme', 'highlights', 'past-meets'])
+    expect(events({ ...member, signedIn: false, verified: false })).not.toContain('highlights')
     const item = MENU.find((i) => i.id === 'past-meets')!
     expect(item.to).toBe('/meets')
     expect(isActive(item, '/meets/alumni-meet-2025')).toBe(true)
@@ -38,6 +39,22 @@ describe('menu registry', () => {
     expect(ids({ ...member, access: limited(['photos_moderate']), organiser: true })).not.toContain('org-content')
     expect(ids(member)).not.toContain('org-content')
     expect(MENU.find((i) => i.id === 'org-content')!.to).toBe('/admin/content')
+  })
+
+  it('lists Highlights under Events & memories for verified members and Stories under Organise only for people who may post them', () => {
+    const item = MENU.find((i) => i.id === 'highlights')!
+    expect(item.group).toBe('events')
+    expect(item.to).toBe('/highlights')
+    expect(ids({ ...member, verified: false })).not.toContain('highlights')
+    expect(ids(member)).toContain('highlights')
+    const stories = MENU.find((i) => i.id === 'org-stories')!
+    expect(stories.group).toBe('organise')
+    expect(stories.to).toBe('/admin/stories')
+    expect(ids({ ...member, access: limited(['stories_post']), organiser: true })).toContain('org-stories')
+    expect(ids({ ...member, access: limited(['photos_moderate', 'gallery_manage']), organiser: true })).not.toContain('org-stories')
+    expect(ids(member)).not.toContain('org-stories')
+    expect(ids({ ...member, access: { is_admin: true, is_super: false, full: true, permissions: [] }, organiser: true })).toContain('org-stories')
+    expect(isActive(item, '/highlights')).toBe(true)
   })
 
   it('hides community entries from unverified members but keeps profile and settings', () => {

@@ -45,6 +45,8 @@ function describe(n: Notification, tx: (key: MsgKey, params?: Params) => string)
       return { text: n.body ?? 'You are now a group admin', to: '/groups' }
     case 'admin_access':
       return { text: n.body ?? 'Your admin access changed', to: '/admin' }
+    case 'story':
+      return { text: n.body ? tx('notif.story', { text: n.body }) : tx('notif.storyPlain'), to: '/' }
     case 'photo_tag':
       return { text: tx('notif.photoTag', { who, event: body }), to: `/photo/${n.target_id}` }
     case 'photo_approved':

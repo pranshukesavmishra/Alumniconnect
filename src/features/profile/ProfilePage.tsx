@@ -1,9 +1,9 @@
 import { BadgeCheck, Briefcase, Globe, GraduationCap, HeartHandshake, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
-import { Avatar, Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { LinkedInIcon } from '../../components/ui/Icons'
 import { friendlyError } from '../../lib/errors'
 import { formatDate } from '../../lib/format'
@@ -20,6 +20,9 @@ import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
 import { useT } from '../../i18n'
 import { LanguageSwitch } from '../../i18n/LanguageSwitch'
+import { MyStoriesPanel, ProfileHighlights } from '../stories/Highlights'
+import { StoryComposer } from '../stories/StoryComposer'
+import { StoryAvatar } from '../stories/StoryRing'
 
 function period(e: Experience) {
   const from = e.start_date ? formatDate(e.start_date, { month: 'short', year: 'numeric' }) : ''
@@ -70,6 +73,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const navigate = useNavigate()
   const organiser = useIsOrganiser()
   const { hash } = useLocation()
+  const [composer, setComposer] = useState(false)
   useEffect(() => {
     if (!hash) return
     const t = setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' }), 150)
@@ -98,7 +102,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
       <div className="h-24 bg-gradient-to-r from-hero to-hero-2 sm:h-32" aria-hidden />
       <Page className="-mt-14 space-y-6 pt-0">
         <section>
-          <Avatar src={p.avatar_url} name={p.full_name} size={104} className="border-4 border-bg" />
+          <StoryAvatar userId={p.id} name={p.full_name} src={p.avatar_url} size={104} className="border-4 border-bg" />
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight">{p.full_name}</h1>
             {p.verification === 'verified' && (
@@ -159,6 +163,11 @@ export function ProfilePage({ self }: { self?: boolean }) {
         </section>
 
         <BadgesRow memberId={p.id} />
+
+        <ProfileHighlights userId={p.id} isMe={isMe} />
+
+        {isMe && <MyStoriesPanel onAdd={() => setComposer(true)} />}
+        {isMe && <StoryComposer open={composer} onClose={() => setComposer(false)} />}
 
         <TripChips userId={p.id} isMe={isMe} />
 

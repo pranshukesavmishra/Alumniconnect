@@ -5,7 +5,8 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
-import { Avatar, Badge, EmptyState, Notice, Skeleton } from '../../components/ui/Display'
+import { Badge, EmptyState, Notice, Skeleton } from '../../components/ui/Display'
+import { StoryAvatar, StoryRingOverlay } from '../stories/StoryRing'
 import { Input, Select } from '../../components/ui/Form'
 import { BRANCHES, CURRENT_YEAR, yearRange } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
@@ -142,9 +143,9 @@ export function DirectoryPage() {
             ) : (
               <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
                 {people.map((p) => (
-                  <li key={p.id} className="flex items-center hover:bg-surface-2">
+                  <li key={p.id} className="relative flex items-center hover:bg-surface-2">
                     <Link to={`/people/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3 p-3.5">
-                      <Avatar src={p.avatar_url} name={p.full_name} size={48} />
+                      <StoryAvatar userId={p.id} name={p.full_name} src={p.avatar_url} size={48} interactive={false} bleed />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{p.full_name}</p>
                         <p className="truncate text-sm">{p.current_title && p.current_company ? `${p.current_title} · ${p.current_company}` : (p.headline ?? '')}</p>
@@ -152,6 +153,7 @@ export function DirectoryPage() {
                       </div>
                       {p.help_tags.includes('Referrals') && <Badge tone="accent">Referrals</Badge>}
                     </Link>
+                    <StoryRingOverlay userId={p.id} name={p.full_name} size={48} className="left-[9px] top-1/2 -translate-y-1/2" />
                     <SocialLinks userId={p.id} name={p.full_name} variant="compact" className="shrink-0 flex-nowrap pr-3" />
                   </li>
                 ))}

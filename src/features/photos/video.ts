@@ -187,7 +187,7 @@ export async function readVideoInfo(file: Blob, timeout = 8000): Promise<VideoIn
 }
 
 // ------------------------------------------------------------------ playback
-export type MediaKind = 'event' | 'gallery' | 'glimpse'
+export type MediaKind = 'event' | 'gallery' | 'glimpse' | 'story'
 
 /** The address of the drive-media function that streams a video (the browser's <video> adds Range requests itself). */
 export function mediaUrl(kind: MediaKind, id: string, token?: string | null, opts: { download?: boolean; base?: string } = {}): string {

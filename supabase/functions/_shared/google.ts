@@ -90,11 +90,13 @@ export async function startResumableUpload(opts: { name: string; parent: string;
   return location
 }
 
-export async function fileInfo(fileId: string): Promise<{ parents: string[]; appProperties: Record<string, string>; size: number | null }> {
-  const f = await api<{ parents?: string[]; appProperties?: Record<string, string>; size?: string }>(
-    `${API}/files/${encodeURIComponent(fileId)}?fields=parents,appProperties,size&supportsAllDrives=true`,
+export async function fileInfo(fileId: string): Promise<{ parents: string[]; appProperties: Record<string, string>; size: number | null; durationMs: number | null }> {
+  const f = await api<{ parents?: string[]; appProperties?: Record<string, string>; size?: string; videoMediaMetadata?: { durationMillis?: string } }>(
+    `${API}/files/${encodeURIComponent(fileId)}?fields=parents,appProperties,size,videoMediaMetadata(durationMillis)&supportsAllDrives=true`,
   )
-  return { parents: f.parents ?? [], appProperties: f.appProperties ?? {}, size: f.size ? Number(f.size) : null }
+  // Drive fills the video details in a little after the upload, so the length is often not known yet: null then
+  const ms = Number(f.videoMediaMetadata?.durationMillis)
+  return { parents: f.parents ?? [], appProperties: f.appProperties ?? {}, size: f.size ? Number(f.size) : null, durationMs: Number.isFinite(ms) && ms > 0 ? ms : null }
 }
 
 export class DriveFileError extends Error {
