@@ -15,6 +15,7 @@ import { useEvent, useMyRegistration } from '../events/queries'
 import { FeaturedGiveCard } from '../giving/FeaturedGiveCard'
 import { GalleryStrips } from '../photos/GalleryStrips'
 import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
+import { HighlightsStrip, StoryRow } from '../stories/StoryRow'
 import { PastMeetsStrip } from '../meets/PastMeetsStrip'
 import { StatusBadge } from '../events/StatusBadge'
 import { supabase } from '../../lib/supabase'
@@ -146,6 +147,9 @@ export function HomePage() {
         </Link>
         <NotificationBell />
       </header>
+
+      {verified && <StoryRow />}
+      {verified && <HighlightsStrip />}
 
       <GlimpseCarousel />
 

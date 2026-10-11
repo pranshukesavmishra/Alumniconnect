@@ -3,6 +3,7 @@
 // numbers/dates/codes stay in Western digits 0-9. Hindi treats 0 and 1 as singular (`_one`).
 import type { en } from './en'
 import { mediaHi } from './mediaHi'
+import { storiesHi } from './storiesHi'
 
 export const hi = {
   // registration form
@@ -1332,4 +1333,5 @@ export const hi = {
   'social.group': '{name} के सोशल लिंक',
   'social.thisMember': 'इस सदस्य',
   ...mediaHi,
+  ...storiesHi,
 } as const satisfies Record<keyof typeof en, string>

@@ -1,4 +1,4 @@
-import { BarChart3, Clapperboard, CalendarPlus, CheckCircle2, ChevronRight, Flag, HeartHandshake, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, CirclePlay, Clapperboard, CalendarPlus, CheckCircle2, ChevronRight, Flag, HeartHandshake, Activity, History, Inbox, KeyRound, Network, ShieldCheck, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, Navigate } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -84,6 +84,7 @@ export function AdminHome() {
           {canAny(['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage']) && <TileLink to="/admin/funds" icon={<HeartHandshake className="size-5" aria-hidden />} title="Funds" blurb="Appeals, donations, sponsors, expenses, reports" />}
           {can('analytics') && <TileLink to="/admin/analytics" icon={<BarChart3 className="size-5" aria-hidden />} title="Analytics" blurb="Growth, batches, engagement" />}
           {can('gallery_manage') && <TileLink to="/admin/content" icon={<Clapperboard className="size-5" aria-hidden />} title="Content" blurb="Glimpse videos and past meets" />}
+          {can('stories_post') && <TileLink to="/admin/stories" icon={<CirclePlay className="size-5" aria-hidden />} title="Stories" blurb="Official stories and highlights" />}
           {can('community_*') && <TileLink to="/admin/community" icon={<Network className="size-5" aria-hidden />} title="Community" blurb="Approve circles, spotlight, batch sizes" />}
           {seesReports && can('moderation_*') && (
             <TileLink to="/admin/reports" icon={<Flag className="size-5" aria-hidden />} title="Reports" blurb="Posts and messages members flagged"

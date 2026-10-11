@@ -6,6 +6,7 @@ import { PageSkeleton } from './components/ui/Display'
 import { RequirePerm } from './features/admin/access'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
 import { LocationAutoRefresh } from './features/location/LocationAutoRefresh'
+import { StoryViewerProvider } from './features/stories/viewerContext'
 import { readCachedTicket } from './features/events/ticketCache'
 import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
@@ -25,6 +26,8 @@ const PhotoLink = lazy(() => import('./features/photos/PhotoLink').then((m) => (
 const MeetsPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetsPage })))
 const MeetDetailPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetDetailPage })))
 const AdminContent = lazy(() => import('./features/meets/admin/AdminContent').then((m) => ({ default: m.AdminContent })))
+const HighlightsPage = lazy(() => import('./features/stories/Highlights').then((m) => ({ default: m.HighlightsPage })))
+const AdminStories = lazy(() => import('./features/stories/AdminStories').then((m) => ({ default: m.AdminStories })))
 const GalleryPage = lazy(() => import('./features/photos/GalleryPage').then((m) => ({ default: m.GalleryPage })))
 const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const EditProfilePage = lazy(() => import('./features/profile/EditProfilePage').then((m) => ({ default: m.EditProfilePage })))
@@ -164,6 +167,7 @@ export function App() {
   const m = (el: ReactNode) => <RequireMember>{el}</RequireMember>
   return (
     <BrowserRouter>
+      <StoryViewerProvider>
       <ClaimInvite />
       <LocationAutoRefresh />
       <AdminTranslator />
@@ -188,6 +192,8 @@ export function App() {
             <Route path="meets" element={<MeetsPage />} />
             <Route path="meets/:slug" element={<MeetDetailPage />} />
             <Route path="admin/content" element={m(<RequirePerm any={['gallery_manage']} what="Glimpses and past meets"><AdminContent /></RequirePerm>)} />
+            <Route path="highlights" element={m(<HighlightsPage />)} />
+            <Route path="admin/stories" element={m(<RequirePerm any={['stories_post']} what="Official stories"><AdminStories /></RequirePerm>)} />
             <Route path="groups" element={m(<GroupsPage />)} />
             <Route path="groups/:slug" element={m(<GroupPage />)} />
             <Route path="chat" element={m(<ChatListPage />)} />
@@ -246,6 +252,7 @@ export function App() {
           </Route>
         </Routes>
       </Suspense>
+      </StoryViewerProvider>
     </BrowserRouter>
   )
 }

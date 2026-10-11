@@ -38,6 +38,7 @@ export const PERMISSIONS: readonly Permission[] = [
   { key: 'community_batches', group: 'Community', label: 'Batch sizes', description: 'Set how many people each batch has.' },
   { key: 'gallery_manage', group: 'Photos', label: 'College gallery', description: 'Curate the college gallery: add, edit, feature and remove photos, albums and chips, and review member suggestions.' },
   { key: 'photos_moderate', group: 'Photos', label: 'Event photos', description: 'Approve, hide, delete and reorder event photos, choose who may upload, open photo votes and download an event photo ZIP.' },
+  { key: 'stories_post', group: 'Stories', label: 'Official stories', description: 'Post official stories and highlights for members (everyone, one event, a batch, a department or a group), see who viewed them, and send one notification about a story an hour.' },
   { key: 'analytics', group: 'Insight', label: 'Analytics', description: 'Growth and activity numbers.' },
   { key: 'audit', group: 'Insight', label: 'Activity log', description: 'Read and download the log of everything admins did.' },
   { key: 'health', group: 'Insight', label: 'Health and backups', description: 'Backup status, errors, storage, site health.' },
@@ -127,8 +128,8 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'content_community',
     label: 'Content & community',
-    blurb: 'Edit events and announcements, approve circles, spotlight, batch sizes, analytics.',
-    permissions: ['events_edit', 'messages_announcements', 'messages_send', ...family('community_'), 'photos_moderate', 'gallery_manage', 'analytics'],
+    blurb: 'Edit events and announcements, official stories, approve circles, spotlight, batch sizes, analytics.',
+    permissions: ['events_edit', 'messages_announcements', 'messages_send', ...family('community_'), 'photos_moderate', 'gallery_manage', 'stories_post', 'analytics'],
   },
   { id: 'moderation', label: 'Moderation only', blurb: 'Reports, hiding content, slow mode and city meetups. Nothing else.', permissions: family('moderation_') },
   {

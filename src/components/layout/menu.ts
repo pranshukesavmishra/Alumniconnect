@@ -3,7 +3,7 @@
 import {
   Activity, Archive, BarChart3, Bell, BriefcaseBusiness, CalendarHeart, CalendarRange, Download, Flag, GraduationCap, Handshake, HeartHandshake, History, Home, Image, Images,
   Clapperboard, Inbox, KeyRound, Landmark, Languages, Link2, LogOut, MapPin, MessagesSquare, Network, PenLine, Search, ShieldCheck, ShieldHalf, ScrollText, Store, UserPlus, UserRound,
-  Users, UsersRound, type LucideIcon,
+  Sparkles, CirclePlay, Users, UsersRound, type LucideIcon,
 } from 'lucide-react'
 import { hasAnyPerm, type AdminAccess } from '../../lib/adminAccess'
 import type { MsgKey } from '../../i18n'
@@ -76,6 +76,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'reunion-photos', group: 'events', label: 'menu.reunionPhotos', icon: Images, to: '/meet/photos', who: 'verified', also: ['/events/'], keywords: 'photos slideshow' },
   { id: 'gallery', group: 'events', label: 'profile.gallery', icon: Image, to: '/gallery', who: 'verified', keywords: 'college photos albums', quick: true },
   { id: 'programme', group: 'events', label: 'menu.programme', icon: CalendarRange, to: '/meet#programme', public: true, keywords: 'schedule agenda' },
+  { id: 'highlights', group: 'events', label: 'menu.highlights', icon: Sparkles, to: '/highlights', who: 'verified', keywords: 'stories status official reunion scholarships campus drives memories' },
   { id: 'past-meets', group: 'events', label: 'menu.pastMeets', icon: Archive, to: '/meets', public: true, also: ['/meets/'], keywords: 'previous earlier alumni meet archive years 2025 2024 videos photos glimpses', quick: true },
   // Opportunities
   { id: 'jobs', group: 'opportunities', label: 'profile.jobs', icon: BriefcaseBusiness, to: '/jobs', who: 'verified', also: ['/jobs/'], keywords: 'work hiring career', quick: true },
@@ -102,6 +103,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'org-analytics', group: 'organise', label: 'menu.org.analytics', icon: BarChart3, to: '/admin/analytics', who: 'admin', perms: ['analytics'] },
   { id: 'org-funds', group: 'organise', label: 'menu.org.funds', icon: HeartHandshake, to: '/admin/funds', who: 'admin', perms: ['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'], also: ['/admin/funds/'] },
   { id: 'org-content', group: 'organise', label: 'menu.org.content', icon: Clapperboard, to: '/admin/content', who: 'admin', perms: ['gallery_manage'], keywords: 'glimpses videos past meets archive' },
+  { id: 'org-stories', group: 'organise', label: 'menu.org.stories', icon: CirclePlay, to: '/admin/stories', who: 'admin', perms: ['stories_post'], keywords: 'stories status official highlights reunion' },
   { id: 'org-roles', group: 'organise', label: 'menu.org.roles', icon: KeyRound, to: '/admin/roles', who: 'admin', perms: ['admins', 'events_team'] },
   { id: 'org-health', group: 'organise', label: 'menu.org.health', icon: Activity, to: '/admin/health', who: 'admin', perms: ['health'] },
   { id: 'org-activity', group: 'organise', label: 'menu.org.activity', icon: History, to: '/admin/activity', who: 'admin', perms: ['audit'] },

@@ -34,6 +34,16 @@ export async function collectMyData(uid: string) {
       ])
     : [[], []]
   const social = await own('profile_social_links', 'user_id')
+  // stories: what you posted (with the picture addresses), what you watched and hearted, who you muted, your highlights
+  const [stories, storyViews, storyHearts, storyMutes, highlights] = await Promise.all([
+    own('stories', 'owner_id'),
+    own('story_views', 'viewer_id'),
+    own('story_hearts', 'user_id'),
+    own('story_mutes', 'user_id'),
+    own('story_highlights', 'owner_id'),
+  ])
+  const highlightIds = (highlights as unknown as { id: string }[]).map((h) => h.id)
+  const highlightItems = highlightIds.length ? await supabase.from('story_highlight_items').select('*').in('highlight_id', highlightIds).then((r) => r.data ?? []) : []
   const { data: loc } = await supabase.rpc('my_location')
   const { data: trips } = await supabase.rpc('my_trips')
   const { data: meetups } = await supabase.from('groups').select('id, name, description, created_at').eq('created_by', uid).eq('kind', 'meetup')
@@ -55,6 +65,12 @@ export async function collectMyData(uid: string) {
     event_registration_items: items,
     event_payments: payments,
     notifications,
+    stories,
+    story_highlights: highlights,
+    story_highlight_items: highlightItems,
+    stories_you_watched: storyViews,
+    stories_you_hearted: storyHearts,
+    people_whose_stories_you_muted: storyMutes,
     shared_location: loc ?? null,
     upcoming_trips: trips ?? [],
     meetups_you_started: meetups ?? [],
@@ -86,7 +102,7 @@ export function DownloadMyData() {
       >
         Download my data
       </Button>
-      <p className="text-sm text-muted">A copy of your profile, posts, registrations and messages you sent, as one file.</p>
+      <p className="text-sm text-muted">A copy of your profile, posts, stories and highlights, registrations and messages you sent, as one file.</p>
     </div>
   )
 }
