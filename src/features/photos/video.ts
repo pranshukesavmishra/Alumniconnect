@@ -203,8 +203,11 @@ export function mediaUrl(kind: MediaKind, id: string, token?: string | null, opt
  * then only the poster shows and a tap plays it.
  */
 export function glimpseAutoplays(env: { reducedMotion: boolean; saveData?: boolean; effectiveType?: string }): boolean {
-  if (env.reducedMotion || env.saveData) return false
-  return !(env.effectiveType === 'slow-2g' || env.effectiveType === '2g' || env.effectiveType === '3g')
+  // Phones often report "3g" or reduced motion (battery saver, "remove animations") although the clip would play fine, and the clip is
+  // muted and tap-to-open, so only an explicit Data Saver or a truly 2G link keeps it to the poster.
+  void env.reducedMotion
+  if (env.saveData) return false
+  return !(env.effectiveType === 'slow-2g' || env.effectiveType === '2g')
 }
 
 /** The plain dark poster for a video nobody could take a frame from (a file that is only in Drive). */

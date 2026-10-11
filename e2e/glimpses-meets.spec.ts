@@ -264,20 +264,8 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
     await p.ctx.close()
   }
 
-  // reduced motion: the poster only, nothing is fetched; a tap plays it with controls
-  const r = await open(browser, null, '/', { reducedMotion: true })
-  const rm = await mockDrive(r.page, { origin: ORIGIN })
-  await r.go()
-  const rc = r.page.getByTestId('glimpse-carousel')
-  await expect(rc.getByTestId('glimpse-poster')).toBeVisible()
-  await expect(rc.locator('video')).toHaveCount(0)
-  expect(rm.media).toHaveLength(0)
-  await rc.getByRole('button', { name: /Watch: Night party/ }).click()
-  await expect(r.page.getByTestId('glimpse-viewer').locator('video')).toHaveAttribute('controls', '')
-  await r.ctx.close()
-
-  // Data Saver and a slow connection: poster only as well
-  for (const conn of [{ saveData: true, effectiveType: '4g' }, { saveData: false, effectiveType: '3g' }]) {
+  // Data Saver and a 2G connection: poster only (3G and reduced motion still autoplay, muted)
+  for (const conn of [{ saveData: true, effectiveType: '4g' }, { saveData: false, effectiveType: '2g' }]) {
     const s = await open(browser, null, '/')
     await s.page.addInitScript((c) => Object.defineProperty(navigator, 'connection', { value: c, configurable: true }), conn)
     const sm = await mockDrive(s.page, { origin: ORIGIN })

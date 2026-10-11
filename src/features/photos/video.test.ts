@@ -94,10 +94,11 @@ describe('glimpse autoplay policy', () => {
     expect(glimpseAutoplays({ reducedMotion: false })).toBe(true)
     expect(glimpseAutoplays({ reducedMotion: false, saveData: false, effectiveType: '4g' })).toBe(true)
   })
-  it('shows only the poster for reduced motion, Data Saver and slow connections', () => {
-    expect(glimpseAutoplays({ reducedMotion: true })).toBe(false)
+  it('shows only the poster for Data Saver and very slow connections, but plays on 3G and with reduced motion', () => {
     expect(glimpseAutoplays({ reducedMotion: false, saveData: true })).toBe(false)
-    for (const t of ['slow-2g', '2g', '3g']) expect(glimpseAutoplays({ reducedMotion: false, effectiveType: t })).toBe(false)
+    for (const t of ['slow-2g', '2g']) expect(glimpseAutoplays({ reducedMotion: false, effectiveType: t })).toBe(false)
+    expect(glimpseAutoplays({ reducedMotion: false, effectiveType: '3g' })).toBe(true)
+    expect(glimpseAutoplays({ reducedMotion: true })).toBe(true)
   })
 })
 

@@ -64,21 +64,38 @@ export function GlimpseCarousel({ className }: { className?: string }) {
   const autoplay = useGlimpseAutoplay()
   const [index, setIndex] = useState(0)
   const [muted, setMuted] = useState(true)
+  const [blocked, setBlocked] = useState(false) // the phone refused to autoplay: show the poster with a play button
   const [open, setOpen] = useState<Glimpse | null>(null)
   const count = items.length
   const cur = items[Math.min(index, Math.max(count - 1, 0))]
-  const playing = active && autoplay && !open
+  const playing = active && autoplay && !open && !blocked
 
   // pause when off screen, the tab is hidden, or the viewer is open; play when back
   useEffect(() => {
     const v = video.current
-    if (!v) return
-    if (playing) void v.play().catch(() => {})
-    else v.pause()
+    if (!playing) {
+      v?.pause()
+      return
+    }
+    // the muted attribute React renders is not enough for some phones' autoplay rules: set the property too
+    if (v) {
+      v.muted = muted
+      v.play().catch((e: unknown) => {
+        if ((e as { name?: string })?.name === 'NotAllowedError') setBlocked(true)
+      })
+    }
+    // a browser that blocks autoplay leaves the element paused for good: fall back to the poster with a play button
+    const t = window.setTimeout(() => {
+      if (video.current?.paused) setBlocked(true)
+    }, 3500)
+    return () => window.clearTimeout(t)
   }, [playing, cur?.id])
 
   const go = useCallback((by: number) => setIndex((i) => (count ? (i + by + count) % count : 0)), [count])
-  useEffect(() => setMuted(true), [cur?.id])
+  useEffect(() => {
+    setMuted(true)
+    setBlocked(false)
+  }, [cur?.id])
 
   if (!count || !cur) return null
   const caption = glimpseCaption(cur, lang)
