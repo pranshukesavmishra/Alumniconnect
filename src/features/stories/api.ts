@@ -498,7 +498,7 @@ export function useStoryEvents() {
     queryKey: ['stories', 'pick-events'],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from('events').select('id, title, starts_at').order('starts_at', { ascending: false }).limit(60)
+      const { data, error } = await supabase.from('events').select('id, title, starts_at').order('created_at', { ascending: false }).limit(200)
       if (error) throw error
       return data as { id: string; title: string; starts_at: string | null }[]
     },

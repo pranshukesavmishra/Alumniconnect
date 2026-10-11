@@ -1295,7 +1295,6 @@ export const ADMIN_HI: Record<string, string> = {
   "Official stories": "आधिकारिक स्टोरी",
   "Official stories and highlights": "आधिकारिक स्टोरी और हाइलाइट्स",
   "Post official stories and highlights for members (everyone, one event, a batch, a department or a group), see who viewed them, and send one notification about a story an hour.": "सदस्यों के लिए आधिकारिक स्टोरी और हाइलाइट्स डालें (सभी, किसी एक आयोजन, बैच, विभाग या समूह के लिए), देखें किसने देखा, और एक घंटे में एक स्टोरी की एक सूचना भेजें।",
-  "Content manager": "सामग्री प्रबंधक",
   "Looks after what members read and watch: official stories and highlights, event announcements, event photos and the college gallery.": "सदस्य जो पढ़ते और देखते हैं उसका ध्यान रखता है: आधिकारिक स्टोरी और हाइलाइट्स, आयोजन की घोषणाएँ, आयोजन की फ़ोटो और कॉलेज गैलरी।",
   "Posted an official story": "आधिकारिक स्टोरी डाली",
   "Deleted an official story": "आधिकारिक स्टोरी हटाई",
@@ -1307,5 +1306,4 @@ export const ADMIN_HI: Record<string, string> = {
   "Cleaned up old stories": "पुरानी स्टोरी साफ़ कीं",
   "Hid a story": "स्टोरी छिपाई",
   "Restored a story": "स्टोरी वापस दिखाई",
-  "Story": "स्टोरी",
 }

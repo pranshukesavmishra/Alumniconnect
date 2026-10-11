@@ -108,6 +108,22 @@ How playback works and what it costs:
 
 **Use files already in Drive (glimpses and gallery videos).** The admin can paste a Drive link or file id instead of uploading, so a video the committee already put in Drive is used where it is (nothing is copied or uploaded again). The app's Drive login only has the `drive.file` permission, which sees just files the app made. To let it open files you put there by hand, authorise the Drive account with **both** scopes in step 5.3: `https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly`, replace `GOOGLE_DRIVE_REFRESH_TOKEN`, and add `drive.readonly` to the OAuth consent screen. Only video files (MP4, MOV, WebM) can be attached, never other file types, and only by an admin who holds *College gallery*. Without the extra scope the admin sees "The app cannot open that file".
 
+### 5c. Stories and highlights (read this if you deploy the stories update)
+
+Like WhatsApp Status or Instagram Stories: a photo, a short video (up to **60 seconds and 40 MB**) or a text card that disappears after 24 hours, plus permanent **highlights**. Members post for all members or their connections; the story team (permission `stories_post`, Organise, Stories) posts official stories for everyone, for one event's registrants, or for a batch, department or group.
+
+After pulling this update:
+
+1. Apply the new migrations (`20261019000081_stories.sql`, `..82_story_highlights_admin.sql`): `npx supabase db push`. They create the private `stories` storage bucket (photos and video posters, served through short-lived signed addresses that only people who may watch the story can get) and the tables and functions. Nothing needs to be switched on in the dashboard.
+2. **Redeploy `drive-upload` and `drive-media`** (`npx supabase functions deploy drive-upload` and `npx supabase functions deploy drive-media --no-verify-jwt`). Story videos go straight from the phone to Drive in pieces like glimpses do; the first story video makes the Drive folder "JEC Alumni Connect - Stories" by itself (no setup like the event folder). Optional: redeploy `push-send` so the "also notify members" push shows the story text (without it the notification still arrives with a generic title).
+3. Give the permission: Organise, Roles, make or change an admin; the *Content manager* and *Communications officer* roles carry `stories_post`.
+
+Cost note: **a video story passes through the `drive-media` function** (like glimpses), so every second watched counts against Supabase's free egress (5 GB a month). Keep clips short: the composer warns members and refuses anything over 60 seconds or 40 MB, and the server checks the same limits (and, when Drive already knows the length, rejects a longer file). Photos are compressed on the phone (about 100 to 300 KB) and served from Storage.
+
+Cleaning up: expired stories that are not in a highlight can be removed two days later with **Organise, Stories, Clean up now** (it also removes their picture files). Where the `pg_cron` extension is on, the migration schedules a daily row cleanup; the picture files are then removed the next time an admin presses the button. Drive videos of removed stories stay in the Stories Drive folder: delete old ones there whenever you like, the app never needs them.
+
+The data download ("Download my data") includes a member's stories, highlights, what they watched or hearted and who they muted.
+
 ## 6. Hosting (Cloudflare Pages, free)
 
 1. Create a Cloudflare account, then go to **Workers & Pages → Create → Pages → Connect to Git** and choose this repository.

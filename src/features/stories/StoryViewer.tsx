@@ -87,7 +87,8 @@ export function StoryViewer({ request, onClose }: { request: ViewerRequest; onCl
   const heart = useHeartState(story)
   const sheetOpen = sheet !== null
   const durationMs = story ? storyDurationMs(story) : 0
-  const stopped = paused || holding || sheetOpen || tabHidden || !mediaReady || mediaFailed || !story
+  const userStopped = paused || holding || sheetOpen || tabHidden
+  const stopped = userStopped || !mediaReady || mediaFailed || !story
 
   // ---- where to start in a person's stories, and what to do when there are none
   useEffect(() => {
@@ -195,9 +196,9 @@ export function StoryViewer({ request, onClose }: { request: ViewerRequest; onCl
   useEffect(() => {
     if (!videoEl) return
     videoEl.muted = muted
-    if (stopped) videoEl.pause()
+    if (userStopped) videoEl.pause()
     else void videoEl.play().catch(() => undefined)
-  }, [videoEl, stopped, muted])
+  }, [videoEl, userStopped, muted])
 
   // ---- mark as watched once it is really showing
   useEffect(() => {
@@ -211,7 +212,12 @@ export function StoryViewer({ request, onClose }: { request: ViewerRequest; onCl
   // ---- Esc and Back close it; keyboard control; keep focus inside; no page scrolling behind
   useEffect(() => {
     const marker = { story: true }
-    window.history.pushState({ ...(window.history.state ?? {}), ...marker }, '')
+    // pushed a moment later so React's development double-mount (mount, unmount, mount) never adds and removes an entry
+    let pushed = false
+    const pushTimer = setTimeout(() => {
+      pushed = true
+      window.history.pushState({ ...(window.history.state ?? {}), ...marker }, '')
+    }, 0)
     let closedByBack = false
     const onPop = () => {
       closedByBack = true
@@ -223,8 +229,9 @@ export function StoryViewer({ request, onClose }: { request: ViewerRequest; onCl
     document.body.style.overflow = 'hidden'
     closeBtn.current?.focus({ preventScroll: true })
     return () => {
+      clearTimeout(pushTimer)
       window.removeEventListener('popstate', onPop)
-      if (!closedByBack && !followed.current && (window.history.state as { story?: boolean } | null)?.story) window.history.back()
+      if (pushed && !closedByBack && !followed.current && (window.history.state as { story?: boolean } | null)?.story) window.history.back()
       document.body.style.overflow = overflow
       before?.focus?.({ preventScroll: true })
     }
