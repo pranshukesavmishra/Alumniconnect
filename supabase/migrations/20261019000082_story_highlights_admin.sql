@@ -114,7 +114,7 @@ begin
     returning id into v_id;
   else
     select * into h from public.story_highlights where id = p_id and is_official = p_official and (p_official or owner_id = me) for update;
-    if not found then raise exception 'Highlight not found' using errcode = '42501'; end if;
+    if not found then raise exception 'Highlight not found' using errcode = 'P0001'; end if;
     update public.story_highlights set title = v_title, audience = v_aud, updated_at = now() where id = p_id;
     v_id := p_id;
   end if;
@@ -154,12 +154,12 @@ declare
   v_ids uuid[] := coalesce(p_ids, '{}');
 begin
   select * into h from public.story_highlights where id = p_id and is_official = p_official and (p_official or owner_id = me) for update;
-  if not found then raise exception 'Highlight not found' using errcode = '42501'; end if;
+  if not found then raise exception 'Highlight not found' using errcode = 'P0001'; end if;
   if coalesce(array_length(v_ids, 1), 0) > 100 then raise exception 'A highlight can hold up to 100 stories' using errcode = 'P0001', hint = 'stories.errItemsMax'; end if;
   if (select count(distinct x) from unnest(v_ids) x) <> coalesce(array_length(v_ids, 1), 0) then raise exception 'A story can be in a highlight only once' using errcode = 'P0001'; end if;
   if exists (select 1 from unnest(v_ids) x where not exists (
         select 1 from public.stories s where s.id = x and s.is_official = p_official and (p_official or s.owner_id = me) and s.is_ready)) then
-    raise exception 'Story not found' using errcode = '42501';
+    raise exception 'Story not found' using errcode = 'P0001';
   end if;
   delete from public.story_highlight_items where highlight_id = p_id and story_id <> all (v_ids);
   insert into public.story_highlight_items (highlight_id, story_id, position)
