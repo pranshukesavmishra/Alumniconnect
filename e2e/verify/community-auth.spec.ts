@@ -77,7 +77,7 @@ test('email code sign-in from a protected page, onboarding validation, next redi
   expect(sql(`select phone from profile_private where id='${uid}'`)).toBe('+919988776655')
   // auto batch + year groups
   expect(sql(`select string_agg(g.slug, ',' order by g.slug) from group_members m join groups g on g.id=m.group_id where m.user_id='${uid}'`)).toBe(
-    'b-e-in-mechanical-engineering-2009,jec-2009',
+    'b-e-in-mechanical-engineering-2009,dept-b-e-in-mechanical-engineering,jec-2009,jec-alumni-connect-official',
   )
 
   // session persists across reload and a new tab

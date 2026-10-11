@@ -81,7 +81,7 @@ export function AppShell() {
             >
               <Menu className="size-6" aria-hidden />
             </button>
-            <Link to="/" className="flex min-w-0 items-center gap-2">
+            <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2 pr-2">
               <img src="/jec-logo.png" alt="" className="h-7 w-auto" />
               <span className="truncate text-[16px] font-bold tracking-tight">JEC Alumni Connect</span>
             </Link>

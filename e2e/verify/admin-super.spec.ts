@@ -157,7 +157,7 @@ test('a Department head needs a department; they then see and verify only that d
   const ctx = await browser.newContext({ viewport: { width: 412, height: 915 } })
   const hp = await ctx.newPage()
   await loginPage(hp, head, '/admin/members')
-  await hp.getByLabel(/Search/i).first().fill('Supa')
+  await hp.getByLabel(/Search/i).locator('visible=true').first().fill('Supa')
   await expect(hp.getByText(nameOf('InDept')).first()).toBeVisible()
   await expect(hp.getByText(nameOf('OutDept'))).toHaveCount(0)
   await ctx.close()
