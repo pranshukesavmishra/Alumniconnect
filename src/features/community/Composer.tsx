@@ -51,14 +51,14 @@ export function Composer({ groups, fixedGroup }: { groups?: GroupWithMe[]; fixed
         <Avatar src={me.avatar_url} name={me.full_name} size={40} />
         {fixedGroup ? (
           <p className="text-sm text-muted">
-            Posting in <strong className="text-text">{fixedGroup.icon} {fixedGroup.name}</strong>
+            Posting in <strong className="text-text">{fixedGroup.name}</strong>
           </p>
         ) : (
           <select aria-label="Who can see this" value={audience} onChange={(e) => setAudience(e.target.value)} className="min-h-10 rounded-full border border-border bg-surface px-3 text-sm font-semibold">
-            <option value="">🌐 All of JEC</option>
+            <option value="">All of JEC</option>
             {postable.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.icon} {g.name}
+                {g.name}
               </option>
             ))}
           </select>

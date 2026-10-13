@@ -28,6 +28,9 @@ export function StatTile({
   className?: string
 }) {
   const onDark = variant === 'glass'
+  // long figures (₹12,50,000) step down a size so they never overflow a half-width tile
+  const len = (format ? format(value) : Math.round(value).toLocaleString('en-IN')).length + (prefix ? 1 : 0) + (suffix ? 1 : 0)
+  const fs = len > 9 ? 'text-[1.375rem]' : len > 6 ? 'text-[1.625rem]' : 'text-[2rem]'
   return (
     <div
       className={cn(
@@ -41,7 +44,7 @@ export function StatTile({
         <p className={cn('text-caption font-semibold', onDark ? 'text-white/75' : 'text-muted')}>{label}</p>
         {icon && <span className={cn('[&_svg]:size-4', onDark ? 'text-accent' : 'text-gold-ink')} aria-hidden>{icon}</span>}
       </div>
-      <p className="text-stat mt-2 text-[2rem]">
+      <p className={cn('text-stat mt-2 whitespace-nowrap', fs)}>
         {prefix}
         <NumberTicker value={value} format={format} />
         {suffix}

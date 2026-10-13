@@ -1,3 +1,5 @@
+import { IconTile } from '../../components/ui/IconTile'
+import { Bell as BellIcon_, Mail as MailIcon_, ShieldCheck as ShieldIcon_ } from 'lucide-react'
 import { BadgeCheck, Briefcase, Globe, GraduationCap, HeartHandshake, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -187,12 +189,12 @@ export function ProfilePage({ self }: { self?: boolean }) {
             )}
             <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('menu.settings')}>
               {[
-                { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: '🔔' },
-                { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: '💌' },
-                ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: '🛡️' }] : []),
+                { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: BellIcon_, tone: 'emerald' as const },
+                { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: MailIcon_, tone: 'gold' as const },
+                ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: ShieldIcon_, tone: 'maroon' as const }] : []),
               ].map((l) => (
                 <Link key={l.to} to={l.to} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
-                  <span className="text-2xl" aria-hidden>{l.icon}</span>
+                  <IconTile icon={l.icon} tone={l.tone} />
                   <span className="min-w-0">
                     <span className="block font-semibold">{l.label}</span>
                     <span className="block truncate text-sm text-muted">{l.hint}</span>

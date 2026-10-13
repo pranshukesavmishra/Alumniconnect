@@ -13,6 +13,7 @@ import { Composer } from './Composer'
 import { FeedList } from './FeedList'
 import { useGroupChatId } from '../chat/queries'
 import { useGroups, useJoinGroup, type GroupWithMe } from './queries'
+import { CIRCLE_ICON_CHOICES, GroupIcon } from '../../components/ui/GroupIcon'
 
 function GroupRow({ g }: { g: GroupWithMe }) {
   const join = useJoinGroup()
@@ -20,9 +21,7 @@ function GroupRow({ g }: { g: GroupWithMe }) {
   return (
     <div className="flex items-center gap-3 p-3.5">
       <Link to={`/groups/${g.slug}`} className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-soft text-2xl" aria-hidden>
-          {g.icon ?? '👥'}
-        </span>
+        <GroupIcon icon={g.icon} kind={g.kind} />
         <span className="min-w-0">
           <span className="block truncate font-semibold">{g.name}</span>
           <span className="block truncate text-sm text-muted">
@@ -102,7 +101,7 @@ export function GroupsPage() {
 function ProposeCircle({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
-  const [icon, setIcon] = useState('✨')
+  const [icon, setIcon] = useState(CIRCLE_ICON_CHOICES[0]!.stored)
   const [busy, setBusy] = useState(false)
   async function submit() {
     if (name.trim().length < 2) return toast.error('Give the circle a name.')
@@ -116,8 +115,22 @@ function ProposeCircle({ onDone }: { onDone: () => void }) {
   return (
     <Card className="space-y-3 p-4">
       <p className="font-semibold">Propose a new circle</p>
+      <div role="radiogroup" aria-label="Icon" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 py-1">
+        {CIRCLE_ICON_CHOICES.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            role="radio"
+            aria-checked={icon === c.stored}
+            aria-label={c.label}
+            onClick={() => setIcon(c.stored)}
+            className={clsx('tap grid size-12 shrink-0 place-items-center rounded-2xl', icon === c.stored ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface' : 'opacity-80 hover:opacity-100')}
+          >
+            <GroupIcon icon={c.stored} size="md" />
+          </button>
+        ))}
+      </div>
       <div className="flex gap-2">
-        <input aria-label="Icon (emoji)" value={icon} maxLength={4} onChange={(e) => setIcon(e.target.value)} className="min-h-12 w-14 rounded-xl border border-border bg-surface text-center text-2xl" />
         <input aria-label="Circle name" placeholder="e.g. JECians in Pune" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} className="min-h-12 flex-1 rounded-xl border border-border bg-surface px-3" />
       </div>
       <input aria-label="What is it about?" placeholder="What is it about?" value={desc} maxLength={500} onChange={(e) => setDesc(e.target.value)} className="min-h-12 w-full rounded-xl border border-border bg-surface px-3" />
@@ -149,7 +162,7 @@ export function GroupPage() {
   return (
     <div>
       <PageHeader
-        title={`${g.icon ?? ''} ${g.name}`}
+        title={g.name}
         subtitle={`${g.member_count} ${g.member_count === 1 ? 'member' : 'members'}`}
         back="/groups"
         action={

@@ -1,3 +1,4 @@
+import { ArrowLeftRight } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '../../i18n'
 
@@ -12,7 +13,7 @@ export function BeforeAfter({ before, after, alt, className = '' }: { before: st
       <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{tx('gallery.then')}</span>
       <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-1 text-xs font-bold text-white">{tx('gallery.now')}</span>
       <div aria-hidden className="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow" style={{ left: `${pos}%` }}>
-        <span className="absolute left-1/2 top-1/2 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-xs font-bold text-black shadow-md">⇆</span>
+        <span className="absolute left-1/2 top-1/2 grid size-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white text-xs font-bold text-black shadow-md"><ArrowLeftRight className="size-4" /></span>
       </div>
       <input type="range" min={0} max={100} step={1} value={pos} onChange={(e) => setPos(Number(e.target.value))} aria-label={tx('gallery.sliderLabel')} className="absolute inset-0 size-full cursor-ew-resize opacity-0" />
     </div>

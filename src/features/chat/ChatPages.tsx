@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertCircle, ArrowDown, Bell, BellOff, Check, CheckCheck, Clock, Gauge, Megaphone, MessagesSquare, Pin, Search, ShieldAlert, Users, X } from 'lucide-react'
+import { AlertCircle, ArrowDown, Ban, Bell, BellOff, Camera, ChartColumn, Check, CheckCheck, Clock, FileText, Gauge, Megaphone, Mic, MessagesSquare, Pin, Search, ShieldAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { toast } from 'sonner'
@@ -8,6 +8,8 @@ import { PageHeader } from '../../components/layout/AppShell'
 import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Button } from '../../components/ui/Button'
 import { Avatar, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
+import { EmptyInboxArt } from '../../components/ui/Illustrations'
+import { reactionDef } from '../../components/ui/Reactions'
 import { friendlyError } from '../../lib/errors'
 import { useT } from '../../i18n'
 import { dateLocale, tr } from '../../i18n/core'
@@ -19,7 +21,8 @@ import { useJoinGroup } from '../community/queries'
 import { ChatComposer } from './Composer'
 import { FileCard, Lightbox, MessageActionsSheet, PhotoGrid, PollCard, VoicePlayer, ReactionChips, ReactorsSheet, ReplyQuote, replyPreviewOf, RichText, useMessageGestures, type ActionPermissions } from './MessageBits'
 import { SocialLinks } from '../profile/SocialLinks'
-import { firstUnreadIndex, isContinuation, previewOf, type Attachment, type Message, type ReplyPreview } from './merge'
+import { firstUnreadIndex, isContinuation, previewOf, splitPreview, type PreviewKind, type Attachment, type Message, type ReplyPreview } from './merge'
+import { groupIconFor } from '../../components/ui/GroupIcon'
 import {
   chatKeys,
   discardLocal,
@@ -82,9 +85,10 @@ function nameColour(id: string | null) {
 
 function ChatAvatar({ c, size }: { c: Pick<ChatSummary, 'kind' | 'avatar_url' | 'icon' | 'title' | 'group_kind'>; size: number }) {
   if (c.kind === 'dm') return <Avatar src={c.avatar_url} name={c.title} size={size} />
+  const g = groupIconFor(c.icon, c.group_kind)
   return (
-    <span className="grid shrink-0 place-items-center rounded-full bg-primary-soft text-primary" style={{ width: size, height: size, fontSize: size * 0.45 }} aria-hidden>
-      {c.icon ?? (c.group_kind === 'channel' ? <Megaphone className="size-1/2" /> : <Users className="size-1/2" />)}
+    <span className="grid shrink-0 place-items-center rounded-full bg-primary-soft text-primary shadow-[inset_0_1px_0_var(--highlight)]" style={{ width: size, height: size }} aria-hidden>
+      <g.icon className="size-[46%]" strokeWidth={1.9} />
     </span>
   )
 }
@@ -102,6 +106,8 @@ function VerifiedOnly({ title }: { title: string }) {
 }
 
 // ------------------------------------------------------------------ list
+const PREVIEW_ICON: Record<PreviewKind, typeof Camera> = { image: Camera, file: FileText, voice: Mic, poll: ChartColumn }
+
 type Filter = 'all' | 'unread' | 'groups' | 'direct'
 
 function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
@@ -121,9 +127,17 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
           </div>
           <div className="mt-0.5 flex items-center gap-1.5">
             {mine && c.kind === 'dm' && (seen ? <CheckCheck className="size-4 shrink-0 text-primary" aria-label={tx('chat.seen')} /> : <Check className="size-4 shrink-0 text-muted" aria-label={tx('chat.sent')} />)}
-            <p className={clsx('min-w-0 flex-1 truncate text-sm', unread ? 'font-medium text-text' : 'text-muted')}>
-              {c.last_message ? `${who}${c.last_message}` : c.kind === 'group' ? tx('chat.sayHelloGroup') : tx('chat.noMessages')}
-            </p>
+            {(() => {
+              const pv = c.last_message ? splitPreview(c.last_message) : null
+              const KindIcon = pv?.kind ? PREVIEW_ICON[pv.kind] : null
+              return (
+                <p className={clsx('flex min-w-0 flex-1 items-center gap-1 truncate text-sm', unread ? 'font-medium text-text' : 'text-muted')}>
+                  {who && <span className="shrink-0">{who}</span>}
+                  {KindIcon && <KindIcon className="size-4 shrink-0" aria-hidden />}
+                  <span className="truncate">{pv ? pv.text : c.kind === 'group' ? tx('chat.sayHelloGroup') : tx('chat.noMessages')}</span>
+                </p>
+              )
+            })()}
             {c.muted && <BellOff className="size-4 shrink-0 text-muted" aria-label={tx('chat.muted')} />}
             {unread && (
               <span className={clsx('min-w-5.5 shrink-0 rounded-full px-1.5 text-center text-xs font-bold leading-5.5 text-white', c.muted ? 'bg-muted' : 'bg-primary')} aria-label={tx('chat.unreadN', { n: c.unread })}>
@@ -307,7 +321,7 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
             {isGroup && !mine && showName && <p className={clsx('mb-0.5 text-[13px] font-semibold', nameColour(m.sender_id))}>{m.sender?.full_name ?? tx('chat.formerMember')}</p>}
             {quote && !deleted && <ReplyQuote r={quote} mine={mine} me={me} onClick={() => onQuote(quote.id)} />}
             {deleted ? (
-              <p className={clsx('italic', mine ? 'text-on-primary/80' : 'text-muted')}>🚫 {tx('chat.deleted')}</p>
+              <p className={clsx('inline-flex items-center gap-1.5 italic', mine ? 'text-on-primary/80' : 'text-muted')}><Ban className="size-4 shrink-0" aria-hidden /> {tx('chat.deleted')}</p>
             ) : (
               <>
                 {m.kind === 'image' && <PhotoGrid items={m.attachments} pending={m.pending} onOpen={(i) => onPhotos(m.attachments, i)} />}
@@ -581,7 +595,8 @@ export function ChatThreadPage() {
   function heart(m: Message) {
     if (!permsFor(m).canReact) return
     const mineNow = m.reactions?.find((r) => r.user_id === uid)?.emoji
-    react.mutate({ id: m.id, emoji: mineNow === '❤️' ? null : '❤️' }, { onError: (e) => toast.error(friendlyError(e)) })
+    const love = reactionDef('love').stored
+    react.mutate({ id: m.id, emoji: mineNow === love ? null : love }, { onError: (e) => toast.error(friendlyError(e)) })
   }
 
   if (meLoading) return <PageSkeleton />
@@ -679,8 +694,8 @@ export function ChatThreadPage() {
               <Skeleton className="h-14 w-3/5 rounded-2xl" />
             </div>
           ) : items.length === 0 ? (
-            <div className="py-16 text-center text-muted">
-              <p className="text-4xl" aria-hidden>👋</p>
+            <div className="flex flex-col items-center py-12 text-center text-muted">
+              <EmptyInboxArt className="h-auto w-40" />
               <p className="mt-2">{isGroup ? tx('chat.noMsgsGroup') : tx('chat.sayHello')}</p>
             </div>
           ) : (

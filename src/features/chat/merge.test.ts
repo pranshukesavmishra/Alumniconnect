@@ -83,9 +83,9 @@ describe('helpers', () => {
   })
 
   it('previews every kind', () => {
-    expect(previewOf({ kind: 'image', body: null, attachments: [], poll: null, deleted_at: null })).toBe('📷 Photo')
-    expect(previewOf({ kind: 'file', body: null, attachments: [{ path: 'p', name: 'a.pdf' }], poll: null, deleted_at: null })).toBe('📄 a.pdf')
-    expect(previewOf({ kind: 'poll', body: null, attachments: [], poll: { question: 'When?', options: ['a', 'b'] }, deleted_at: null })).toBe('📊 When?')
+    expect(previewOf({ kind: 'image', body: null, attachments: [], poll: null, deleted_at: null })).toBe('Photo')
+    expect(previewOf({ kind: 'file', body: null, attachments: [{ path: 'p', name: 'a.pdf' }], poll: null, deleted_at: null })).toBe('File: a.pdf')
+    expect(previewOf({ kind: 'poll', body: null, attachments: [], poll: { question: 'When?', options: ['a', 'b'] }, deleted_at: null })).toBe('Poll: When?')
     expect(previewOf({ kind: 'text', body: 'hi', attachments: [], poll: null, deleted_at: '2026-10-08T10:00:00Z' })).toBe('This message was deleted')
   })
 

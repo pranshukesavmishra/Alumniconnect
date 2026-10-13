@@ -133,16 +133,30 @@ export function previewOf(m: Pick<Message, 'kind' | 'body' | 'attachments' | 'po
   if (m.deleted_at) return 'This message was deleted'
   switch (m.kind) {
     case 'image':
-      return m.body ? `📷 ${m.body}` : '📷 Photo'
+      return m.body ? `Photo: ${m.body}` : 'Photo'
     case 'file':
-      return `📄 ${m.attachments[0]?.name ?? 'File'}`
+      return `File: ${m.attachments[0]?.name ?? 'File'}`
     case 'voice':
-      return '🎤 Voice message'
+      return 'Voice message'
     case 'poll':
-      return `📊 ${m.poll?.question ?? 'Poll'}`
+      return `Poll: ${m.poll?.question ?? 'Poll'}`
     default:
       return m.body ?? ''
   }
+}
+
+export type PreviewKind = 'image' | 'file' | 'voice' | 'poll'
+// The database still writes chat-list previews with a leading pictograph (camera, page, microphone, chart).
+// The UI shows a proper icon instead: split that prefix off. (Written as code-point escapes: no emoji in UI source.)
+const PREVIEW_PREFIX: [string, PreviewKind][] = [
+  ['\u{1F4F7}', 'image'],
+  ['\u{1F4C4}', 'file'],
+  ['\u{1F3A4}', 'voice'],
+  ['\u{1F4CA}', 'poll'],
+]
+export function splitPreview(text: string): { kind: PreviewKind | null; text: string } {
+  for (const [pre, kind] of PREVIEW_PREFIX) if (text.startsWith(pre)) return { kind, text: text.slice(pre.length).replace(/^\uFE0F?\s*/, '') }
+  return { kind: null, text }
 }
 
 /** Index of the first unread message from someone else, given my last-read time when the chat was opened. */

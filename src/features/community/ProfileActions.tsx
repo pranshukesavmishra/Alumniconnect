@@ -1,3 +1,4 @@
+import { Award, Crown, Handshake, PartyPopper, Trophy, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BadgeCheck, Ban, Check, MessageCircle, UserPlus } from 'lucide-react'
 import { useState } from 'react'
@@ -121,13 +122,16 @@ export function BadgesRow({ memberId }: { memberId: string }) {
     },
   })
   if (!data?.length) return null
-  const icon: Record<string, string> = { connector: '🤝', champion: '🏆', founding: '🌟', complete: '✅', meet2026: '🎉' }
+  const icon: Record<string, LucideIcon> = { connector: Handshake, champion: Trophy, founding: Crown, complete: BadgeCheck, meet2026: PartyPopper }
   return (
     <div className="flex flex-wrap gap-2">
       {data.map((b) => (
-        <span key={b.id} title={b.hint} className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-3 py-1 text-sm font-semibold text-warning">
-          <span aria-hidden>{icon[b.id] ?? '🏅'}</span> {b.label}
-        </span>
+        <Badge key={b.id} tone={b.id === 'founding' ? 'founding' : 'gold'} className="px-3 py-1 text-sm" icon={(() => {
+          const I = icon[b.id] ?? Award
+          return <I aria-hidden />
+        })()}>
+          <span title={b.hint}>{b.label}</span>
+        </Badge>
       ))}
     </div>
   )

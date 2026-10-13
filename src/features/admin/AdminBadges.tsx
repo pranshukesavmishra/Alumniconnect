@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import clsx from 'clsx'
 import { Printer, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -79,7 +80,7 @@ export function AdminBadges() {
             {pg.map((b) => (
               <article key={b.key} className="relative flex min-h-[15rem] flex-col justify-between rounded-2xl border border-dashed border-border bg-white p-4 text-black print:min-h-[6.2cm] print:rounded-none print:border-neutral-400" data-testid="badge">
                 <button type="button" className="absolute right-2 top-2 grid size-9 place-items-center rounded-full text-xs text-neutral-500 hover:bg-neutral-100 print:hidden" aria-label={`Leave out the badge for ${b.name}`} onClick={() => setSkip((s) => new Set(s).add(b.key))}>
-                  ✕
+                  <X className="size-4" aria-hidden />
                 </button>
                 <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-600">{data.event.title}</p>
                 <div className="my-2">
