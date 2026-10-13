@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AdminTranslator } from './i18n/AdminTranslator'
-import { AppShell } from './components/layout/AppShell'
 import { PageSkeleton } from './components/ui/Display'
 import { RequirePerm } from './features/admin/access'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'
@@ -12,6 +11,7 @@ import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
 import { MeetPage } from './features/events/MeetPage'
 import { HomePage } from './features/home/HomePage'
+import { RootLayout } from './features/home/RootLayout'
 import { InstallPage, NotFoundPage, AboutPage, PrivacyPage, TermsPage } from './features/home/StaticPages'
 import { WelcomePage } from './features/onboarding/WelcomePage'
 import { isConfigured, supabase } from './lib/supabase'
@@ -77,6 +77,7 @@ const CampaignEditor = lazy(() => import('./features/giving/admin/CampaignEditor
 const SponsorDetail = lazy(() => import('./features/giving/admin/SponsorDetail').then((m) => ({ default: m.SponsorDetail })))
 const SponsorPrint = lazy(() => import('./features/giving/admin/SponsorPrint').then((m) => ({ default: m.SponsorPrint })))
 const StyleguidePage = lazy(() => import('./features/styleguide/StyleguidePage').then((m) => ({ default: m.StyleguidePage })))
+const WorldPage = lazy(() => import('./features/world/WorldPage').then((m) => ({ default: m.WorldPage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -177,7 +178,7 @@ export function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/welcome" element={<RequireSession><WelcomePage /></RequireSession>} />
-          <Route element={<AppShell />}>
+          <Route element={<RootLayout />}>
             <Route index element={<HomePage />} />
             <Route path="meet" element={<MeetPage />} />
             <Route path="meet/register" element={m(<RegisterPage />)} />
@@ -214,6 +215,7 @@ export function App() {
             <Route path="invite" element={m(<InvitePage />)} />
             <Route path="people" element={m(<DirectoryPage />)} />
             <Route path="nearby" element={m(<NearbyPage />)} />
+            <Route path="world" element={<WorldPage />} />
             <Route path="trips" element={m(<TripsPage />)} />
             <Route path="city/:id" element={m(<CityPage />)} />
             <Route path="people/:id" element={m(<ProfilePage />)} />
