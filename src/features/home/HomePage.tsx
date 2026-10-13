@@ -1,3 +1,4 @@
+import { Cake, Star } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Bell, BriefcaseBusiness, CalendarHeart, Search, Send, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
@@ -67,7 +68,7 @@ function Landing() {
             {tx('home.landingBody')}
           </p>
           <GlimpseCarousel className="mt-6" />
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:text-hero">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:bg-none [&_a:first-child]:text-hero">
             <ButtonLink to="/signin" size="lg">
               {tx('home.signInOrJoin')}
             </ButtonLink>
@@ -248,7 +249,7 @@ function Birthdays() {
   if (!data?.length) return null
   return (
     <Card className="p-4">
-      <p className="font-semibold">🎂 {tx('home.birthdays')}</p>
+      <p className="flex items-center gap-2 font-semibold"><Cake className="size-5 text-gold-ink" aria-hidden /> {tx('home.birthdays')}</p>
       <ul className="mt-3 flex gap-4 overflow-x-auto pb-1">
         {data.map((b) => (
           <li key={b.id} className="w-20 shrink-0 text-center">
@@ -285,7 +286,7 @@ function Spotlight() {
   if (!data) return null
   return (
     <Link to={`/people/${data.profile.id}`} className="block rounded-2xl border border-accent/40 bg-accent-soft p-4">
-      <p className="text-xs font-bold uppercase tracking-wider text-warning">⭐ {tx('home.spotlight')}</p>
+      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-warning"><Star className="size-3.5 fill-current" aria-hidden /> {tx('home.spotlight')}</p>
       <div className="mt-2 flex items-center gap-3">
         <Avatar src={data.profile.avatar_url} name={data.profile.full_name} size={52} />
         <div className="min-w-0">

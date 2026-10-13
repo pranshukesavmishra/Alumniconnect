@@ -8,6 +8,7 @@ import { Field, Input, Select, Textarea } from '../../components/ui/Form'
 import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
 import { MemberPicker } from './MemberPicker'
+import { GroupIcon } from '../../components/ui/GroupIcon'
 
 interface DeptGroup {
   id: string
@@ -57,7 +58,7 @@ export function AdminOfficialGroups() {
             <li key={g.id}>
               <Card className="space-y-3 p-4" data-group={g.slug}>
                 <div className="flex items-start gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary-soft text-2xl" aria-hidden>{g.icon ?? '👥'}</span>
+                  <GroupIcon icon={g.icon} kind={g.kind} size="md" />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold leading-snug">{g.name}</p>
                     <p className="text-sm text-muted">

@@ -2,6 +2,7 @@
 // Plural messages use `key_one` / `key_other` and are called as t('key', { count }).
 import { mediaEn } from './mediaEn'
 import { storiesEn } from './storiesEn'
+import { designEn } from './designEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -188,7 +189,7 @@ export const en = {
   'chat.you': 'You',
   'chat.seen': 'Seen',
   'chat.sent': 'Sent',
-  'chat.sayHelloGroup': 'Say hello to the group 👋',
+  'chat.sayHelloGroup': 'Say hello to the group',
   'chat.noMessages': 'No messages yet',
   'chat.muted': 'Muted',
   'chat.unreadN': '{n} unread',
@@ -337,7 +338,7 @@ export const en = {
   'notif.message': '{who} sent you a message: “{body}”',
   'notif.mention': '{who} mentioned you: “{body}”',
   'notif.help': '{who} asked for help: “{body}”',
-  'notif.invite': '{who} joined JEC Alumni Connect through your invite 🎉',
+  'notif.invite': '{who} joined JEC Alumni Connect through your invite',
   'notif.default': 'New activity',
   'notif.title': 'Notifications',
   'notif.empty': 'No notifications yet',
@@ -1315,4 +1316,5 @@ export const en = {
   'social.thisMember': 'this member',
   ...mediaEn,
   ...storiesEn,
+  ...designEn,
 } as const satisfies Record<string, string>

@@ -72,7 +72,7 @@ export function PostCard({ post, showGroup = true }: { post: Post; showGroup?: b
                 {' · '}
                 {post.group ? (
                   <Link to={`/groups/${post.group.slug}`} className="font-medium text-primary">
-                    {post.group.icon} {post.group.name}
+                    {post.group.name}
                   </Link>
                 ) : (
                   'All of JEC'

@@ -76,6 +76,7 @@ const AdminFunds = lazy(() => import('./features/giving/admin/AdminFunds').then(
 const CampaignEditor = lazy(() => import('./features/giving/admin/CampaignEditor').then((m) => ({ default: m.CampaignEditor })))
 const SponsorDetail = lazy(() => import('./features/giving/admin/SponsorDetail').then((m) => ({ default: m.SponsorDetail })))
 const SponsorPrint = lazy(() => import('./features/giving/admin/SponsorPrint').then((m) => ({ default: m.SponsorPrint })))
+const StyleguidePage = lazy(() => import('./features/styleguide/StyleguidePage').then((m) => ({ default: m.StyleguidePage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
@@ -248,6 +249,7 @@ export function App() {
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="install" element={<InstallPage />} />
+            <Route path="styleguide" element={<StyleguidePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Routes>

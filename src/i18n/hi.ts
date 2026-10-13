@@ -4,6 +4,7 @@
 import type { en } from './en'
 import { mediaHi } from './mediaHi'
 import { storiesHi } from './storiesHi'
+import { designHi } from './designHi'
 
 export const hi = {
   // registration form
@@ -199,7 +200,7 @@ export const hi = {
   'chat.you': 'आप',
   'chat.seen': 'देखा गया',
   'chat.sent': 'भेजा गया',
-  'chat.sayHelloGroup': 'ग्रुप को नमस्ते कहें 👋',
+  'chat.sayHelloGroup': 'ग्रुप को नमस्ते कहें',
   'chat.noMessages': 'अभी कोई संदेश नहीं',
   'chat.muted': 'म्यूट',
   'chat.unreadN': '{n} अनपढ़े',
@@ -352,7 +353,7 @@ export const hi = {
   'notif.message': '{who} ने आपको संदेश भेजा: “{body}”',
   'notif.mention': '{who} ने आपको टैग किया: “{body}”',
   'notif.help': '{who} ने मदद माँगी: “{body}”',
-  'notif.invite': '{who} आपके आमंत्रण से JEC Alumni Connect से जुड़े 🎉',
+  'notif.invite': '{who} आपके आमंत्रण से JEC Alumni Connect से जुड़े',
   'notif.default': 'नई गतिविधि',
   'notif.title': 'सूचनाएँ',
   'notif.empty': 'अभी कोई सूचना नहीं',
@@ -1334,4 +1335,5 @@ export const hi = {
   'social.thisMember': 'इस सदस्य',
   ...mediaHi,
   ...storiesHi,
+  ...designHi,
 } as const satisfies Record<keyof typeof en, string>

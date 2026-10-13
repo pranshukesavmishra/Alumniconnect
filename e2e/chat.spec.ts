@@ -33,8 +33,8 @@ test('group chat: react, reply, edit, photo, delete — seen by the other member
   const msgRow = (p: typeof b.page) => p.locator('li').filter({ hasText: `Reunion plan ${run}` }).filter({ hasNotText: 'Count me in' })
   await expect(msg).toBeVisible()
   await msg.click({ button: 'right' })
-  await b.page.getByRole('dialog', { name: 'Message options' }).getByRole('button', { name: 'React 👍' }).click()
-  await expect(msgRow(b.page).getByRole('button', { name: /Reactions: 👍 1/ })).toBeVisible()
+  await b.page.getByRole('dialog', { name: 'Message options' }).getByRole('button', { name: 'React with Like' }).click()
+  await expect(msgRow(b.page).getByRole('button', { name: /Reactions: Like 1/ })).toBeVisible()
   await msg.click({ button: 'right' })
   await b.page.getByRole('dialog', { name: 'Message options' }).getByRole('button', { name: 'Reply' }).click()
   await expect(b.page.getByText(`Replying to Asha ${run}`)).toBeVisible()
@@ -44,7 +44,7 @@ test('group chat: react, reply, edit, photo, delete — seen by the other member
   await expect(reply.getByRole('button', { name: new RegExp(`Asha ${run}.*Reunion plan`) })).toBeVisible() // quote
 
   // Asha sees the reaction and the reply live, then edits her message
-  await expect(msgRow(a.page).getByRole('button', { name: /Reactions: 👍 1/ })).toBeVisible({ timeout: 15_000 })
+  await expect(msgRow(a.page).getByRole('button', { name: /Reactions: Like 1/ })).toBeVisible({ timeout: 15_000 })
   await expect(a.page.getByText('Count me in')).toBeVisible({ timeout: 15_000 })
   await msgRow(a.page).getByText(`Reunion plan ${run}`).click({ button: 'right' })
   await a.page.getByRole('dialog', { name: 'Message options' }).getByRole('button', { name: 'Edit' }).click()

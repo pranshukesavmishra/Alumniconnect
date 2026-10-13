@@ -1,17 +1,31 @@
 import clsx from 'clsx'
-import { ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pause, Pencil, Flag, Pin, PinOff, Play, Plus, Reply, Trash2, UserX, X } from 'lucide-react'
+import { ChartColumn, ChevronLeft, ChevronRight, Copy, Download, FileText, Loader2, Pause, Pencil, Flag, Pin, PinOff, Play, Plus, Reply, Trash2, UserX, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Sheet, SheetAction } from '../../components/ui/Sheet'
 import { Avatar } from '../../components/ui/Display'
+import { QUICK_REACTION_KEYS, REACTIONS, ReactionIcon, reactionDef, reactionKeyOf, reactionLabel } from '../../components/ui/Reactions'
 import { friendlyError } from '../../lib/errors'
 import { Linkified } from '../community/PostCard'
 import { downloadUrl, formatBytes, useMediaUrl } from './media'
 import { formatDuration, groupReactions, nextSelection, pollTally, previewOf, type Attachment, type Message, type Reaction, type ReplyPreview } from './merge'
 
-export const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🙏']
-const MORE_REACTIONS = ['🔥', '🎉', '👏', '💯', '🙌', '😍', '🤣', '😊', '🤔', '😎', '🥳', '😅', '👌', '✅', '🙂', '😇', '🤝', '💪', '🌟', '🎂', '🇮🇳', '☕', '🍰', '📸']
+const MORE_REACTION_KEYS = REACTIONS.map((r) => r.key).filter((k) => !QUICK_REACTION_KEYS.includes(k))
+
+/** Reactions grouped by what they show (older stored values merge into their closest reaction). */
+function displayGroups(list: Reaction[] | undefined, me: string | null) {
+  const out: { id: string; label: string; count: number; mine: boolean }[] = []
+  for (const g of groupReactions(list, me)) {
+    const id = reactionKeyOf(g.emoji) ?? 'other'
+    const hit = out.find((x) => x.id === id)
+    if (hit) {
+      hit.count += g.count
+      hit.mine ||= g.mine
+    } else out.push({ id, label: reactionLabel(g.emoji), count: g.count, mine: g.mine })
+  }
+  return out.sort((a, b) => b.count - a.count)
+}
 
 // ------------------------------------------------------------------ media
 function MediaImg({ a, thumb, className, alt }: { a: Attachment; thumb?: boolean; className?: string; alt: string }) {
@@ -184,18 +198,18 @@ export function ReplyQuote({ r, mine, me, onClick }: { r: ReplyPreview; mine: bo
 
 // ------------------------------------------------------------------ reactions
 export function ReactionChips({ list, me, mine, onOpen }: { list: Reaction[] | undefined; me: string | null; mine: boolean; onOpen: () => void }) {
-  const groups = groupReactions(list, me)
+  const groups = displayGroups(list, me)
   if (!groups.length) return null
   const total = groups.reduce((n, g) => n + g.count, 0)
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={clsx('relative z-[1] -mt-1.5 flex min-h-7 items-center gap-0.5 rounded-full border border-border bg-surface px-1.5 text-sm shadow-sm', mine ? 'mr-2 self-end' : 'ml-2 self-start', groups.some((g) => g.mine) && 'border-primary/50 bg-primary-soft')}
-      aria-label={`Reactions: ${groups.map((g) => `${g.emoji} ${g.count}`).join(', ')}. Show who reacted`}
+      className={clsx('tap relative z-[1] -mt-1.5 flex min-h-7 items-center rounded-full border border-border bg-surface py-0.5 pl-0.5 pr-1.5 text-sm shadow-e1', mine ? 'mr-2 self-end' : 'ml-2 self-start', groups.some((g) => g.mine) && 'border-primary/50 bg-primary-soft')}
+      aria-label={`Reactions: ${groups.map((g) => `${g.label} ${g.count}`).join(', ')}. Show who reacted`}
     >
-      {groups.slice(0, 3).map((g) => (
-        <span key={g.emoji} aria-hidden>{g.emoji}</span>
+      {groups.slice(0, 3).map((g, i) => (
+        <ReactionIcon key={g.id} reaction={g.id === 'other' ? null : g.id} size={20} className={clsx(i > 0 && '-ml-1.5 ring-2 ring-surface')} />
       ))}
       {total > 1 && <span className="ml-0.5 text-xs font-semibold text-muted">{total}</span>}
     </button>
@@ -203,9 +217,9 @@ export function ReactionChips({ list, me, mine, onOpen }: { list: Reaction[] | u
 }
 
 export function ReactorsSheet({ m, me, onClose, onRemoveMine }: { m: Message | null; me: string | null; onClose: () => void; onRemoveMine: () => void }) {
-  const groups = groupReactions(m?.reactions, me)
+  const groups = displayGroups(m?.reactions, me)
   const [tab, setTab] = useState<string | null>(null)
-  const list = (m?.reactions ?? []).filter((r) => !tab || r.emoji === tab)
+  const list = (m?.reactions ?? []).filter((r) => !tab || (reactionKeyOf(r.emoji) ?? 'other') === tab)
   return (
     <Sheet open={!!m} onClose={onClose} label="Reactions">
       <div className="flex gap-1 overflow-x-auto border-b border-border px-4 pb-2 pt-1">
@@ -213,8 +227,8 @@ export function ReactorsSheet({ m, me, onClose, onRemoveMine }: { m: Message | n
           All {m?.reactions?.length ?? 0}
         </button>
         {groups.map((g) => (
-          <button key={g.emoji} type="button" onClick={() => setTab(g.emoji)} className={clsx('min-h-10 shrink-0 rounded-full px-3 text-sm font-semibold', tab === g.emoji ? 'bg-primary-soft text-primary' : 'text-muted')}>
-            {g.emoji} {g.count}
+          <button key={g.id} type="button" onClick={() => setTab(g.id)} aria-label={`${g.label} ${g.count}`} className={clsx('inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold', tab === g.id ? 'bg-primary-soft text-primary' : 'text-muted')}>
+            <ReactionIcon reaction={g.id === 'other' ? null : g.id} size={20} /> {g.count}
           </button>
         ))}
       </div>
@@ -228,19 +242,43 @@ export function ReactorsSheet({ m, me, onClose, onRemoveMine }: { m: Message | n
                   <span className="block font-semibold">You</span>
                   <span className="block text-xs text-muted">Tap to remove</span>
                 </span>
-                <span className="text-2xl">{r.emoji}</span>
+                <ReactionIcon reaction={r.emoji} size={28} />
+                <span className="sr-only">{reactionLabel(r.emoji)}</span>
               </button>
             ) : (
               <div className="flex min-h-14 items-center gap-3 px-5">
                 <Avatar src={r.user?.avatar_url} name={r.user?.full_name ?? 'Member'} size={36} />
                 <span className="flex-1 font-semibold">{r.user?.full_name ?? 'Member'}</span>
-                <span className="text-2xl">{r.emoji}</span>
+                <ReactionIcon reaction={r.emoji} size={28} />
+                <span className="sr-only">{reactionLabel(r.emoji)}</span>
               </div>
             )}
           </li>
         ))}
       </ul>
     </Sheet>
+  )
+}
+
+// one reaction in the picker: pops on hover, presses on tap; the accessible name says what it does
+function ReactionButton({ k, mine, onReact, withLabel }: { k: ReturnType<typeof reactionDef>['key']; mine: boolean; onReact: (emoji: string | null) => void; withLabel?: boolean }) {
+  const def = reactionDef(k)
+  return (
+    <button
+      type="button"
+      onClick={() => onReact(mine ? null : def.stored)}
+      className={clsx(
+        'group/r inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full transition-colors',
+        withLabel && 'px-3 text-sm font-semibold hover:bg-surface-2',
+        mine && 'bg-primary-soft ring-2 ring-primary',
+      )}
+      aria-label={mine ? `Remove ${def.label}` : `React with ${def.label}`}
+      aria-pressed={mine}
+      title={def.label}
+    >
+      <ReactionIcon reaction={k} size={32} className="transition-transform duration-200 ease-[var(--ease-spring)] group-hover/r:-translate-y-0.5 group-hover/r:scale-[1.18] group-active/r:scale-90 motion-reduce:transition-none" />
+      {withLabel && def.label}
+    </button>
   )
 }
 
@@ -287,7 +325,7 @@ export function MessageActionsSheet({
   useEffect(() => {
     if (!m) setMore(false)
   }, [m])
-  const myEmoji = m?.reactions?.find((r) => r.user_id === me)?.emoji ?? null
+  const myKey = reactionKeyOf(m?.reactions?.find((r) => r.user_id === me)?.emoji ?? null)
   const copyable = !!m?.body && !m.deleted_at
   return (
     <Sheet open={!!m} onClose={onClose} label="Message options">
@@ -297,28 +335,17 @@ export function MessageActionsSheet({
           {perms.canReact && (
             <div className="px-3 pb-2">
               <div className="flex items-center justify-between gap-1 rounded-full bg-surface-2 p-1.5" role="group" aria-label="React">
-                {QUICK_REACTIONS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    onClick={() => onReact(myEmoji === e ? null : e)}
-                    className={clsx('grid size-11 place-items-center rounded-full text-2xl transition-transform active:scale-110', myEmoji === e && 'bg-primary-soft ring-2 ring-primary')}
-                    aria-label={myEmoji === e ? `Remove ${e}` : `React ${e}`}
-                    aria-pressed={myEmoji === e}
-                  >
-                    {e}
-                  </button>
+                {QUICK_REACTION_KEYS.map((k) => (
+                  <ReactionButton key={k} k={k} mine={myKey === k} onReact={onReact} />
                 ))}
                 <button type="button" onClick={() => setMore((x) => !x)} className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface" aria-label="More reactions" aria-expanded={more}>
                   <Plus className="size-5" />
                 </button>
               </div>
               {more && (
-                <div className="mt-2 grid grid-cols-8 gap-1">
-                  {MORE_REACTIONS.map((e) => (
-                    <button key={e} type="button" onClick={() => onReact(myEmoji === e ? null : e)} className={clsx('grid aspect-square min-h-11 place-items-center rounded-xl text-2xl hover:bg-surface-2', myEmoji === e && 'bg-primary-soft')} aria-label={`React ${e}`}>
-                      {e}
-                    </button>
+                <div className="mt-2 flex flex-wrap gap-1 px-1.5">
+                  {MORE_REACTION_KEYS.map((k) => (
+                    <ReactionButton key={k} k={k} mine={myKey === k} onReact={onReact} withLabel />
                   ))}
                 </div>
               )}
@@ -355,7 +382,7 @@ export function MessageActionsSheet({
 
 /**
  * Touch gestures on a message, like WhatsApp/Instagram:
- * swipe right to reply, long-press for options, double-tap to ❤️. Right-click opens options on desktop.
+ * swipe right to reply, long-press for options, double-tap to love. Right-click opens options on desktop.
  */
 export function useMessageGestures({ onReply, onMenu, onDoubleTap, enabled }: { onReply: () => void; onMenu: () => void; onDoubleTap: () => void; enabled: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -546,7 +573,7 @@ export function PollCard({ m, me, mine, onVote }: { m: Message; me: string | nul
   const total = t.counts.reduce((a, b) => a + b, 0)
   return (
     <div className="w-[min(70vw,300px)] py-0.5">
-      <p className="mb-2 font-semibold">📊 {poll.question}</p>
+      <p className="mb-2 flex items-start gap-1.5 font-semibold"><ChartColumn className="mt-0.5 size-4 shrink-0" aria-hidden /> {poll.question}</p>
       <p className={clsx('mb-1.5 text-xs', mine ? 'text-on-primary/75' : 'text-muted')}>{poll.multiple ? 'Select one or more' : 'Select one'}</p>
       <ul className="space-y-1.5">
         {poll.options.map((o, i) => {

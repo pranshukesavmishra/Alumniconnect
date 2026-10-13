@@ -14,6 +14,7 @@ import { supabase } from '../../lib/supabase'
 import { useMyProfile } from '../auth/AuthProvider'
 import { NoAccess, useAdminAccess } from './access'
 import { AdminOfficialGroups } from './AdminOfficialGroups'
+import { GroupIcon } from '../../components/ui/GroupIcon'
 
 interface Circle {
   id: string
@@ -96,7 +97,7 @@ function PendingCircles() {
             <li key={c.id}>
               <Card className="space-y-3 p-4">
                 <div className="flex items-start gap-3">
-                  <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-soft text-2xl">{c.icon ?? '👥'}</span>
+                  <GroupIcon icon={c.icon} kind="circle" />
                   <div className="min-w-0">
                     <p className="font-bold">{c.name}</p>
                     {c.description && <p className="text-[15px] text-muted">{c.description}</p>}

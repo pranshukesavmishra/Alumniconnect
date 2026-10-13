@@ -1,12 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Toaster } from 'sonner'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { MotionProvider } from './components/ui/Motion'
+import { AppToaster } from './components/ui/Toast'
+import { applyTheme } from './lib/theme'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { I18nProvider } from './i18n'
 import './index.css'
+
+applyTheme()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,10 +41,12 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <I18nProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-          <Toaster position="top-center" richColors closeButton toastOptions={{ style: { fontFamily: 'inherit' } }} />
+          <MotionProvider>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+            <AppToaster />
+          </MotionProvider>
         </I18nProvider>
       </AuthProvider>
     </QueryClientProvider>
