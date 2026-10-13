@@ -25,7 +25,7 @@ export function initialsOf(name: string): string {
       .split(/\s+/)
       .filter(Boolean)
       .slice(0, 2)
-      .map((p) => [...p][0]?.toUpperCase())
+      .map((p) => p.match(/[\p{L}\p{N}]/u)?.[0]?.toUpperCase() ?? '')
       .join('') || '?'
   )
 }

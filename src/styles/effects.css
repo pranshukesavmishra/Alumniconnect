@@ -37,6 +37,8 @@
   font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 50, "WONK" 0;
   font-weight: 600; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums lining-nums;
 }
+/* Devanagari must never be letter-spaced (it breaks the shirorekha line); unlayered so it beats tracking-* utilities */
+:lang(hi) :is(.uppercase, .text-eyebrow, [class*="tracking-["], [class*="tracking-wide"], [class*="tracking-wider"]) { letter-spacing: 0; }
 :lang(hi) :is(.text-display-xl, .text-display, .text-h1, .text-h2, .text-stat, .font-display) { letter-spacing: 0; line-height: 1.3; font-weight: 700; }
 
 /* ---------- surfaces ---------- */

@@ -26,7 +26,7 @@ test('Hindi interface: switch from the profile page, persists on the profile, sw
   await expect(page.locator('html')).toHaveAttribute('lang', 'hi')
   const nav = page.getByRole('navigation', { name: 'मुख्य' })
   for (const label of ['होम', 'ग्रुप', 'मीट 2026', 'चैट']) await expect(nav.getByRole('link', { name: label })).toBeVisible()
-  await expect(nav.getByRole('button', { name: 'मेनू' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'मेनू' })).toBeVisible() // the menu button lives in the top bar
   await expect.poll(dbLang).toBe('hi')
 
   // Home and Meet headings are Hindi; digits stay Western

@@ -7,7 +7,13 @@ import { cn } from '../../lib/cn'
  * components using `m.*` render statically until it arrives, then animate. Everything respects reduced motion.
  */
 
-const loadFeatures = () => import('./motionFeatures').then((r) => r.default)
+// fetched once the first screen is idle, so it never competes with the app's own code on mobile data
+const loadFeatures = () =>
+  new Promise<void>((resolve) => {
+    const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback
+    if (idle) idle(() => resolve(), { timeout: 2500 })
+    else setTimeout(resolve, 800)
+  }).then(() => import('./motionFeatures').then((r) => r.default))
 
 /** Wrap the app once (main.tsx). Gives every `m.*` component springs + shared layout, honouring reduced motion. */
 export function MotionProvider({ children }: { children: ReactNode }) {
