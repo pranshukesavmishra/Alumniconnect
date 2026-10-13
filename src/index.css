@@ -6,6 +6,7 @@
 @import "@fontsource/noto-sans-devanagari/600.css";
 @import "@fontsource/noto-sans-devanagari/700.css";
 @import "./styles/effects.css";
+@import "./styles/fx.css";
 
 /* Display serif: Fraunces (wght + opsz + SOFT + WONK axes), Latin only. Hindi headings never use it (see :lang(hi) below). */
 @font-face {
