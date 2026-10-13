@@ -1,0 +1,25 @@
+/* Events & Giving layer: the few keyframes Tailwind utilities can't express. Static under reduced motion. */
+@keyframes meet-kenburns {
+  from { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+  to { transform: scale(1.2) translate3d(1.5%, 1%, 0); }
+}
+@keyframes evx-holo {
+  from { background-position: 0% 50%; }
+  to { background-position: 200% 50%; }
+}
+@keyframes evx-flash {
+  from { opacity: 0.85; }
+  to { opacity: 0; }
+}
+@keyframes evx-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes evx-scanline {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(calc(var(--evx-frame, 220px) - 4px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="meet-kenburns"], [class*="evx-"] { animation: none !important; }
+}

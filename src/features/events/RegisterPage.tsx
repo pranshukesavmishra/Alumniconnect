@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { CalendarDays, Check, Clock, MapPin, Pencil, Save } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Navigate, useNavigate } from 'react-router'
+import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
@@ -129,6 +129,8 @@ export function RegisterPage() {
   const uid = useUserId()
   const { session } = useAuth()
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const wantTicket = params.get('ticket')
   const { data: event, isLoading: le } = useEvent(MEET_SLUG)
   const { data: tickets, isLoading: lt } = useTicketTypes(event?.id)
   const { data: questions, isLoading: lq } = useEventQuestions(event?.id)
@@ -232,10 +234,16 @@ export function RegisterPage() {
       const known = new Set(tickets.map((t) => t.id))
       const cleaned = Object.fromEntries(Object.entries(form.qty).filter(([id]) => known.has(id)))
       if (primary.length === 1 && !primary.some((p) => (cleaned[p.id] ?? 0) > 0)) cleaned[primary[0]!.id] = 1
+      // a pass chosen on the Meet page (?ticket=) is pre-selected; family tickets that don't fit it are dropped
+      const wanted = primary.find((p) => p.id === wantTicket)
+      if (wanted) {
+        for (const p of primary) cleaned[p.id] = p.id === wanted.id ? 1 : 0
+        for (const t of tickets) if (!t.is_primary && !ticketFits(wanted, t)) cleaned[t.id] = 0
+      }
       setForm((f) => ({ ...f, qty: cleaned }))
     }
     setPrefilled(true)
-  }, [prefilled, lm, tickets, mine, form.qty, setForm])
+  }, [prefilled, lm, tickets, mine, form.qty, setForm, wantTicket])
 
   useEffect(() => {
     topRef.current?.scrollIntoView({ block: 'start' })
