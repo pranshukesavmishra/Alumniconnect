@@ -130,7 +130,7 @@ export interface BadgeState {
   attainable: boolean
 }
 
-export interface ShownBadge extends BadgeDef {
+export interface ShownBadge extends Omit<BadgeDef, 'target'> {
   earned: boolean
   earnedAt: string | null
   progress: number | null

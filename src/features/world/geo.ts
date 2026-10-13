@@ -25,7 +25,7 @@ export interface PublicWorldPlace extends WorldPlace {
 export function normaliseLatLng(lat: number, lng: number): { lat: number; lng: number } | null {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
   const la = Math.max(-90, Math.min(90, lat))
-  let lo = ((((lng + 180) % 360) + 360) % 360) - 180
+  let lo = lng >= -180 && lng < 180 ? lng : ((((lng + 180) % 360) + 360) % 360) - 180
   if (Object.is(lo, -0)) lo = 0
   return { lat: la, lng: lo }
 }

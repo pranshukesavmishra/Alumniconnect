@@ -26,7 +26,8 @@ describe('countdown', () => {
     // 26 Dec 2026 10:00 IST, from 13 Oct 2026 23:00 IST (17:30 UTC) and from 14 Oct 00:30 IST (19:00 UTC)
     expect(daysUntilIST('2026-12-26T04:30:00Z', new Date('2026-10-13T17:30:00Z'))).toBe(74)
     expect(daysUntilIST('2026-12-26T04:30:00Z', new Date('2026-10-13T19:00:00Z'))).toBe(73)
-    expect(daysUntilIST('2026-10-13T18:00:00Z', new Date('2026-10-13T19:00:00Z'))).toBe(0)
+    expect(daysUntilIST('2026-10-13T20:00:00Z', new Date('2026-10-13T19:00:00Z'))).toBe(0)
+    expect(daysUntilIST('2026-10-13T18:00:00Z', new Date('2026-10-13T19:00:00Z'))).toBe(-1)
   })
 })
 
