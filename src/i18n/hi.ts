@@ -5,6 +5,7 @@ import type { en } from './en'
 import { mediaHi } from './mediaHi'
 import { storiesHi } from './storiesHi'
 import { designHi } from './designHi'
+import { shellHi } from './shellHi'
 
 export const hi = {
   // registration form
@@ -1336,4 +1337,5 @@ export const hi = {
   ...mediaHi,
   ...storiesHi,
   ...designHi,
+  ...shellHi,
 } as const satisfies Record<keyof typeof en, string>

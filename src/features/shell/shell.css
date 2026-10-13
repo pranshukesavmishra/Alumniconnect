@@ -1,0 +1,40 @@
+/* App shell: top/bottom bars, route transitions, progress bar. Static under reduced motion. */
+
+/* the phone top bar is full-bleed glass: a hairline and a soft shadow instead of the floating drop shadow */
+.fx-liquid.shell-bar-top {
+  box-shadow: inset 0 -1px 0 color-mix(in oklab, var(--border) 80%, transparent), inset 0 1px 0 rgb(255 255 255 / 0.35), 0 10px 30px -22px rgb(6 42 32 / 0.5);
+}
+[data-theme="dark"] .fx-liquid.shell-bar-top {
+  box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.07), 0 12px 30px -20px rgb(0 0 0 / 0.8);
+}
+
+/* page headers sit under the top bar; when the bar tucks away they slide up to the notch */
+@media (max-width: 767px) {
+  .has-topbar[data-topbar-hidden] main header.sticky {
+    top: 0;
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* a new screen fades in (opacity only: transforms would re-anchor fixed elements inside pages) */
+.route-fade { animation: route-fade 260ms var(--ease-out) both; }
+@keyframes route-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.route-progress-run { width: 0; animation: route-progress 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+.route-progress-done { width: 100%; opacity: 0; transition: opacity 360ms ease 120ms; }
+@keyframes route-progress { from { width: 0; } to { width: 88%; } }
+
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+  75% { transform: rotate(2deg); }
+}
+@keyframes menu-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .route-fade, .route-progress-run { animation: none; }
+  .route-progress-run { width: 88%; }
+}

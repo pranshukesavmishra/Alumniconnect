@@ -3,7 +3,7 @@
 import {
   Activity, Archive, BarChart3, Bell, BriefcaseBusiness, CalendarHeart, CalendarRange, Download, Flag, GraduationCap, Handshake, HeartHandshake, History, Home, Image, Images,
   Clapperboard, Inbox, KeyRound, Landmark, Languages, Link2, LogOut, MapPin, MessagesSquare, Network, PenLine, Search, ShieldCheck, ShieldHalf, ScrollText, Store, UserPlus, UserRound,
-  Sparkles, CirclePlay, Users, UsersRound, type LucideIcon,
+  Sparkles, CirclePlay, Users, UsersRound, Globe2, IdCard, Award, BookOpen, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { hasAnyPerm, type AdminAccess } from '../../lib/adminAccess'
 import type { MsgKey } from '../../i18n'
@@ -68,6 +68,8 @@ export const MENU: readonly MenuItem[] = [
   { id: 'directory', group: 'community', label: 'home.findJecians', icon: Search, to: '/people', who: 'verified', keywords: 'directory people search members', quick: true },
   { id: 'nearby', group: 'community', label: 'nearby.title', icon: MapPin, to: '/nearby', who: 'verified', also: ['/trips', '/city/'], keywords: 'city trips location' },
   { id: 'chat', group: 'community', label: 'nav.chat', icon: MessagesSquare, to: '/chat', who: 'verified', keywords: 'messages dm' },
+  { id: 'world', group: 'community', label: 'shell.menu.world', icon: Globe2, to: '/world', who: 'verified', keywords: 'map globe countries cities where jecians live abroad' },
+  { id: 'yearbook', group: 'community', label: 'shell.menu.yearbook', icon: BookOpen, to: '/yearbook', who: 'verified', also: ['/yearbook/'], keywords: 'batch class year book memories then now' },
   { id: 'connections', group: 'community', label: 'profile.connections', icon: Handshake, to: '/me/connections', who: 'verified' },
   { id: 'give', group: 'community', label: 'menu.give', icon: HeartHandshake, to: '/give', who: 'verified', also: ['/give/'], keywords: 'donate donation fund scholarship appeal sponsor give back', quick: true },
   { id: 'notifications', group: 'community', label: 'notif.title', icon: Bell, to: '/notifications', who: 'verified', keywords: 'alerts' },
@@ -77,6 +79,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'gallery', group: 'events', label: 'profile.gallery', icon: Image, to: '/gallery', who: 'verified', keywords: 'college photos albums', quick: true },
   { id: 'programme', group: 'events', label: 'menu.programme', icon: CalendarRange, to: '/meet#programme', public: true, keywords: 'schedule agenda' },
   { id: 'highlights', group: 'events', label: 'menu.highlights', icon: Sparkles, to: '/highlights', who: 'verified', keywords: 'stories status official reunion scholarships campus drives memories' },
+  { id: 'fame', group: 'events', label: 'shell.menu.fame', icon: Trophy, to: '/fame', who: 'verified', also: ['/fame/'], keywords: 'hall of fame achievers awards honours proud' },
   { id: 'past-meets', group: 'events', label: 'menu.pastMeets', icon: Archive, to: '/meets', public: true, also: ['/meets/'], keywords: 'previous earlier alumni meet archive years 2025 2024 videos photos glimpses', quick: true },
   // Opportunities
   { id: 'jobs', group: 'opportunities', label: 'profile.jobs', icon: BriefcaseBusiness, to: '/jobs', who: 'verified', also: ['/jobs/'], keywords: 'work hiring career', quick: true },
@@ -86,6 +89,8 @@ export const MENU: readonly MenuItem[] = [
   // Me
   { id: 'profile', group: 'me', label: 'menu.myProfile', icon: UserRound, to: '/me', end: true },
   { id: 'edit-profile', group: 'me', label: 'profile.edit', icon: PenLine, to: '/me/edit' },
+  { id: 'id-card', group: 'me', label: 'shell.menu.idCard', icon: IdCard, to: '/id-card', keywords: 'identity card membership wallet pass digital id' },
+  { id: 'badges', group: 'me', label: 'shell.menu.badges', icon: Award, to: '/me/badges', keywords: 'achievements medals rewards' },
   { id: 'invite', group: 'me', label: 'profile.invite', icon: UserPlus, to: '/invite', who: 'verified', keywords: 'share refer', quick: true },
   { id: 'import', group: 'me', label: 'home.importLinkedin', icon: Link2, to: '/me/import', keywords: 'linkedin pdf' },
   { id: 'language', group: 'me', label: 'menu.language', icon: Languages, to: '/me#language', keywords: 'hindi english bhasha' },
@@ -103,6 +108,8 @@ export const MENU: readonly MenuItem[] = [
   { id: 'org-analytics', group: 'organise', label: 'menu.org.analytics', icon: BarChart3, to: '/admin/analytics', who: 'admin', perms: ['analytics'] },
   { id: 'org-funds', group: 'organise', label: 'menu.org.funds', icon: HeartHandshake, to: '/admin/funds', who: 'admin', perms: ['funds_manage', 'funds_verify', 'funds_reports', 'sponsors_manage'], also: ['/admin/funds/'] },
   { id: 'org-content', group: 'organise', label: 'menu.org.content', icon: Clapperboard, to: '/admin/content', who: 'admin', perms: ['gallery_manage'], keywords: 'glimpses videos past meets archive' },
+  { id: 'org-yearbooks', group: 'organise', label: 'shell.menu.orgYearbooks', icon: BookOpen, to: '/admin/yearbooks', who: 'admin', perms: ['gallery_manage'], keywords: 'batch yearbook pages' },
+  { id: 'org-fame', group: 'organise', label: 'shell.menu.orgFame', icon: Trophy, to: '/admin/fame', who: 'admin', perms: ['gallery_manage'], keywords: 'hall of fame nominations' },
   { id: 'org-stories', group: 'organise', label: 'menu.org.stories', icon: CirclePlay, to: '/admin/stories', who: 'admin', perms: ['stories_post'], keywords: 'stories status official highlights reunion' },
   { id: 'org-roles', group: 'organise', label: 'menu.org.roles', icon: KeyRound, to: '/admin/roles', who: 'admin', perms: ['admins', 'events_team'] },
   { id: 'org-health', group: 'organise', label: 'menu.org.health', icon: Activity, to: '/admin/health', who: 'admin', perms: ['health'] },

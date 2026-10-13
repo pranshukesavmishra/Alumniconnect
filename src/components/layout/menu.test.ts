@@ -29,7 +29,7 @@ describe('menu registry', () => {
   it('lists Past meets under Events & memories for everyone, signed in or not, and Content only for gallery curators', () => {
     const events = (c: MenuCtx) => visibleMenu(c).find((x) => x.id === 'events')!.items.map((i) => i.id)
     expect(events({ ...member, signedIn: false, verified: false })).toContain('past-meets')
-    expect(events(member)).toEqual(['meet', 'reunion-photos', 'gallery', 'programme', 'highlights', 'past-meets'])
+    expect(events(member)).toEqual(['meet', 'reunion-photos', 'gallery', 'programme', 'highlights', 'fame', 'past-meets'])
     expect(events({ ...member, signedIn: false, verified: false })).not.toContain('highlights')
     const item = MENU.find((i) => i.id === 'past-meets')!
     expect(item.to).toBe('/meets')
@@ -55,6 +55,26 @@ describe('menu registry', () => {
     expect(ids(member)).not.toContain('org-stories')
     expect(ids({ ...member, access: { is_admin: true, is_super: false, full: true, permissions: [] }, organiser: true })).toContain('org-stories')
     expect(isActive(item, '/highlights')).toBe(true)
+  })
+
+  it('lists the new pages: JEC World and Batch yearbook (Community), Digital ID card and My badges (Me), Wall of Fame (Events), and their Organise screens for gallery curators', () => {
+    const by = (id: string) => MENU.find((i) => i.id === id)!
+    expect([by('world').group, by('world').to]).toEqual(['community', '/world'])
+    expect([by('yearbook').group, by('yearbook').to]).toEqual(['community', '/yearbook'])
+    expect([by('id-card').group, by('id-card').to]).toEqual(['me', '/id-card'])
+    expect([by('badges').group, by('badges').to]).toEqual(['me', '/me/badges'])
+    expect([by('fame').group, by('fame').to]).toEqual(['events', '/fame'])
+    expect(isActive(by('badges'), '/me/badges')).toBe(true)
+    expect(isActive(by('profile'), '/me/badges')).toBe(false)
+    expect(isActive(by('yearbook'), '/yearbook/2008')).toBe(true)
+    const curator = ids({ ...member, access: limited(['gallery_manage']), organiser: true })
+    expect(curator).toEqual(expect.arrayContaining(['org-yearbooks', 'org-fame']))
+    expect(ids({ ...member, access: limited(['analytics']), organiser: true })).not.toContain('org-fame')
+    expect(ids(member)).not.toContain('org-yearbooks')
+    expect(ids({ ...member, verified: false })).toEqual(expect.arrayContaining(['id-card', 'badges']))
+    expect(ids({ ...member, verified: false })).not.toContain('world')
+    expect(by('org-fame').to).toBe('/admin/fame')
+    expect(by('org-yearbooks').to).toBe('/admin/yearbooks')
   })
 
   it('hides community entries from unverified members but keeps profile and settings', () => {

@@ -1,129 +1,117 @@
 import clsx from 'clsx'
-import { CalendarHeart, Home, Menu, MessagesSquare, Users, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, NavLink, Outlet, useMatch } from 'react-router'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Link, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
 import { useAutoPhoto } from '../../features/profile/useAutoPhoto'
 import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
-import { Avatar } from '../ui/Display'
-import { useT, type MsgKey } from '../../i18n'
+import { BottomTabs } from '../../features/shell/BottomTabs'
+import { CreateSheet } from '../../features/shell/CreateSheet'
+import { InstallPrompt } from '../../features/shell/InstallPrompt'
+import { useUnreadNotificationCount } from '../../features/shell/queries'
+import { RouteProgress, ScrollMemory } from '../../features/shell/RouteChrome'
+import { TopBar } from '../../features/shell/TopBar'
+import { useHideOnScroll } from '../../features/shell/useHideOnScroll'
+import '../../features/shell/shell.css'
+import { PageSkeleton } from '../ui/Display'
+import { useT } from '../../i18n'
 import { MenuSheet, SidebarMenu } from './MenuNav'
 
 export { useIsOrganiser } from './useMenuCtx'
 
-interface Tab {
-  to: string
-  label: MsgKey
-  icon: LucideIcon
-  end?: boolean
-}
+// heavy overlays load the first time they open
+const CommandSearch = lazy(() => import('../../features/shell/CommandSearch').then((r) => ({ default: r.CommandSearch })))
+const NotificationsCentre = lazy(() => import('../../features/shell/NotificationsCentre').then((r) => ({ default: r.NotificationsCentre })))
 
-// The phone bar keeps four places and a Menu button; everything else lives in the registry (menu.ts).
-const TABS: Tab[] = [
-  { to: '/', label: 'nav.home', icon: Home, end: true },
-  { to: '/groups', label: 'nav.groups', icon: Users },
-  { to: '/meet', label: 'nav.meet', icon: CalendarHeart },
-  { to: '/chat', label: 'nav.chat', icon: MessagesSquare },
-]
+const SIDEBAR_KEY = 'jec-sidebar-collapsed'
+function readCollapsed() {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 export function AppShell() {
   useAutoPhoto()
-  const tx = useT()
   const { data: profile } = useMyProfile()
   const unread = useUnreadChats()
+  const unreadNotifs = useUnreadNotificationCount()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(readCollapsed)
   const menuBtn = useRef<HTMLButtonElement>(null)
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     setMenuOpen(false)
     requestAnimationFrame(() => menuBtn.current?.focus({ preventScroll: true }))
-  }
+  }, [])
   useInboxLive()
-  // Focused screens (an open chat, the registration form, the check-in scanner) use the whole height: no bottom tabs.
+  // Focused screens (an open chat, the registration form, the check-in scanner) use the whole height: no bars.
   const inChat = useMatch('/chat/:id')
   const inRegister = useMatch('/meet/register')
   const inCheckIn = useMatch('/admin/events/:slug/check-in')
   const focused = !!(inChat || inRegister || inCheckIn)
-  return (
-    <div className={clsx('min-h-dvh md:flex', !focused && 'has-topbar')}>
-      {/* desktop sidebar: every destination, grouped */}
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 flex-col border-r border-border bg-surface/80 px-3 py-5 backdrop-blur md:flex">
-        <Link to="/" className="mb-5 flex items-center gap-3 px-3">
-          <img src="/jec-logo.png" alt="" className="h-10 w-auto drop-shadow-sm" />
-          <span className="leading-tight">
-            <span className="block text-[17px] font-bold tracking-tight">JEC Alumni</span>
-            <span className="block text-xs font-medium text-muted">Jabalpur Engineering College</span>
-          </span>
-        </Link>
-        <SidebarMenu />
-        {profile && (
-          <Link to="/me" className="mt-3 flex shrink-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3 shadow-card hover:bg-surface-2" data-testid="sidebar-user">
-            <Avatar src={profile.avatar_url} name={profile.full_name} size={40} />
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold">{profile.full_name || tx('nav.yourProfile')}</span>
-              <span className="block truncate text-xs text-muted">{profile.grad_year ? tx('common.batch', { year: profile.grad_year }) : tx('nav.completeProfile')}</span>
-            </span>
-          </Link>
-        )}
-      </aside>
+  const barHidden = useHideOnScroll(!focused && !menuOpen)
 
-      {/* phone top bar: the menu opens from the top-left, where people look for it */}
+  // Ctrl/Cmd+K opens search anywhere (signed in)
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && !e.altKey) {
+        e.preventDefault()
+        if (profile) setSearchOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [profile])
+
+  const toggleSidebar = () =>
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? '0' : '1')
+      } catch {
+        /* ignore */
+      }
+      return !c
+    })
+
+  return (
+    <div className={clsx('min-h-dvh md:flex', !focused && 'has-topbar')} data-topbar-hidden={barHidden || undefined}>
+      <RouteProgress />
+      <ScrollMemory />
+      <SidebarMenu collapsed={collapsed} onToggle={toggleSidebar} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} unread={unreadNotifs} />
+
       {!focused && (
-        <div className="sticky top-0 z-30 border-b border-border/60 bg-bg/90 pt-safe backdrop-blur-xl md:hidden" data-testid="topbar">
-          <div className="mx-auto flex h-12 max-w-3xl items-center gap-1 px-2">
-            <button
-              ref={menuBtn}
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={menuOpen}
-              aria-label={tx('menu.title')}
-              className="grid size-11 place-items-center rounded-full text-text hover:bg-surface-2 active:bg-surface-2"
-            >
-              <Menu className="size-6" aria-hidden />
-            </button>
-            <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2 pr-2">
-              <img src="/jec-logo.png" alt="" className="h-7 w-auto" />
-              <span className="truncate text-[16px] font-bold tracking-tight">JEC Alumni Connect</span>
-            </Link>
-          </div>
-        </div>
+        <TopBar
+          menuRef={menuBtn}
+          menuOpen={menuOpen}
+          onMenu={() => setMenuOpen(true)}
+          onSearch={() => setSearchOpen(true)}
+          onNotifications={() => setNotifOpen(true)}
+          unread={unreadNotifs}
+          profile={profile}
+          hidden={barHidden}
+        />
       )}
-      <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(6rem+env(safe-area-inset-bottom))]')}>
-        <Outlet />
+      <main className={clsx('min-w-0 flex-1 md:pb-0', !focused && 'pb-[calc(7rem+env(safe-area-inset-bottom))]')}>
+        <Suspense fallback={<PageSkeleton />}>
+          <div key={pathname} className="route-fade">
+            <Outlet />
+          </div>
+        </Suspense>
       </main>
 
-      {/* phone bottom tabs: a floating glass bar */}
-      {!focused && (
-        <nav aria-label={tx('nav.main')} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:hidden">
-          <ul className="pointer-events-auto mx-auto flex max-w-md gap-1 rounded-[1.75rem] border border-border/70 bg-surface/85 p-1.5 shadow-pop backdrop-blur-xl">
-            {TABS.map((t) => (
-              <li key={t.to} className="flex-1">
-                <NavLink
-                  to={t.to}
-                  end={t.end}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[1.25rem] text-[11px] font-semibold transition-colors',
-                      isActive ? 'bg-primary text-on-primary shadow-[0_6px_16px_-8px_var(--primary)]' : 'text-muted active:bg-surface-2',
-                    )
-                  }
-                >
-                  <span className="relative grid h-6 place-items-center">
-                    <t.icon className="size-[22px]" aria-hidden />
-                    {t.to === '/chat' && unread > 0 && (
-                      <span className="absolute -right-2.5 -top-1.5 min-w-4.5 rounded-full bg-accent px-1 text-[10px] font-bold leading-4.5 text-[#2b1d00]" aria-label={tx('chat.unreadN', { n: unread })}>
-                        {unread > 9 ? '9+' : unread}
-                      </span>
-                    )}
-                  </span>
-                  {tx(t.label)}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
+      {!focused && <BottomTabs unread={unread} createOpen={createOpen} onCreate={() => (profile ? setCreateOpen(true) : navigate('/signin'))} />}
       <MenuSheet open={menuOpen} onClose={closeMenu} />
+      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+      <Suspense fallback={null}>
+        {searchOpen && <CommandSearch open onClose={() => setSearchOpen(false)} />}
+        {notifOpen && <NotificationsCentre open onClose={() => setNotifOpen(false)} />}
+      </Suspense>
+      <InstallPrompt enabled={!!profile && !focused} />
     </div>
   )
 }
@@ -152,7 +140,7 @@ export function PageHeader({ title, subtitle, back, action }: { title: ReactNode
     <header
       data-scrolled={scrolled || undefined}
       className={clsx(
-        'sticky top-0 z-20 border-b pt-safe transition-[background-color,border-color,box-shadow] duration-300',
+        'sticky top-0 z-20 border-b pt-safe transition-[top,background-color,border-color,box-shadow] duration-300 ease-[var(--ease-out)]',
         scrolled
           ? 'border-border/60 bg-bg/80 shadow-[0_10px_30px_-24px_rgb(0_0_0/0.45)] backdrop-blur-xl backdrop-saturate-150'
           : 'border-transparent bg-bg/0',
