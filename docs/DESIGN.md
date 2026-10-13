@@ -231,3 +231,37 @@ Old imports keep working: `Display.tsx` re-exports Card / Avatar / Skeleton.
 - `npx vitest run` — includes token contrast (`src/styles/contrast.test.ts`), the emoji guard (`src/styles/noEmoji.test.ts`), i18n parity.
 - `/styleguide` — compare Light | Dark side by side after any token change.
 - New strings for the design system live in `src/i18n/designEn.ts` / `designHi.ts` (spread into en/hi).
+
+---
+
+## FX layer — the "premium" toolkit (src/components/ui/Fx.tsx + src/styles/fx.css)
+
+The founder's review: the app must look as premium as Linear, Revolut, Apple (Liquid Glass) and the best Aceternity /
+Magic UI showcases. Plain recoloured cards are NOT enough. Every primary screen must use this layer deliberately:
+
+| effect | API | where it belongs |
+|---|---|---|
+| Liquid glass | `className="fx-liquid"` (auto theme) / `fx-liquid-dark` (on photos, aurora) | top/bottom bars, floating CTAs, stat chips on heroes, sheets |
+| Spotlight | `<SpotlightCard>` or `useSpotlight()` + `fx-spotlight` | interactive cards, feature tiles, tier cards |
+| Border beam | `<BorderBeam className="rounded-[1.6rem]">` | ONE hero card per screen (next event, ID card, featured campaign) |
+| Gradient hairline | `fx-hairline` | precious cards (pass, badges, premium tiers) |
+| Shine sweep | `fx-shine` (auto) / `fx-shine-hover` | primary CTA, gold buttons, wallet pass |
+| Dots / grid backdrop | `fx-dots`, `fx-grid` (+ `-light` on dark) | behind hero headlines and section intros |
+| Glow orbs / Meteors | `<GlowOrbs/>`, `<Meteors/>` | dark heroes only (landing, meet, sign-in) |
+| Text reveal | `<TextReveal text="…" as="h1"/>` | the ONE big headline of a hero |
+| Animated gradient text | `fx-gradient-text` | one key phrase ("comes home", "2026") |
+| 3D tilt | `<TiltCard>` | ID card, entry pass, badge medallion |
+| Marquee | `<Marquee label="…">` | companies where JECians work, cities, crests |
+| Bento grid | `<BentoGrid><BentoCard cols rows tone/></BentoGrid>` | Home dashboard, landing features, profile stats |
+| Press / lift | `fx-press`, `fx-lift` | every tappable card |
+| Scroll reveal | `fx-scroll-reveal` (CSS view-timeline) or `<Reveal>` | sections below the fold |
+
+Rules that make it look premium rather than busy:
+- **Real imagery first.** Use glimpse posters, event photos, member photos as hero imagery with dark gradient overlays.
+  Never leave big empty grey areas or broken-media boxes: always fall back to a designed poster.
+- **Bold hierarchy.** Hero titles 36–56px serif on phones (`text-display`/`text-display-xl`), tight leading; one idea per
+  card; numbers big (`text-stat`) with small labels.
+- **Bento over lists** for dashboards; lists only for genuinely list-shaped data.
+- **Depth:** layered surfaces (background → glass → card → floating action). Dark mode is first-class: test it first.
+- **Restraint:** max one beam + one motion headline per screen; effects never carry meaning; all static under reduced motion.
+- **Never truncate text inside circles/chips** — put labels below; ellipsis only on secondary lines.

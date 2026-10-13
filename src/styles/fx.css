@@ -1,0 +1,257 @@
+/*
+ * FX: the premium effect layer (inspired by the patterns of Linear, Apple "Liquid Glass", Aceternity / Magic UI),
+ * written for this app's tokens. Components live in src/components/ui/Fx.tsx. Every effect is static under
+ * prefers-reduced-motion, and none of them carries meaning on its own (decoration only).
+ */
+
+@property --fx-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ---------------------------------------------------------------- Liquid glass: translucent, refractive edge, specular top */
+.fx-liquid {
+  position: relative;
+  isolation: isolate;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.04) 42%, rgb(255 255 255 / 0.02)),
+    color-mix(in oklab, var(--surface) 58%, transparent);
+  backdrop-filter: blur(22px) saturate(1.7);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    inset 0 0 0 1px rgb(255 255 255 / 0.10),
+    0 1px 2px rgb(0 0 0 / 0.06),
+    0 18px 44px -18px rgb(6 42 32 / 0.45);
+}
+[data-theme="dark"] .fx-liquid {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.02) 45%, transparent),
+    color-mix(in oklab, var(--surface) 62%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06),
+    0 1px 2px rgb(0 0 0 / 0.5),
+    0 22px 50px -20px rgb(0 0 0 / 0.75);
+}
+/* on a dark photo/aurora: always the dark variant */
+.fx-liquid-dark {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0.04) 45%, rgb(255 255 255 / 0.02)), rgb(6 24 18 / 0.38);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), inset 0 0 0 1px rgb(255 255 255 / 0.10), 0 20px 50px -20px rgb(0 0 0 / 0.6);
+  color: #fff;
+}
+
+/* ---------------------------------------------------------------- Spotlight: a soft light that follows the pointer */
+.fx-spotlight {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.fx-spotlight::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(420px circle at var(--fx-x, 50%) var(--fx-y, 0%), color-mix(in oklab, var(--primary) 22%, transparent), transparent 60%);
+}
+.fx-spotlight[data-lit="true"]::before { opacity: 1; }
+.fx-spotlight-gold::before {
+  background: radial-gradient(420px circle at var(--fx-x, 50%) var(--fx-y, 0%), rgb(228 173 69 / 0.24), transparent 60%);
+}
+
+/* ---------------------------------------------------------------- Border beam: a light travelling around the edge */
+.fx-beam {
+  position: relative;
+  isolation: isolate;
+}
+.fx-beam::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(from var(--fx-angle), transparent 0 70%, var(--fx-beam-a, #ecc56a) 80%, var(--fx-beam-b, #3fae85) 88%, transparent 96%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: fx-spin var(--fx-beam-speed, 6s) linear infinite;
+}
+@keyframes fx-spin { to { --fx-angle: 360deg; } }
+
+/* static gradient hairline (for cards that should look precious without moving) */
+.fx-hairline {
+  position: relative;
+  isolation: isolate;
+}
+.fx-hairline::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(140deg, rgb(255 255 255 / 0.55), rgb(236 197 106 / 0.35) 30%, transparent 55%, rgb(63 174 133 / 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ---------------------------------------------------------------- Shine: a light sweep across a surface */
+.fx-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.fx-shine::after {
+  content: "";
+  position: absolute;
+  inset: -40% auto -40% -60%;
+  width: 45%;
+  pointer-events: none;
+  transform: skewX(-20deg) translateX(0);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.38), transparent);
+  animation: fx-sweep var(--fx-shine-every, 5.5s) cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes fx-sweep {
+  0%, 62% { transform: skewX(-20deg) translateX(0); }
+  100% { transform: skewX(-20deg) translateX(420%); }
+}
+.fx-shine-hover::after { animation: none; transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.fx-shine-hover:hover::after { transform: skewX(-20deg) translateX(420%); }
+
+/* ---------------------------------------------------------------- Backgrounds: dots / grid fading out at the edges */
+.fx-dots {
+  background-image: radial-gradient(color-mix(in oklab, var(--text) 16%, transparent) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 35%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 35%, #000 40%, transparent 100%);
+}
+.fx-grid {
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--text) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--text) 8%, transparent) 1px, transparent 1px);
+  background-size: 36px 36px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 100%);
+}
+.fx-dots-light { background-image: radial-gradient(rgb(255 255 255 / 0.22) 1px, transparent 1.2px); }
+.fx-grid-light {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+}
+
+/* ---------------------------------------------------------------- Glow orbs for heroes */
+.fx-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: fx-float 14s ease-in-out infinite alternate;
+}
+@keyframes fx-float {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(6%, -8%, 0) scale(1.15); }
+}
+
+/* ---------------------------------------------------------------- Meteors */
+.fx-meteor {
+  position: absolute;
+  top: -10%;
+  width: 1.5px;
+  height: 1.5px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  transform: rotate(215deg);
+  animation: fx-meteor var(--fx-dur, 7s) linear infinite;
+  animation-delay: var(--fx-delay, 0s);
+  pointer-events: none;
+}
+.fx-meteor::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 70px;
+  height: 1px;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, #ecc56a, transparent);
+}
+@keyframes fx-meteor {
+  0% { transform: rotate(215deg) translateX(0); opacity: 0; }
+  8% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: rotate(215deg) translateX(-900px); opacity: 0; }
+}
+
+/* ---------------------------------------------------------------- Marquee */
+.fx-marquee {
+  display: flex;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+.fx-marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--fx-gap, 1rem);
+  padding-right: var(--fx-gap, 1rem);
+  animation: fx-marquee var(--fx-marquee-dur, 38s) linear infinite;
+}
+.fx-marquee:hover .fx-marquee-track { animation-play-state: paused; }
+.fx-marquee[data-reverse="true"] .fx-marquee-track { animation-direction: reverse; }
+@keyframes fx-marquee { to { transform: translateX(-100%); } }
+
+/* ---------------------------------------------------------------- Animated gradient text */
+.fx-gradient-text {
+  background: linear-gradient(100deg, #f4dc9e, #e4ad45 25%, #6fc8a5 50%, #e4ad45 75%, #f4dc9e);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: fx-pan 8s linear infinite;
+}
+@keyframes fx-pan { to { background-position: 220% center; } }
+
+/* ---------------------------------------------------------------- Pressable: native-feeling press */
+.fx-press { transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.25s ease; }
+.fx-press:active { transform: scale(0.97); }
+@media (hover: hover) {
+  .fx-lift { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
+  .fx-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-pop); }
+}
+
+/* ---------------------------------------------------------------- Bento grid */
+.fx-bento {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: dense;
+}
+@media (min-width: 768px) { .fx-bento { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; } }
+
+/* ---------------------------------------------------------------- Scroll-driven reveal (progressive enhancement) */
+@supports (animation-timeline: view()) {
+  .fx-scroll-reveal {
+    animation: fx-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+  }
+}
+@keyframes fx-rise { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------- Reduced motion: everything still */
+@media (prefers-reduced-motion: reduce) {
+  .fx-beam::after, .fx-shine::after, .fx-orb, .fx-gradient-text, .fx-marquee-track { animation: none !important; }
+  .fx-meteor { display: none; }
+  .fx-scroll-reveal { animation: none !important; }
+}
