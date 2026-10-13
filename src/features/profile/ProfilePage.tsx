@@ -1,67 +1,69 @@
-import { IconTile } from '../../components/ui/IconTile'
-import { Bell as BellIcon_, Mail as MailIcon_, ShieldCheck as ShieldIcon_ } from 'lucide-react'
-import { BadgeCheck, Briefcase, Globe, GraduationCap, HeartHandshake, LogOut, MapPin, Pencil, ShieldAlert } from 'lucide-react'
+import { BadgeCheck, Briefcase, Globe, GraduationCap, Lightbulb, MapPin, Pencil, ShieldAlert, Sparkles, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { Page, PageHeader } from '../../components/layout/AppShell'
-import { Button, ButtonLink } from '../../components/ui/Button'
-import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { ButtonLink } from '../../components/ui/Button'
+import { Avatar, Card, EmptyState, Notice, SectionHeader } from '../../components/ui/Display'
+import { SkeletonProfile } from '../../components/ui/Skeleton'
 import { LinkedInIcon } from '../../components/ui/Icons'
+import { BentoCard, BentoGrid } from '../../components/ui/Fx'
+import { NumberTicker } from '../../components/ui/Motion'
+import { IconTile } from '../../components/ui/IconTile'
 import { friendlyError } from '../../lib/errors'
-import { formatDate } from '../../lib/format'
-import type { Education, Experience } from '../../lib/types'
-import { signOut, useMyProfile, useUserId } from '../auth/AuthProvider'
-import { LocationSettings } from '../location/LocationSharing'
+import { shortBranch } from '../../lib/constants'
+import type { Profile } from '../../lib/types'
+import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { TripChips } from '../location/TripChips'
-import { DownloadMyData } from './DownloadMyData'
 import { useMember } from './queries'
 import { SocialLinks } from './SocialLinks'
 import { useMySocialLinks } from './socialQueries'
 import { profileCompleteness } from '../home/HomePage'
-import { BadgesRow, ProfileActions } from '../community/ProfileActions'
-import { useIsOrganiser } from '../../components/layout/AppShell'
-import { useT } from '../../i18n'
-import { LanguageSwitch } from '../../i18n/LanguageSwitch'
-import { ThemeToggle } from '../../components/ui/ThemeToggle'
+import { ProfileActions } from '../community/ProfileActions'
+import { useT, type MsgKey } from '../../i18n'
 import { MyStoriesPanel, ProfileHighlights } from '../stories/Highlights'
 import { StoryComposer } from '../stories/StoryComposer'
 import { StoryAvatar } from '../stories/StoryRing'
+import { useStoryRing } from '../stories/api'
+import { BadgesStrip, CareerTimeline, EducationList, MetaChip, MutualConnections, ProfileCover, useProfileStats } from './ProfileParts'
+import { MeSettings, ProfileStrengthCard } from './MeSettings'
 
-function period(e: Experience) {
-  const from = e.start_date ? formatDate(e.start_date, { month: 'short', year: 'numeric' }) : ''
-  const to = e.is_current ? 'Present' : e.end_date ? formatDate(e.end_date, { month: 'short', year: 'numeric' }) : ''
-  return [from, to].filter(Boolean).join(' – ')
+/** The same checks as profileCompleteness(), listed so the Me page can show every next step. */
+function strengthSteps(p: Profile): { label: MsgKey; to: string; done: boolean }[] {
+  return [
+    { label: 'home.stepPhoto', to: '/me/edit', done: !!p.avatar_url },
+    { label: 'home.stepRole', to: '/me/import', done: !!p.headline || !!p.current_title },
+    { label: 'home.stepAbout', to: '/me/edit', done: !!p.about },
+    { label: 'home.stepSkills', to: '/me/import', done: p.skills.length > 0 },
+    { label: 'home.stepHelp', to: '/me/edit', done: p.help_tags.length > 0 },
+    { label: 'home.stepLinkedin', to: '/me/edit', done: !!p.linkedin_url },
+  ]
 }
 
-function ExperienceItem({ e }: { e: Experience }) {
+function ProfileAvatar({ p }: { p: Profile }) {
+  const { data: ring } = useStoryRing(p.id)
   return (
-    <li className="flex gap-3 p-4">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-        <Briefcase className="size-5" aria-hidden />
-      </span>
-      <div className="min-w-0">
-        <p className="font-semibold leading-snug">{e.title}</p>
-        <p className="text-[15px]">{e.company}</p>
-        <p className="text-sm text-muted">{[period(e), e.location].filter(Boolean).join(' · ')}</p>
-        {e.description && <p className="mt-1.5 line-clamp-4 whitespace-pre-line text-sm text-muted">{e.description}</p>}
-      </div>
-    </li>
+    <span className="relative inline-grid rounded-full bg-bg p-1 shadow-e3">
+      {ring ? (
+        <StoryAvatar userId={p.id} name={p.full_name} src={p.avatar_url} size={112} />
+      ) : (
+        <Avatar name={p.full_name} src={p.avatar_url} size={112} ring={p.verification === 'verified' ? 'verified' : 'seen'} />
+      )}
+    </span>
   )
 }
 
-function EducationItem({ e }: { e: Education }) {
-  return (
-    <li className="flex gap-3 p-4">
-      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted">
-        <GraduationCap className="size-5" aria-hidden />
+function Stat({ value, label, to, capped }: { value: number | null; label: string; to?: string; capped?: boolean }) {
+  const body = (
+    <>
+      <span className="text-stat block text-[28px] leading-none">
+        {value === null ? <span className="text-muted">–</span> : <NumberTicker value={value} />}
+        {capped && <span className="text-gold-ink">+</span>}
       </span>
-      <div className="min-w-0">
-        <p className="font-semibold leading-snug">{e.school}</p>
-        <p className="text-[15px]">{[e.degree, e.field].filter(Boolean).join(', ')}</p>
-        {(e.start_year || e.end_year) && <p className="text-sm text-muted">{[e.start_year, e.end_year].filter(Boolean).join(' – ')}</p>}
-      </div>
-    </li>
+      <span className="text-caption mt-1.5 block font-semibold text-muted">{label}</span>
+    </>
   )
+  const cls = 'fx-press flex min-h-16 flex-1 flex-col items-center justify-center rounded-2xl px-1 py-2 text-center'
+  return to ? <Link to={to} className={`${cls} hover:bg-surface-2`}>{body}</Link> : <div className={cls}>{body}</div>
 }
 
 export function ProfilePage({ self }: { self?: boolean }) {
@@ -73,8 +75,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const { data, isLoading, error } = useMember(id)
   const { data: me } = useMyProfile()
   const { data: mySocial } = useMySocialLinks()
-  const navigate = useNavigate()
-  const organiser = useIsOrganiser()
+  const stats = useProfileStats(data ? id : undefined)
   const { hash } = useLocation()
   const [composer, setComposer] = useState(false)
   useEffect(() => {
@@ -83,7 +84,15 @@ export function ProfilePage({ self }: { self?: boolean }) {
     return () => clearTimeout(t)
   }, [hash, data])
 
-  if (isLoading) return <PageSkeleton />
+  if (isLoading)
+    return (
+      <div>
+        <div className="mx-auto h-44 max-w-3xl animate-pulse bg-surface-2 md:mt-4 md:rounded-[32px]" />
+        <Page>
+          <SkeletonProfile />
+        </Page>
+      </div>
+    )
   if (error) return <Page><Notice tone="danger" title={friendlyError(error)} /></Page>
   if (!data) {
     return (
@@ -98,74 +107,99 @@ export function ProfilePage({ self }: { self?: boolean }) {
 
   const { profile: p, experiences, educations } = data
   const comp = profileCompleteness(p, !!(mySocial?.instagram_url || mySocial?.facebook_url))
-  const role = p.current_title && p.current_company ? `${p.current_title} at ${p.current_company}` : p.headline
+  const role = p.current_title && p.current_company ? tx('pp.roleAt', { title: p.current_title, company: p.current_company }) : p.current_title || p.headline
+  const subline = role !== p.headline ? p.headline : null
+  const place = [p.city, p.country !== 'India' ? p.country : null].filter(Boolean).join(', ')
+  const verified = p.verification === 'verified'
+  const website = p.website_url && /^https?:\/\//i.test(p.website_url) ? p.website_url : null
+  const linkPill =
+    'fx-press inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-[15px] font-semibold text-primary shadow-e1 hover:bg-primary-soft'
+
   return (
     <div>
       {!isMe && <PageHeader title={p.full_name} back="/people" />}
-      <div className="h-24 bg-gradient-to-r from-hero to-hero-2 sm:h-32" aria-hidden />
-      <Page className="-mt-14 space-y-6 pt-0">
-        <section>
-          <StoryAvatar userId={p.id} name={p.full_name} src={p.avatar_url} size={104} className="border-4 border-bg" />
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">{p.full_name}</h1>
-            {p.verification === 'verified' && (
-              <Badge tone="success">
-                <BadgeCheck className="size-3.5" aria-hidden /> Verified
-              </Badge>
+      <div className="mx-auto max-w-3xl md:px-4 md:pt-4">
+        <ProfileCover year={p.grad_year} branch={p.branch} className="h-40 sm:h-52 md:rounded-[32px]">
+          <div className="flex justify-end p-4">
+            {p.grad_year && (
+              <span className="fx-liquid-dark inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold">
+                <GraduationCap className="size-3.5 text-accent" aria-hidden />
+                {tx('pp.classOf', { year: p.grad_year })}
+              </span>
             )}
           </div>
-          {role && <p className="mt-1 text-[17px]">{role}</p>}
-          <p className="mt-1 text-[15px] text-muted">
-            {[p.branch, p.grad_year && tx('common.batch', { year: p.grad_year })].filter(Boolean).join(' · ')}
-          </p>
-          {p.city && (
-            <p className="mt-0.5 flex items-center gap-1 text-[15px] text-muted">
-              <MapPin className="size-4" aria-hidden /> {[p.city, p.country !== 'India' ? p.country : null].filter(Boolean).join(', ')}
-            </p>
+        </ProfileCover>
+      </div>
+
+      <Page className="relative -mt-16 space-y-8 pt-0 md:px-8">
+        <section aria-label={tx('pp.profileOf', { name: p.full_name })} className="space-y-4">
+          <ProfileAvatar p={p} />
+          <div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h1 className="font-display text-[30px] font-semibold leading-[1.1] tracking-tight sm:text-[36px]">{p.full_name}</h1>
+              {verified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-bold text-primary" title={tx('pp.verifiedHint')}>
+                  <BadgeCheck className="size-4" fill="currentColor" stroke="var(--surface)" aria-hidden />
+                  {tx('pp.verified')}
+                </span>
+              )}
+            </div>
+            {role && <p className="text-body-lg mt-1.5 font-medium">{role}</p>}
+            {subline && <p className="text-body mt-0.5 text-muted">{subline}</p>}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {p.grad_year && <MetaChip icon={<GraduationCap />}>{tx('common.batch', { year: p.grad_year })}</MetaChip>}
+            {p.branch && <MetaChip icon={<Lightbulb />}>{shortBranch(p.branch)}</MetaChip>}
+            {place && <MetaChip icon={<MapPin />}>{place}</MetaChip>}
+          </div>
+          {!isMe && <MutualConnections otherId={p.id} />}
+
+          {isMe ? (
+            <div className="flex gap-2">
+              <ButtonLink to="/me/edit" className="flex-1" icon={<Pencil className="size-4" />}>
+                {tx('profile.edit')}
+              </ButtonLink>
+              <ButtonLink to="/me/import" variant="secondary" aria-label={tx('home.importLinkedin')} icon={<LinkedInIcon className="size-4" />}>
+                LinkedIn
+              </ButtonLink>
+            </div>
+          ) : (
+            <ProfileActions profile={p} />
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {isMe ? (
-              <>
-                <ButtonLink to="/me/edit" icon={<Pencil className="size-4" />}>
-                  {tx('profile.edit')}
-                </ButtonLink>
-                <ButtonLink to="/me/import" variant="secondary" icon={<LinkedInIcon className="size-4" />}>
-                  {tx('home.importLinkedin')}
-                </ButtonLink>
-                <ButtonLink to="/give" variant="secondary" icon={<HeartHandshake className="size-4" />}>
-                  {tx('give.giveBack')}
-                </ButtonLink>
-              </>
-            ) : (
-              <ProfileActions profile={p} />
-            )}
-            {p.website_url && /^https?:\/\//i.test(p.website_url) && (
-              <a
-                href={p.website_url}
-                target="_blank"
-                rel="noopener noreferrer nofollow"
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-5 font-semibold text-primary hover:bg-primary-soft"
-              >
-                <Globe className="size-4" aria-hidden /> {new URL(p.website_url).hostname.replace(/^www\./, '')}
-              </a>
-            )}
-            {!isMe && (
-              p.linkedin_url && (
-                <a
-                  href={p.linkedin_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-surface px-5 font-semibold text-primary hover:bg-primary-soft"
-                >
+
+          {(website || (!isMe && p.linkedin_url)) && (
+            <div className="flex flex-wrap gap-2">
+              {website && (
+                <a href={website} target="_blank" rel="noopener noreferrer nofollow" className={linkPill}>
+                  <Globe className="size-4" aria-hidden /> {new URL(website).hostname.replace(/^www\./, '')}
+                </a>
+              )}
+              {!isMe && p.linkedin_url && (
+                <a href={p.linkedin_url} target="_blank" rel="noreferrer" className={linkPill}>
                   <LinkedInIcon className="size-4" /> View on LinkedIn
                 </a>
-              )
-            )}
-          </div>
-          <SocialLinks userId={p.id} name={p.full_name} className="mt-2" />
+              )}
+            </div>
+          )}
+          <SocialLinks userId={p.id} name={p.full_name} />
         </section>
 
-        <BadgesRow memberId={p.id} />
+        <BentoGrid>
+          {isMe && (
+            <BentoCard cols={2} tone="hero" className="p-5">
+              <ProfileStrengthCard percent={comp.percent} steps={strengthSteps(p)} />
+            </BentoCard>
+          )}
+          <BentoCard cols={2} className="flex items-stretch gap-1 p-2" data-testid="profile-stats">
+            <Stat value={stats.connections} capped={stats.connectionsCapped} label={tx('pp.stat.connections')} to={isMe ? '/me/connections' : undefined} />
+            <span aria-hidden className="my-3 w-px bg-border" />
+            <Stat value={stats.groups} label={tx('pp.stat.groups')} to={isMe ? '/groups' : undefined} />
+            <span aria-hidden className="my-3 w-px bg-border" />
+            <Stat value={stats.badges} label={tx('pp.stat.badges')} to={isMe ? '/me/badges' : undefined} />
+          </BentoCard>
+        </BentoGrid>
+
+        <BadgesStrip userId={p.id} isMe={isMe} />
 
         <ProfileHighlights userId={p.id} isMe={isMe} />
 
@@ -174,154 +208,83 @@ export function ProfilePage({ self }: { self?: boolean }) {
 
         <TripChips userId={p.id} isMe={isMe} />
 
-        {isMe && (
-          <>
-            {comp.next && (
-              <Card className="p-4" data-testid="me-completeness">
-                <p className="font-semibold">{tx('home.complete', { percent: comp.percent })}</p>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={comp.percent} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${comp.percent}%` }} />
-                </div>
-                <Link to={comp.next.to} className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary">
-                  {tx('home.next')} {tx(comp.next.label)}
-                </Link>
-              </Card>
-            )}
-            <nav className="grid gap-2 sm:grid-cols-2" aria-label={tx('menu.settings')}>
-              {[
-                { to: '/notifications', label: tx('notif.title'), hint: tx('profile.notifHint'), icon: BellIcon_, tone: 'emerald' as const },
-                { to: '/invite', label: tx('profile.invite'), hint: tx('profile.inviteHint'), icon: MailIcon_, tone: 'gold' as const },
-                ...(organiser ? [{ to: '/admin', label: tx('nav.organise'), hint: tx('profile.organiseHint'), icon: ShieldIcon_, tone: 'maroon' as const }] : []),
-              ].map((l) => (
-                <Link key={l.to} to={l.to} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:border-primary/40">
-                  <IconTile icon={l.icon} tone={l.tone} />
-                  <span className="min-w-0">
-                    <span className="block font-semibold">{l.label}</span>
-                    <span className="block truncate text-sm text-muted">{l.hint}</span>
-                  </span>
-                </Link>
-              ))}
-            </nav>
-            <p className="text-sm text-muted">{tx('menu.meHint')}</p>
-          </>
-        )}
-
-        {isMe && p.verification !== 'verified' && (
+        {isMe && !verified && (
           <Notice tone="info" title={tx('profile.unverified')}>
             {tx('profile.unverifiedBody')}
           </Notice>
         )}
 
-        {p.help_tags.length > 0 && (
-          <section>
-            <SectionTitle>Can help with</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {p.help_tags.map((t) => (
-                <Badge key={t} tone="accent" className="px-3 py-1 text-sm">
-                  {t}
-                </Badge>
-              ))}
-            </div>
-          </section>
-        )}
-
         {p.about && (
           <section>
-            <SectionTitle>About</SectionTitle>
-            <Card className="whitespace-pre-line p-4 text-[15px] leading-relaxed">{p.about}</Card>
+            <SectionHeader eyebrow={isMe ? undefined : tx('pp.inTheirWords')} title={tx('pp.about')} />
+            <Card variant="gradient-border" className="text-body-lg whitespace-pre-line p-5 leading-relaxed">{p.about}</Card>
           </section>
         )}
 
         {experiences.length > 0 && (
           <section>
-            <SectionTitle>Experience</SectionTitle>
-            <Card>
-              <ul className="divide-y divide-border">
-                {experiences.map((e) => (
-                  <ExperienceItem key={e.id} e={e} />
-                ))}
-              </ul>
+            <SectionHeader eyebrow={tx('pp.career')} title="Experience" />
+            <Card className="p-5">
+              <CareerTimeline items={experiences} />
             </Card>
           </section>
         )}
 
         {educations.length > 0 && (
           <section>
-            <SectionTitle>Education</SectionTitle>
-            <Card>
-              <ul className="divide-y divide-border">
-                {educations.map((e) => (
-                  <EducationItem key={e.id} e={e} />
-                ))}
-              </ul>
+            <SectionHeader title={tx('pp.education')} />
+            <Card className="p-5">
+              <EducationList items={educations} />
             </Card>
           </section>
         )}
 
-        {p.skills.length > 0 && (
-          <section>
-            <SectionTitle>Skills</SectionTitle>
-            <div className="flex flex-wrap gap-2">
-              {p.skills.map((s) => (
-                <Badge key={s} tone="neutral" className="px-3 py-1 text-sm">
-                  {s}
-                </Badge>
-              ))}
-            </div>
+        {(p.help_tags.length > 0 || p.skills.length > 0) && (
+          <section className="space-y-5">
+            {p.help_tags.length > 0 && (
+              <div>
+                <SectionHeader eyebrow={tx('pp.forJuniors')} title={tx('pp.canHelp')} />
+                <div className="flex flex-wrap gap-2">
+                  {p.help_tags.map((t) => (
+                    <span key={t} className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-accent/40 bg-accent-soft px-3.5 text-sm font-semibold text-gold-ink">
+                      <Sparkles className="size-3.5" aria-hidden />
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {p.skills.length > 0 && (
+              <div>
+                <SectionHeader title={tx('pp.skills')} />
+                <div className="flex flex-wrap gap-2">
+                  {p.skills.map((s) => (
+                    <span key={s} className="inline-flex min-h-9 items-center rounded-full border border-border bg-surface px-3.5 text-sm font-semibold shadow-e1">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
         {isMe && experiences.length === 0 && !p.about && (
-          <Card className="p-5 text-center">
-            <p className="font-semibold">Fill your profile in 30 seconds</p>
-            <p className="mt-1 text-[15px] text-muted">Import your experience, education and skills from LinkedIn, then review before saving.</p>
+          <Card variant="gradient-border" className="flex flex-col items-center p-6 text-center">
+            <IconTile icon={Briefcase} tone="ink" variant="solid" size="lg" />
+            <p className="text-title mt-3">Fill your profile in 30 seconds</p>
+            <p className="text-body mt-1 text-muted">Import your experience, education and skills from LinkedIn, then review before saving.</p>
             <ButtonLink to="/me/import" className="mt-4" icon={<LinkedInIcon className="size-4" />}>
               Import from LinkedIn
             </ButtonLink>
           </Card>
         )}
 
-        {isMe && (
-          <section id="language" aria-labelledby="lang-title" className="scroll-mt-20">
-            <SectionTitle><span id="lang-title">भाषा / Language</span></SectionTitle>
-            <LanguageSwitch />
-          </section>
+        {!isMe && experiences.length === 0 && !p.about && p.skills.length === 0 && (
+          <EmptyState compact icon={<Users />} title={tx('pp.sparse', { name: p.full_name.split(' ')[0]! })} />
         )}
 
-        {isMe && (
-          <section id="appearance" aria-labelledby="theme-title" className="scroll-mt-20">
-            <SectionTitle><span id="theme-title">{tx('ds.theme.title')}</span></SectionTitle>
-            <ThemeToggle />
-            <p className="mt-2 text-sm text-muted">{tx('ds.theme.hint')}</p>
-          </section>
-        )}
-
-        {isMe && (
-          <section aria-label={tx('loc.title')}>
-            <LocationSettings />
-          </section>
-        )}
-
-        {isMe && (
-          <section id="my-data" className="scroll-mt-20 pt-2">
-            <DownloadMyData />
-          </section>
-        )}
-
-        {isMe && (
-          <section className="pt-2">
-            <Button
-              variant="danger-ghost"
-              icon={<LogOut className="size-4" />}
-              onClick={async () => {
-                await signOut()
-                navigate('/', { replace: true })
-              }}
-            >
-              {tx('profile.signOut')}
-            </Button>
-          </section>
-        )}
+        {isMe && <MeSettings profile={p} />}
       </Page>
     </div>
   )

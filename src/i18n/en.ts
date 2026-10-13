@@ -3,6 +3,7 @@
 import { mediaEn } from './mediaEn'
 import { storiesEn } from './storiesEn'
 import { designEn } from './designEn'
+import { peopleUiEn } from './peopleUiEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1317,4 +1318,5 @@ export const en = {
   ...mediaEn,
   ...storiesEn,
   ...designEn,
+  ...peopleUiEn,
 } as const satisfies Record<string, string>

@@ -1,10 +1,12 @@
 import { Award, Crown, Handshake, PartyPopper, Trophy, type LucideIcon } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BadgeCheck, Ban, Check, MessageCircle, UserPlus } from 'lucide-react'
+import { BadgeCheck, Ban, Check, MessageCircle, MoreHorizontal, Share2, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
-import { Button } from '../../components/ui/Button'
+import { Button, IconButton } from '../../components/ui/Button'
+import { Sheet, SheetAction } from '../../components/ui/Sheet'
+import { useT } from '../../i18n'
 import { Badge } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
 import { supabase } from '../../lib/supabase'
@@ -40,6 +42,8 @@ export function ProfileActions({ profile }: { profile: Profile }) {
   const navigate = useNavigate()
   const { data: state } = useConnectionState(profile.id)
   const [busy, setBusy] = useState<string | null>(null)
+  const [more, setMore] = useState(false)
+  const tx = useT()
   const verified = me?.verification === 'verified' || me?.is_admin
 
   if (!verified || profile.id === uid) return null
@@ -77,6 +81,19 @@ export function ProfileActions({ profile }: { profile: Profile }) {
     void qc.invalidateQueries({ queryKey: ['member', profile.id] })
   }
 
+  async function share() {
+    const url = `${window.location.origin}/people/${profile.id}`
+    try {
+      if (navigator.share) await navigator.share({ title: profile.full_name, url })
+      else {
+        await navigator.clipboard.writeText(url)
+        toast.success(tx('pp.linkCopied'))
+      }
+    } catch {
+      /* cancelled */
+    }
+  }
+
   async function block() {
     if (!window.confirm(`Block ${profile.full_name}? They won’t be able to message you, and you won’t see each other’s posts.`)) return
     const { error } = await supabase.from('blocks').insert({ blocker: uid, blocked: profile.id })
@@ -86,27 +103,37 @@ export function ProfileActions({ profile }: { profile: Profile }) {
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button icon={<MessageCircle className="size-4" />} loading={busy === 'message'} onClick={message}>
+    <div className="flex w-full items-center gap-2">
+      <Button className="flex-1" icon={<MessageCircle className="size-4" />} loading={busy === 'message'} onClick={message}>
         Message
       </Button>
       {state === 'connected' ? (
-        <Badge tone="success" className="min-h-11 px-4 text-sm">
+        <span className="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-full border border-success/25 bg-success-soft px-4 text-[15px] font-semibold text-success">
           <Check className="size-4" aria-hidden /> Connected
-        </Badge>
+        </span>
       ) : (
-        <Button variant="secondary" icon={<UserPlus className="size-4" />} loading={busy === 'connect'} disabled={state === 'sent'} onClick={connect}>
+        <Button className="flex-1" variant="secondary" icon={state === 'sent' ? <Check className="size-4" /> : <UserPlus className="size-4" />} loading={busy === 'connect'} disabled={state === 'sent'} onClick={connect}>
           {state === 'sent' ? 'Request sent' : state === 'received' ? 'Accept request' : 'Connect'}
         </Button>
       )}
-      {profile.verification !== 'verified' && (
-        <Button variant="secondary" icon={<BadgeCheck className="size-4" />} onClick={vouch}>
-          I know them from JEC
-        </Button>
-      )}
-      <Button variant="danger-ghost" size="sm" icon={<Ban className="size-4" />} onClick={block}>
-        Block
-      </Button>
+      <IconButton label={tx('pp.more')} variant="secondary" size="md" onClick={() => setMore(true)}>
+        <MoreHorizontal className="size-5" />
+      </IconButton>
+      <Sheet open={more} onClose={() => setMore(false)} label={tx('pp.more')}>
+        <div className="pb-2">
+          {profile.verification !== 'verified' && (
+            <SheetAction icon={<BadgeCheck />} onClick={() => { setMore(false); void vouch() }}>
+              I know them from JEC
+            </SheetAction>
+          )}
+          <SheetAction icon={<Share2 />} onClick={() => { setMore(false); void share() }}>
+            {tx('pp.shareProfile')}
+          </SheetAction>
+          <SheetAction danger icon={<Ban />} onClick={() => { setMore(false); void block() }}>
+            Block
+          </SheetAction>
+        </div>
+      </Sheet>
     </div>
   )
 }
