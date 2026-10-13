@@ -2,11 +2,11 @@ import clsx from 'clsx'
 import { CalendarPlus, Check, Copy, Images, Pencil, Smartphone, Upload, UserPlus, X } from 'lucide-react'
 import { readCachedTicket, ticketKey, type CachedTicket } from './ticketCache'
 import { useOnline } from '../../hooks/useOnline'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
-import { Button, ButtonLink } from '../../components/ui/Button'
+import { Button, ButtonLink, buttonClass } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Field, Input } from '../../components/ui/Form'
 import { WhatsAppIcon } from '../../components/ui/Icons'
@@ -25,6 +25,7 @@ import { buildUpiLink, isValidUpiId, normalizeUtr } from '../../lib/upi'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useCancelRegistration, useEvent, useEventQuestions, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
 import { answerText, dayLabel, eventDayCount } from './reunion'
+import { EntryPass, PassTips, RegisteredCelebration, ShareCardButton } from './PassParts'
 import { PaymentBadge, StatusBadge } from './StatusBadge'
 
 const ua = typeof navigator !== 'undefined' ? navigator.userAgent : ''
@@ -80,11 +81,13 @@ export function MyRegistrationPage() {
   const reg = mine.registration
   return (
     <div>
-      <PageHeader title={tx('my.title')} subtitle={event.title} back="/meet" action={<StatusBadge status={reg.status} />} />
+      <PageHeader title={tx('my.title')} subtitle={event.title} back="/meet" />
       <Page className="space-y-6">
-        {justRegistered && <WhatNext mine={mine} />}
+        {justRegistered && <WhatNext mine={mine} event={event} />}
+        <div className="flex justify-center"><StatusBadge status={reg.status} /></div>
         <Timeline status={reg.status} hasPayment={mine.payments.some((p) => p.status !== 'rejected')} free={reg.amount_paise === 0} />
         {reg.status === 'confirmed' && <TicketCard event={event} mine={mine} />}
+        {reg.status === 'confirmed' && !justRegistered && <ShareRow event={event} mine={mine} />}
         {reg.status === 'pending_payment' && <PaymentPanel event={event} mine={mine} />}
         {reg.status === 'under_review' && <UnderReview mine={mine} />}
         <Details mine={mine} event={event} />
@@ -98,22 +101,11 @@ export function MyRegistrationPage() {
 function OfflineTicket({ t }: { t: CachedTicket }) {
   const tx = useT()
   return (
-    <Card className="overflow-hidden">
-      <div className="bg-hero px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent">{tx('my.passOffline')}</p>
-        <p className="text-lg font-bold">{t.title}</p>
-        <p className="text-sm text-hero-text">{t.when}</p>
-      </div>
-      <div className="flex flex-col items-center gap-3 p-5">
-        <QrCode value={t.code} size={200} label={tx('my.qrLabel', { code: t.code })} />
-        <p className="font-mono text-2xl font-bold tracking-widest">{t.code}</p>
-        <p className="text-center">
-          <span className="font-semibold">{t.name}</span>
-          <span className="text-muted"> · {tx('my.admits', { count: t.headcount })}</span>
-        </p>
-        <p className="text-center text-sm text-muted">{tx('my.offlineNote')}</p>
-      </div>
-    </Card>
+    <div className="space-y-3">
+      <p className="text-caption flex items-center justify-center gap-2 font-semibold text-muted">{tx('my.passOffline')}</p>
+      <EntryPass pass={{ title: t.title, when: t.when, code: t.code, name: t.name, headcount: t.headcount, status: 'offline' }} />
+      <p className="text-center text-sm text-muted">{tx('my.offlineNote')}</p>
+    </div>
   )
 }
 
@@ -212,6 +204,20 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
     )
   }
 
+  const digits = utr.replace(/\D/g, '').length
+  const utrOk = !!normalizeUtr(utr)
+  const copyRow = (label: string, value: ReactNode, onCopy: () => void, aria: string, mono?: boolean) => (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2/70 py-2 pl-4 pr-1.5">
+      <div className="min-w-0">
+        <dt className="text-caption text-muted">{label}</dt>
+        <dd className={clsx('truncate text-[15px] font-semibold tabular-nums', mono && 'font-mono')}>{value}</dd>
+      </div>
+      <button type="button" className="fx-press grid size-11 shrink-0 place-items-center rounded-full bg-surface text-primary shadow-e1 hover:bg-primary-soft" onClick={onCopy} aria-label={aria}>
+        <Copy className="size-4" />
+      </button>
+    </div>
+  )
+
   return (
     <section className="space-y-4">
       {lastRejected && (
@@ -219,20 +225,21 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           {lastRejected.review_note ?? tx('my.rejectedBody')}
         </Notice>
       )}
-      <Card className="overflow-hidden">
-        <div className="bg-primary-soft p-4">
-          <p className="text-sm font-semibold text-primary">{tx('my.step1')}</p>
-          <p className="mt-1 text-3xl font-bold tabular-nums">{formatPaise(due)}</p>
-          <p className="text-sm text-muted">{tx('my.payTo', { name: event.upi_payee_name ?? '' })}</p>
-          {reg.fund_paise > 0 && <p className="mt-1 text-sm text-muted">{tx('rr.payBreakdown', { tickets: formatPaise(reg.amount_paise - reg.fund_paise, { zeroAsFree: false }), fund: formatPaise(reg.fund_paise) })}</p>}
+      <div className="fx-hairline overflow-hidden rounded-[1.75rem] bg-surface shadow-e3">
+        <div className="aurora relative px-5 pb-6 pt-5 text-white">
+          <p className="text-eyebrow text-accent">{tx('my.step1')}</p>
+          <p className="text-caption mt-3 text-white/70">{tx('evx.amountDue')}</p>
+          <p className="text-stat text-[2.75rem] leading-tight">{formatPaise(due)}</p>
+          <p className="text-caption text-hero-text">{tx('my.payTo', { name: event.upi_payee_name ?? '' })}</p>
+          {reg.fund_paise > 0 && <p className="text-caption mt-1 text-hero-text">{tx('rr.payBreakdown', { tickets: formatPaise(reg.amount_paise - reg.fund_paise, { zeroAsFree: false }), fund: formatPaise(reg.fund_paise) })}</p>}
         </div>
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-4 sm:p-5">
           {isIos && link && (
             <div className="space-y-2">
               <p className="text-center text-sm font-semibold">{tx('my.payWith', { amount: formatPaise(due) })}</p>
               <div className="grid grid-cols-3 gap-2">
                 {IOS_APPS.map((a) => (
-                  <a key={a.name} href={link.replace('upi://pay', a.scheme)} className="flex min-h-12 items-center justify-center rounded-xl border border-border bg-surface px-2 text-center text-sm font-semibold text-primary hover:bg-primary-soft">
+                  <a key={a.name} href={link.replace('upi://pay', a.scheme)} className="fx-press flex min-h-12 items-center justify-center rounded-2xl border border-border bg-surface px-2 text-center text-sm font-semibold text-primary shadow-e1 hover:bg-primary-soft">
                     {a.name}
                   </a>
                 ))}
@@ -241,75 +248,54 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
             </div>
           )}
           {isPhone && !isIos && link && (
-            <a
-              href={link}
-              className="flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 text-base font-semibold text-on-primary hover:bg-primary-hover"
-            >
+            <a href={link} className={buttonClass('primary', 'lg', 'fx-shine w-full')}>
               <Smartphone className="size-5" aria-hidden /> {tx('my.payApp', { amount: formatPaise(due) })}
             </a>
           )}
-          <dl className="divide-y divide-border rounded-xl border border-border px-3">
-            <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">{tx('my.upiId')}</dt>
-              <dd className="flex min-w-0 items-center gap-1">
-                <span className="truncate font-mono text-[15px] font-semibold">{event.upi_id}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(event.upi_id!, tx('my.upiId'))} aria-label={tx('my.copyUpi')}>
-                  <Copy className="size-4" />
-                </button>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">{tx('my.amount')}</dt>
-              <dd className="flex items-center gap-1">
-                <span className="font-semibold tabular-nums">{formatPaise(due)}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(String(due / 100), tx('my.amount'))} aria-label={tx('my.copyAmount')}>
-                  <Copy className="size-4" />
-                </button>
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-3 py-2.5">
-              <dt className="text-sm text-muted">{tx('my.note')}</dt>
-              <dd className="flex items-center gap-1">
-                <span className="font-mono font-semibold">{reg.code}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-primary hover:bg-primary-soft" onClick={() => copy(reg.code, tx('my.code'))} aria-label={tx('my.copyCode')}>
-                  <Copy className="size-4" />
-                </button>
-              </dd>
-            </div>
+          <dl className="grid gap-2">
+            {copyRow(tx('my.upiId'), event.upi_id, () => copy(event.upi_id!, tx('my.upiId')), tx('my.copyUpi'), true)}
+            {copyRow(tx('my.amount'), formatPaise(due), () => copy(String(due / 100), tx('my.amount')), tx('my.copyAmount'))}
+            {copyRow(tx('my.note'), reg.code, () => copy(reg.code, tx('my.code')), tx('my.copyCode'), true)}
           </dl>
           {link &&
             (showQr ? (
-              <div className="flex flex-col items-center gap-2">
-                <QrCode value={link} size={220} label={tx('my.upiQr', { amount: formatPaise(due) })} />
+              <div className="flex flex-col items-center gap-2 rounded-[1.5rem] bg-surface-2/60 p-4">
+                <div className="rounded-[1.4rem] bg-white p-2.5 shadow-e2">
+                  <QrCode value={link} size={220} label={tx('my.upiQr', { amount: formatPaise(due) })} />
+                </div>
                 <p className="text-center text-sm text-muted">{tx('my.scan')}</p>
               </div>
             ) : (
-              <button type="button" className="w-full text-center text-sm font-semibold text-primary" onClick={() => setShowQr(true)}>
+              <button type="button" className="min-h-11 w-full text-center text-sm font-semibold text-primary" onClick={() => setShowQr(true)}>
                 {tx('my.showQr')}
               </button>
             ))}
           {event.payment_note && <p className="text-sm text-muted">{event.payment_note}</p>}
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-4">
-        <p className="text-sm font-semibold text-primary">{tx('my.step2')}</p>
-        <form onSubmit={onSubmit} noValidate className="mt-3 space-y-4">
-          <Field
-            label={tx('my.utr')}
-            error={utrError}
-            hint={tx('my.utrHint')}
-          >
+      <div className="fx-hairline rounded-[1.75rem] bg-surface p-4 shadow-card sm:p-5">
+        <p className="text-eyebrow text-gold-ink">{tx('my.step2')}</p>
+        <form onSubmit={onSubmit} noValidate className="mt-4 space-y-4">
+          <Field label={tx('my.utr')} error={utrError} success={!utrError && utrOk ? tx('evx.utrLooksGood') : null} hint={tx('my.utrHint')}>
             {(p) => (
               <Input
                 {...p}
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder={tx('my.utrPh')}
-                className="font-mono tracking-wider"
+                className={clsx('font-mono text-lg tracking-[0.12em] placeholder:font-sans placeholder:text-base placeholder:tracking-normal', utrOk && !utrError && 'border-success ring-2 ring-success/20')}
                 value={utr}
                 maxLength={16}
-                onChange={(e) => setUtr(e.target.value.replace(/[^\d ]/g, ''))}
+                onChange={(e) => {
+                  setUtr(e.target.value.replace(/[^\d ]/g, ''))
+                  if (utrError) setUtrError(null)
+                }}
+                trailing={
+                  <span className={clsx('mr-2 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', utrOk ? 'bg-success-soft text-success' : 'bg-surface-2 text-muted')} aria-hidden>
+                    {utrOk ? <Check className="size-4" /> : `${digits}/12`}
+                  </span>
+                }
               />
             )}
           </Field>
@@ -321,14 +307,14 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
               {tx('my.screenshot')} <span className="font-normal text-muted">{tx('my.screenshotHint')}</span>
             </p>
             {proof ? (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2/60 p-3">
                 <span className="truncate text-sm">{proof.name}</span>
-                <button type="button" className="grid size-10 place-items-center rounded-full text-muted hover:bg-surface-2" onClick={() => setProof(null)} aria-label={tx('my.removeShot')}>
+                <button type="button" className="grid size-11 place-items-center rounded-full text-muted hover:bg-surface-2" onClick={() => setProof(null)} aria-label={tx('my.removeShot')}>
                   <X className="size-4" />
                 </button>
               </div>
             ) : (
-              <label className="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border text-[15px] font-semibold text-primary hover:bg-primary-soft">
+              <label className="fx-press flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface-2/40 text-[15px] font-semibold text-primary hover:border-primary/50 hover:bg-primary-soft">
                 <Upload className="size-4" aria-hidden /> {tx('my.addShot')}
                 <input
                   type="file"
@@ -344,11 +330,11 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
             )}
           </div>
           {submit.error && <Notice tone="danger" title={friendlyError(submit.error)} />}
-          <Button type="submit" size="lg" block loading={submitting}>
+          <Button type="submit" size="lg" block loading={submitting} haptic>
             {tx('my.submitPay')}
           </Button>
         </form>
-      </Card>
+      </div>
     </section>
   )
 }
@@ -385,25 +371,40 @@ function PaymentRow({ p }: { p: Payment }) {
 function TicketCard({ event, mine }: { event: EventRow; mine: MyRegistration }) {
   const tx = useT()
   const reg = mine.registration
+  const nDays = eventDayCount(event)
+  const heads = reg.day_heads ?? {}
+  const days =
+    nDays > 1 && Object.keys(heads).length
+      ? Array.from({ length: nDays }, (_, i) => i + 1)
+          .filter((d) => (heads[String(d)] ?? 0) > 0)
+          .map((d) => dayLabel(event, d))
+          .join(' & ')
+      : null
   return (
-    <Card className="overflow-hidden">
-      <div className="bg-hero px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent">{tx('my.pass')}</p>
-        <p className="text-lg font-bold">{event.title}</p>
-        <p className="text-sm text-hero-text">{formatDateRange(event.starts_at, event.ends_at)}</p>
-      </div>
-      <div className="flex flex-col items-center gap-3 p-5">
-        <QrCode value={reg.code} size={200} label={tx('my.qrLabel', { code: reg.code })} />
-        <p className="font-mono text-2xl font-bold tracking-widest">{reg.code}</p>
-        <p className="text-center">
-          <span className="font-semibold">{reg.full_name}</span>
-          <span className="text-muted"> · {tx('my.admits', { count: reg.headcount })}</span>
-        </p>
-        {reg.checked_in_at && <p className="text-sm font-semibold text-success">{tx('my.checkedIn', { when: formatDateTime(reg.checked_in_at) })}</p>}
-        <p className="text-center text-sm text-muted">{tx('my.showAtGate')}</p>
-      </div>
-    </Card>
+    <section className="space-y-3">
+      <EntryPass
+        pass={{
+          title: event.title,
+          when: formatDateRange(event.starts_at, event.ends_at),
+          venue: event.venue,
+          code: reg.code,
+          name: reg.full_name,
+          headcount: reg.headcount,
+          days: days && days.split(' & ').length < nDays ? days : null,
+          guests: reg.guests.map((g) => g.name || g.relation || '').filter(Boolean),
+          status: 'confirmed',
+        }}
+        footer={reg.checked_in_at ? <p className="text-sm font-semibold text-emerald-200">{tx('my.checkedIn', { when: formatDateTime(reg.checked_in_at) })}</p> : null}
+      />
+      <p className="text-center text-sm text-muted">{tx('my.showAtGate')}</p>
+      <PassTips />
+    </section>
   )
+}
+
+function ShareRow({ event, mine }: { event: EventRow; mine: MyRegistration }) {
+  const { data: profile } = useMyProfile()
+  return <ShareCardButton variant="secondary" name={mine.registration.full_name} batch={profile?.grad_year ?? mine.registration.grad_year ?? null} url={`${window.location.origin}/meet`} eventTitle={event.title} />
 }
 
 function Details({ mine, event }: { mine: MyRegistration; event: EventRow }) {
@@ -477,27 +478,19 @@ function Details({ mine, event }: { mine: MyRegistration; event: EventRow }) {
   )
 }
 
-/** Shown right after registering: the code and what happens next. */
-function WhatNext({ mine }: { mine: MyRegistration }) {
+/** Shown right after registering: confetti, the code, what happens next and the share card. */
+function WhatNext({ mine, event }: { mine: MyRegistration; event: EventRow }) {
   const tx = useT()
+  const { data: profile } = useMyProfile()
   const reg = mine.registration
   const free = reg.amount_paise === 0
+  const steps = [free ? tx('rr.next1Free') : tx('rr.next1'), ...(free ? [] : [tx('rr.next2')]), tx('rr.next3')]
   return (
-    <Card className="overflow-hidden border-success/40">
-      <div className="bg-success-soft p-4">
-        <p className="flex items-center gap-2 font-bold text-success">
-          <Check className="size-5" aria-hidden /> {tx('rr.doneTitle')}
-        </p>
-        <p className="mt-1 text-sm">
-          {tx('rr.doneCode')} <span className="font-mono text-base font-bold tracking-wide">{reg.code}</span>
-        </p>
-      </div>
-      <ol className="space-y-2 p-4 text-[15px]">
-        <li>{free ? tx('rr.next1Free') : tx('rr.next1')}</li>
-        {!free && <li>{tx('rr.next2')}</li>}
-        <li>{tx('rr.next3')}</li>
-      </ol>
-    </Card>
+    <RegisteredCelebration
+      code={reg.code}
+      steps={steps}
+      share={<ShareCardButton name={reg.full_name} batch={profile?.grad_year ?? reg.grad_year ?? null} url={`${window.location.origin}/meet`} eventTitle={event.title} />}
+    />
   )
 }
 
