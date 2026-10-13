@@ -164,17 +164,22 @@ begin
                    'memories', yb.memories, 'memories_hi', yb.memories_hi, 'is_published', yb.is_published, 'updated_at', yb.updated_at) from yb),
     'stats', jsonb_build_object(
       'members', (select count(*) from scoped),
-      'cities', (select count(distinct lower(btrim(city)) || '|' || lower(coalesce(nullif(btrim(country), ''), 'India'))) from scoped where nullif(btrim(city), '') is not null),
-      'countries', (select count(distinct lower(coalesce(nullif(btrim(country), ''), 'India'))) from scoped where nullif(btrim(city), '') is not null or nullif(btrim(country), '') is not null),
+      'cities', (select count(distinct public._world_city_key(city) || '|' || coalesce(public._world_country_code(country), lower(btrim(country))))
+                   from scoped where nullif(btrim(city), '') is not null),
+      'countries', (select count(distinct coalesce(public._world_country_code(country), lower(btrim(country))))
+                      from scoped where nullif(btrim(city), '') is not null or nullif(btrim(country), '') is not null),
       'top_companies', (select coalesce(jsonb_agg(jsonb_build_object('name', c.name, 'members', c.n) order by c.n desc, c.name), '[]'::jsonb) from (
-                          select min(btrim(current_company)) as name, count(*)::int as n from scoped
+                          select mode() within group (order by btrim(current_company) collate "C") as name, count(*)::int as n from scoped
                            where nullif(btrim(current_company), '') is not null
-                           group by lower(btrim(current_company)) having count(*) >= 2 order by count(*) desc, min(btrim(current_company)) limit 8) c),
+                           group by lower(regexp_replace(btrim(current_company), '\s+', ' ', 'g')) having count(*) >= 2
+                           order by count(*) desc, 1 limit 8) c),
       'top_cities', (select coalesce(jsonb_agg(jsonb_build_object('city', c.city, 'country', c.country, 'members', c.n) order by c.n desc, c.city), '[]'::jsonb) from (
-                       select min(btrim(city)) as city, min(coalesce(nullif(btrim(country), ''), 'India')) as country, count(*)::int as n from scoped
+                       select mode() within group (order by btrim(city) collate "C") as city,
+                              mode() within group (order by coalesce(nullif(btrim(country), ''), 'India') collate "C") as country, count(*)::int as n from scoped
                         where nullif(btrim(city), '') is not null
-                        group by lower(btrim(city)), lower(coalesce(nullif(btrim(country), ''), 'India')) having count(*) >= 2
-                        order by count(*) desc, min(btrim(city)) limit 8) c)),
+                        group by public._world_city_key(city), coalesce(public._world_country_code(country), lower(btrim(country)))
+                        having count(*) >= 2
+                        order by count(*) desc, 1 limit 8) c)),
     'branches', (select coalesce(jsonb_agg(jsonb_build_object('branch', b.branch, 'members', b.n) order by b.n desc, b.branch), '[]'::jsonb) from (
                    select branch, count(*)::int as n from batch where branch is not null group by branch) b),
     'members', (select coalesce(jsonb_agg(jsonb_build_object('id', pe.id, 'full_name', pe.full_name, 'avatar_url', pe.avatar_url,

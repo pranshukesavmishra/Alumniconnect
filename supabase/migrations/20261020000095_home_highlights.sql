@@ -63,14 +63,16 @@ begin
                        'branch', f.branch, 'joined_at', f.issued_at) order by f.issued_at desc), '[]'::jsonb)
                        from (select * from fresh order by issued_at desc, id limit 5) f))) end,
     'upcoming_events', (
-        select coalesce(jsonb_agg(jsonb_build_object('event_id', e.id, 'slug', e.slug, 'title', e.title, 'starts_at', e.starts_at,
-                 'ends_at', e.ends_at, 'venue', e.venue, 'cover_url', e.cover_url, 'registration_status', r.status,
-                 'days_left', case when e.starts_at is not null then (e.starts_at at time zone 'Asia/Kolkata')::date - today end)
-                 order by e.starts_at nulls last), '[]'::jsonb)
-          from (select * from public.event_registrations r0 where r0.user_id = me and r0.status <> 'cancelled') r
-          join public.events e on e.id = r.event_id
-         where e.is_published and coalesce(e.ends_at, e.starts_at, 'infinity'::timestamptz) >= now()
-         limit 5),
+        select coalesce(jsonb_agg(jsonb_build_object('event_id', x.id, 'slug', x.slug, 'title', x.title, 'starts_at', x.starts_at,
+                 'ends_at', x.ends_at, 'venue', x.venue, 'cover_url', x.cover_url, 'registration_status', x.reg_status,
+                 'days_left', case when x.starts_at is not null then (x.starts_at at time zone 'Asia/Kolkata')::date - today end)
+                 order by x.starts_at nulls last, x.id), '[]'::jsonb)
+          from (select e.id, e.slug, e.title, e.starts_at, e.ends_at, e.venue, e.cover_url, r.status as reg_status
+                  from public.event_registrations r
+                  join public.events e on e.id = r.event_id
+                 where r.user_id = me and r.status <> 'cancelled'
+                   and e.is_published and coalesce(e.ends_at, e.starts_at, 'infinity'::timestamptz) >= now()
+                 order by e.starts_at nulls last, e.id limit 5) x),
     'unread', jsonb_build_object(
         'notifications', (select count(*) from public.notifications n where n.user_id = me and n.read_at is null),
         'chats', case when not verified then 0 else (
