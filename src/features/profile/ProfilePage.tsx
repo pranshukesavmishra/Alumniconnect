@@ -20,6 +20,7 @@ import { BadgesRow, ProfileActions } from '../community/ProfileActions'
 import { useIsOrganiser } from '../../components/layout/AppShell'
 import { useT } from '../../i18n'
 import { LanguageSwitch } from '../../i18n/LanguageSwitch'
+import { ThemeToggle } from '../../components/ui/ThemeToggle'
 import { MyStoriesPanel, ProfileHighlights } from '../stories/Highlights'
 import { StoryComposer } from '../stories/StoryComposer'
 import { StoryAvatar } from '../stories/StoryRing'
@@ -282,6 +283,14 @@ export function ProfilePage({ self }: { self?: boolean }) {
           <section id="language" aria-labelledby="lang-title" className="scroll-mt-20">
             <SectionTitle><span id="lang-title">भाषा / Language</span></SectionTitle>
             <LanguageSwitch />
+          </section>
+        )}
+
+        {isMe && (
+          <section id="appearance" aria-labelledby="theme-title" className="scroll-mt-20">
+            <SectionTitle><span id="theme-title">{tx('ds.theme.title')}</span></SectionTitle>
+            <ThemeToggle />
+            <p className="mt-2 text-sm text-muted">{tx('ds.theme.hint')}</p>
           </section>
         )}
 

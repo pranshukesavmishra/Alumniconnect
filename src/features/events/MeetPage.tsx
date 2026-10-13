@@ -81,7 +81,7 @@ export function MeetPage() {
               </li>
             )}
           </ul>
-          <div className="mt-7 hidden max-w-xs sm:block [&_a]:bg-white [&_a]:text-hero [&_a:hover]:bg-primary-soft">{cta}</div>
+          <div className="mt-7 hidden max-w-xs sm:block [&_a]:bg-white [&_a]:bg-none [&_a]:text-hero [&_a:hover]:bg-primary-soft">{cta}</div>
         </div>
       </section>
 

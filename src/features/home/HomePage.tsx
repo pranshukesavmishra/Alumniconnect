@@ -67,7 +67,7 @@ function Landing() {
             {tx('home.landingBody')}
           </p>
           <GlimpseCarousel className="mt-6" />
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:text-hero">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:bg-none [&_a:first-child]:text-hero">
             <ButtonLink to="/signin" size="lg">
               {tx('home.signInOrJoin')}
             </ButtonLink>

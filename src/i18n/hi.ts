@@ -4,6 +4,7 @@
 import type { en } from './en'
 import { mediaHi } from './mediaHi'
 import { storiesHi } from './storiesHi'
+import { designHi } from './designHi'
 
 export const hi = {
   // registration form
@@ -1334,4 +1335,5 @@ export const hi = {
   'social.thisMember': 'इस सदस्य',
   ...mediaHi,
   ...storiesHi,
+  ...designHi,
 } as const satisfies Record<keyof typeof en, string>

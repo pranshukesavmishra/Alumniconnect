@@ -2,6 +2,7 @@
 // Plural messages use `key_one` / `key_other` and are called as t('key', { count }).
 import { mediaEn } from './mediaEn'
 import { storiesEn } from './storiesEn'
+import { designEn } from './designEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1315,4 +1316,5 @@ export const en = {
   'social.thisMember': 'this member',
   ...mediaEn,
   ...storiesEn,
+  ...designEn,
 } as const satisfies Record<string, string>

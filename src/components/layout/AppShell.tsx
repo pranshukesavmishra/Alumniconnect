@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { CalendarHeart, Home, Menu, MessagesSquare, Users, type LucideIcon } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useMatch } from 'react-router'
 import { useMyProfile } from '../../features/auth/AuthProvider'
 import { useAutoPhoto } from '../../features/profile/useAutoPhoto'
@@ -128,22 +128,60 @@ export function AppShell() {
   )
 }
 
-/** Page header with title and optional back link / action, used on every screen. */
+function useScrolledPast(px = 12) {
+  const [past, setPast] = useState(false)
+  useEffect(() => {
+    // hysteresis so the header never flickers at the threshold
+    const on = () => setPast((p) => (p ? window.scrollY > 4 : window.scrollY > px))
+    on()
+    window.addEventListener('scroll', on, { passive: true })
+    return () => window.removeEventListener('scroll', on)
+  }, [px])
+  return past
+}
+
+/**
+ * Page header with title and optional back link / action, used on every screen.
+ * At the top: a large serif title on the page background. Once scrolled: the title eases down to a compact size and
+ * the bar turns to glass with a hairline. No layout shift (the title scales with a transform).
+ */
 export function PageHeader({ title, subtitle, back, action }: { title: ReactNode; subtitle?: ReactNode; back?: string; action?: ReactNode }) {
   const tx = useT()
+  const scrolled = useScrolledPast()
   return (
-    <header className="sticky top-0 z-20 bg-bg/80 pt-safe backdrop-blur-xl">
+    <header
+      data-scrolled={scrolled || undefined}
+      className={clsx(
+        'sticky top-0 z-20 border-b pt-safe transition-[background-color,border-color,box-shadow] duration-300',
+        scrolled
+          ? 'border-border/60 bg-bg/80 shadow-[0_10px_30px_-24px_rgb(0_0_0/0.45)] backdrop-blur-xl backdrop-saturate-150'
+          : 'border-transparent bg-bg/0',
+      )}
+    >
       <div className="mx-auto flex min-h-16 max-w-3xl items-center gap-2 px-4">
         {back && (
-          <Link to={back} className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-text hover:bg-surface-2" aria-label={tx('common.back')}>
+          <Link
+            to={back}
+            className="tap -ml-2 grid size-11 shrink-0 place-items-center rounded-full border border-border/70 bg-surface/70 text-text shadow-e1 hover:bg-surface-2"
+            aria-label={tx('common.back')}
+          >
             <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="m15 18-6-6 6-6" />
             </svg>
           </Link>
         )}
         <div className="min-w-0 flex-1 py-2">
-          <h1 className="truncate text-[22px] font-bold leading-tight tracking-tight">{title}</h1>
-          {subtitle && <p className="truncate text-sm text-muted">{subtitle}</p>}
+          <h1
+            className={clsx(
+              'origin-left truncate text-[26px] font-semibold leading-tight transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none',
+              scrolled && 'scale-[0.78]',
+            )}
+          >
+            {title}
+          </h1>
+          {subtitle && (
+            <p className={clsx('truncate text-sm text-muted transition-[opacity,transform] duration-300', scrolled && '-translate-y-1 opacity-80')}>{subtitle}</p>
+          )}
         </div>
         {action}
       </div>

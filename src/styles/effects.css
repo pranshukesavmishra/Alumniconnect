@@ -1,0 +1,204 @@
+/*
+ * Design System 2.0 — signature surfaces, type scale, motion keyframes. Imported by src/index.css.
+ * Everything here is a Tailwind utility (`@utility`) so it composes with, and can be overridden by, normal classes.
+ */
+
+/* ---------- type scale (see docs/DESIGN.md › Typography) ---------- */
+@utility font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+}
+@utility text-display-xl {
+  font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 40, "WONK" 0;
+  font-size: clamp(2.5rem, 7vw + 0.5rem, 3.75rem); line-height: 1.02; letter-spacing: -0.035em; font-weight: 600;
+}
+@utility text-display {
+  font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 40, "WONK" 0;
+  font-size: clamp(2rem, 5vw + 0.5rem, 2.75rem); line-height: 1.06; letter-spacing: -0.03em; font-weight: 600;
+}
+@utility text-h1 {
+  font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.022em; font-weight: 600;
+}
+@utility text-h2 {
+  font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 30, "WONK" 0;
+  font-size: 1.375rem; line-height: 1.22; letter-spacing: -0.018em; font-weight: 600;
+}
+@utility text-h3 { font-size: 1.125rem; line-height: 1.33; letter-spacing: -0.012em; font-weight: 650; }
+@utility text-title { font-size: 1.0625rem; line-height: 1.35; letter-spacing: -0.01em; font-weight: 600; }
+@utility text-body-lg { font-size: 1.0625rem; line-height: 1.55; }
+@utility text-body { font-size: 0.9375rem; line-height: 1.5; }
+@utility text-caption { font-size: 0.8125rem; line-height: 1.4; }
+@utility text-eyebrow {
+  font-family: var(--font-sans); font-size: 0.75rem; line-height: 1.2; letter-spacing: 0.14em; font-weight: 700; text-transform: uppercase;
+}
+@utility text-stat {
+  font-family: var(--font-display); font-optical-sizing: auto; font-variation-settings: "SOFT" 50, "WONK" 0;
+  font-weight: 600; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums lining-nums;
+}
+:lang(hi) :is(.text-display-xl, .text-display, .text-h1, .text-h2, .text-stat, .font-display) { letter-spacing: 0; line-height: 1.3; font-weight: 700; }
+
+/* ---------- surfaces ---------- */
+/* Aurora: emerald → teal → gold glows on deep forest, with grain. Text on it is white / hero-text. */
+@utility aurora {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--hero);
+  background-image:
+    var(--grain),
+    radial-gradient(60% 55% at 12% 8%, rgb(31 145 106 / 0.75), transparent 70%),
+    radial-gradient(45% 45% at 92% 12%, rgb(228 173 69 / 0.42), transparent 70%),
+    radial-gradient(70% 60% at 70% 105%, rgb(20 120 118 / 0.6), transparent 70%),
+    radial-gradient(40% 40% at 0% 100%, rgb(139 30 45 / 0.28), transparent 70%),
+    linear-gradient(160deg, #0b4a37 0%, #062a20 55%, #041a14 100%);
+  background-size: 160px 160px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+}
+/* moving glow layer for an AuroraBackground (pseudo element, reduced-motion safe) */
+@utility aurora-drift {
+  &::after {
+    content: ""; position: absolute; inset: -30%; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(30% 30% at 30% 40%, rgb(79 209 161 / 0.32), transparent 70%),
+      radial-gradient(28% 28% at 70% 60%, rgb(240 180 79 / 0.24), transparent 70%);
+    animation: aurora-drift 18s var(--ease-in-out) infinite alternate;
+  }
+}
+@keyframes aurora-drift {
+  0% { transform: translate3d(-6%, -4%, 0) rotate(0deg) scale(1); }
+  50% { transform: translate3d(5%, 3%, 0) rotate(8deg) scale(1.08); }
+  100% { transform: translate3d(-3%, 6%, 0) rotate(-6deg) scale(1.02); }
+}
+
+/* Glass: translucent surface with blur, 1px inner highlight */
+@utility glass {
+  background-color: var(--glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-3);
+}
+/* Glass on a dark hero (always light-on-dark, independent of theme) */
+@utility glass-dark {
+  background-color: rgb(255 255 255 / 0.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 12px 32px -12px rgb(0 0 0 / 0.5);
+}
+/* Gradient hairline border (brand emerald→gold→maroon). Works on any radius. */
+@utility hairline-gradient {
+  position: relative;
+  &::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+    background: var(--grad-hairline);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+  }
+}
+/* inner top highlight that makes solid surfaces feel lit */
+@utility inner-highlight { box-shadow: inset 0 1px 0 var(--highlight); }
+@utility grain {
+  background-image: var(--grain);
+  background-size: 160px 160px;
+}
+@utility text-gradient-brand {
+  background: var(--grad-brand); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+@utility text-gradient-gold {
+  background: var(--grad-gold); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- interaction ---------- */
+@utility tap {
+  transition: transform var(--dur-1) var(--ease-out);
+  &:active { transform: scale(0.97); }
+}
+@utility lift {
+  transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out), border-color var(--dur-2);
+  @media (hover: hover) and (pointer: fine) {
+    &:hover { transform: translateY(-2px); box-shadow: var(--shadow-4); }
+  }
+  &:active { transform: scale(0.985); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tap:active, .lift:hover, .lift:active { transform: none; }
+}
+
+/* ---------- motion keyframes ---------- */
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+.skeleton { position: relative; overflow: hidden; background: var(--surface-2); }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface) 70%, transparent), transparent);
+  animation: shimmer 1.5s var(--ease-in-out) infinite;
+}
+@keyframes shimmer-text { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@utility shimmer-text {
+  background: linear-gradient(100deg, currentColor 35%, color-mix(in srgb, var(--accent) 85%, white) 50%, currentColor 65%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: shimmer-text 3.2s linear infinite;
+}
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 45%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@utility pulse-ring { animation: pulse-ring 1.8s var(--ease-out) infinite; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes flip-in { from { transform: perspective(300px) rotateX(-70deg); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { [class*="[animation:"] { animation: none !important; } }
+
+/* Reveal (see components/ui/Motion.tsx): hidden until scrolled into view */
+.reveal { opacity: 0; transform: translateY(16px); transition: opacity var(--dur-4) var(--ease-out), transform var(--dur-4) var(--ease-out); transition-delay: var(--reveal-delay, 0ms); }
+.reveal[data-shown="true"] { opacity: 1; transform: none; }
+
+/* Button: soft shimmer sweep while loading */
+.btn-loading { position: relative; overflow: hidden; }
+.btn-loading::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  animation: shimmer 1.2s var(--ease-in-out) infinite;
+}
+
+/* Sonner toasts: glass cards with brand icons */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  border-radius: 18px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 var(--highlight), var(--shadow-4);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  padding: 14px 16px;
+  gap: 10px;
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-description] { color: var(--muted); }
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] { color: var(--success); }
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] { color: var(--danger); }
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] { color: var(--warning); }
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] [data-icon] { color: var(--info); }
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-close-button] {
+  background: var(--surface); border-color: var(--border); color: var(--muted);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+  background: var(--primary); color: var(--on-primary); border-radius: 999px; font-weight: 600; padding: 0 12px; height: 30px;
+}
+
+/* Existing solid `bg-hero` banners inherit the aurora treatment automatically (text on them is already white). */
+.bg-hero {
+  background-image:
+    var(--grain),
+    radial-gradient(60% 55% at 12% 8%, rgb(31 145 106 / 0.6), transparent 70%),
+    radial-gradient(45% 45% at 95% 10%, rgb(228 173 69 / 0.3), transparent 70%),
+    radial-gradient(70% 60% at 70% 110%, rgb(20 120 118 / 0.45), transparent 70%),
+    linear-gradient(160deg, #0b4a37 0%, #062a20 55%, #041a14 100%);
+  background-size: 160px 160px, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after, .btn-loading::after, .shimmer-text, .pulse-ring, .aurora-drift::after { animation: none !important; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
