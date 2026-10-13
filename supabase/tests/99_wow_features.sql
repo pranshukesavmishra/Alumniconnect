@@ -100,6 +100,7 @@ begin
   assert exists (select 1 from jsonb_array_elements(r) x where x ->> 'place_precision' = 'country' and x ->> 'country_code' = 'US' and x ->> 'city' is null),
     'an unknown city in the USA falls back to the country: ' || r::text;
   assert (row ->> 'lat') is not null and (row ->> 'lng') is not null, 'city centre coordinates';
+  assert row ->> 'country' = 'India' and row ->> 'country_code' = 'IN', 'country resolved by name, clean (also after a CRLF migration): ' || row::text;
   -- anon: only places with >= 3, rounded, no ids
   r := pg_temp.q(null, 'select coalesce(jsonb_agg(t), ''[]'') from public.public_alumni_world() t');
   assert pg_temp.err(r) is null, 'anon reads the public world: ' || r::text;

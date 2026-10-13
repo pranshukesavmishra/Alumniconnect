@@ -13,6 +13,7 @@
 --   alumni_world()          verified members: one row per city (and per country for unknown cities) with a count.
 --   public_alumni_world()   anon: only places with >= 3 visible alumni, counts rounded DOWN (3, 5, 10, 15, ... "at least").
 --   alumni_world_city()     verified members: the members of one place (blocks and the map opt-out respected), paginated.
+-- Country names from geo_countries are trimmed of stray \r (a database migrated from a Windows checkout stores them that way).
 
 -- ------------------------------------------------------------------ privacy preferences
 create table if not exists public.member_showcase_prefs (
@@ -98,7 +99,7 @@ as $$
               when 'uk' then 'GB' when 'u.k.' then 'GB' when 'england' then 'GB' when 'great britain' then 'GB' when 'britain' then 'GB'
               when 'scotland' then 'GB' when 'wales' then 'GB' when 'uae' then 'AE' when 'u.a.e.' then 'AE' when 'bharat' then 'IN'
               when 'holland' then 'NL' when 'korea' then 'KR' end from k),
-    (select gc.code from public.geo_countries gc, k where lower(gc.name) = k.v or gc.code = upper(k.v) limit 1));
+    (select gc.code from public.geo_countries gc, k where lower(btrim(gc.name, E' \r\n\t')) = k.v or gc.code = upper(k.v) limit 1));
 $$;
 
 -- every verified, onboarded member with the place their profile names (p_visible_only: drop members who hid from the map)
@@ -122,7 +123,7 @@ as $$
          g.id,
          coalesce(g.name, m.raw_city),
          coalesce(g.country_code, m.cc),
-         coalesce((select gc.name from public.geo_countries gc where gc.code = coalesce(g.country_code, m.cc)), m.cname),
+         coalesce((select btrim(gc.name, E' \r\n\t') from public.geo_countries gc where gc.code = coalesce(g.country_code, m.cc)), m.cname),
          coalesce(g.lat, f.lat), coalesce(g.lng, f.lng),
          case when g.id is not null then 'city' when f.id is not null then 'country' end
     from m
