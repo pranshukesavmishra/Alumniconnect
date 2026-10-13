@@ -96,13 +96,21 @@ export function Globe({
 
     const placeLabels = () => {
       const v = view.current
+      // biggest places first; a label that would overlap one already shown is hidden (no pile-ups over dense regions)
+      const shown: { x: number; y: number; w: number }[] = []
       latest.current.labelled.forEach((p, i) => {
         const node = labelEls.current[i]
         if (!node) return
         const pr = projectGlobe(p.lat, p.lng, v.phi, v.theta)
-        node.style.transform = `translate3d(${(pr.x * size).toFixed(1)}px, ${(pr.y * size).toFixed(1)}px, 0) translate(-50%, calc(-100% - 10px))`
-        node.style.opacity = pr.visible ? '1' : '0'
-        node.style.visibility = pr.visible ? 'visible' : 'hidden'
+        const x = pr.x * size
+        const y = pr.y * size
+        const w = node.offsetWidth || 90
+        const clash = shown.some((o) => Math.abs(o.y - y) < 26 && Math.abs(o.x - x) < (o.w + w) / 2 + 6)
+        const on = pr.visible && !clash
+        if (on) shown.push({ x, y, w })
+        node.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translate(-50%, calc(-100% - 10px))`
+        node.style.opacity = on ? '1' : '0'
+        node.style.visibility = on ? 'visible' : 'hidden'
       })
     }
 

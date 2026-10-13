@@ -5,11 +5,11 @@ import {
   ChevronDown,
   GraduationCap,
   HeartHandshake,
-  Languages,
   MessagesSquare,
   Quote,
   Receipt,
   School,
+  Search,
   Sparkles,
   Trophy,
   Users,
@@ -57,6 +57,18 @@ export function FeatureBento({ flagship }: { flagship: FlagshipEvent | null }) {
               <IconTile icon={Users} variant="glass" size="lg" />
               <h3 className="mt-5 font-display text-[26px] font-semibold leading-tight">{tx('landing.f.batch')}</h3>
               <p className="mt-2 max-w-sm text-white/75">{tx('landing.f.batchBody')}</p>
+              <div aria-hidden className="mt-6 space-y-2.5">
+                <div className="flex min-h-11 items-center gap-2.5 rounded-full border border-white/12 bg-white/[0.06] px-4 text-sm text-white/60">
+                  <Search className="size-4" /> {tx('landing.f.batchSearch')}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {['1972', '1986', '1999', '2008', '2016', '2024'].map((y) => (
+                    <span key={y} className="rounded-full border border-white/12 bg-white/[0.06] px-3 py-1 text-[13px] font-semibold tabular-nums text-white/85">
+                      {y}
+                    </span>
+                  ))}
+                </div>
+              </div>
               <div className="mt-auto pt-6">
                 <div className="fx-liquid-dark flex items-center gap-3 rounded-2xl p-3">
                   <AvatarStack people={SAMPLE.map((n) => ({ name: n }))} max={5} size={36} />
@@ -119,17 +131,24 @@ export function FeatureBento({ flagship }: { flagship: FlagshipEvent | null }) {
               <h3 className="mt-4 text-title">{tx('landing.f.mentor')}</h3>
               <p className="mt-1 text-sm text-muted">{tx('landing.f.mentorBody')}</p>
             </BentoCard>
-            <BentoCard tone="gold" className="flex flex-col p-5">
-              <ProgressRing value={72} size={56} stroke={6} tone="brand" label={tx('landing.f.give')}>
-                <HeartHandshake className="size-5" aria-hidden />
+            <BentoCard cols={2} tone="gold" className="flex items-center gap-5 p-6">
+              <ProgressRing value={72} size={76} stroke={7} tone="brand" className="shrink-0">
+                <HeartHandshake className="size-7" aria-hidden />
               </ProgressRing>
-              <h3 className="mt-4 text-title">{tx('landing.f.give')}</h3>
-              <p className="mt-1 text-sm text-[#3d2a0c]">{tx('landing.f.giveBody')}</p>
+              <div>
+                <h3 className="font-display text-[22px] font-semibold leading-tight">{tx('landing.f.give')}</h3>
+                <p className="mt-1 text-[15px] text-[#3d2a0c]">{tx('landing.f.giveBody')}</p>
+              </div>
             </BentoCard>
-            <BentoCard className="flex flex-col p-5">
-              <IconTile icon={Languages} tone="emerald" />
-              <h3 className="mt-4 text-title">{tx('landing.f.lang')}</h3>
-              <p className="mt-1 text-sm text-muted">{tx('landing.f.langBody')}</p>
+            <BentoCard cols={2} className="flex items-center gap-5 p-6">
+              <div className="flex shrink-0 flex-col items-center gap-1 rounded-2xl bg-primary-soft px-4 py-3 text-primary">
+                <span className="font-display text-[22px] font-semibold leading-none">Aa</span>
+                <span className="text-[20px] font-semibold leading-none" lang="hi">अ</span>
+              </div>
+              <div>
+                <h3 className="font-display text-[22px] font-semibold leading-tight">{tx('landing.f.lang')}</h3>
+                <p className="mt-1 text-[15px] text-muted">{tx('landing.f.langBody')}</p>
+              </div>
             </BentoCard>
           </BentoGrid>
         </Reveal>

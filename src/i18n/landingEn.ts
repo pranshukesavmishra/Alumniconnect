@@ -40,6 +40,7 @@ export const landingEn = {
   'landing.featBody': 'Simple enough for every batch from the 1960s to today, in English and Hindi.',
   'landing.f.batch': 'Find your batch',
   'landing.f.batchBody': 'Search by batch, branch, city or company. See who joined this week and pick up where you left off.',
+  'landing.f.batchSearch': 'Batch, branch, city or company',
   'landing.f.batchPreview': 'Your batchmates',
   'landing.f.batchPreviewSub': 'New faces every week',
   'landing.f.meet': 'Alumni Meet 2026',

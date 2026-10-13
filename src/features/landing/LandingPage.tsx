@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ButtonLink } from '../../components/ui/Button'
 import { Countdown } from '../../components/ui/Countdown'
-import { GlowOrbs, Meteors, TextReveal } from '../../components/ui/Fx'
+import { GlowOrbs, Meteors } from '../../components/ui/Fx'
 import { NumberTicker, useInViewOnce, useReducedMotion } from '../../components/ui/Motion'
 import { useLang, useT } from '../../i18n'
 import { cn } from '../../lib/cn'
@@ -95,7 +95,9 @@ function LandingNav() {
       >
         <Link to="/" className="flex min-h-11 min-w-0 items-center gap-2 rounded-full pr-2" aria-label="JEC Alumni Connect">
           <img src="/jec-logo.png" alt="" className="size-9 shrink-0 object-contain drop-shadow" />
-          <span className="truncate font-display text-[17px] font-semibold tracking-[-0.01em] max-[379px]:hidden">JEC Alumni Connect</span>
+          <span className="whitespace-nowrap font-display text-[17px] font-semibold tracking-[-0.01em] max-[359px]:hidden">
+            JEC Alumni<span className="max-sm:hidden"> Connect</span>
+          </span>
         </Link>
         <div className="ml-auto flex items-center gap-1">
           <a href="#world" className={cn('hidden min-h-11 items-center rounded-full px-3.5 text-sm font-semibold md:inline-flex', scrolled ? 'hover:bg-surface-2' : 'text-white/85 hover:bg-white/10')}>
@@ -105,7 +107,7 @@ function LandingNav() {
             {tx('landing.navMeet')}
           </Link>
           <LangToggle onDark={!scrolled} />
-          <ButtonLink to="/signin" size="sm" variant={scrolled ? 'primary' : 'glass'} className="px-4">
+          <ButtonLink to="/signin" size="sm" variant={scrolled ? 'primary' : 'glass'} className="whitespace-nowrap px-4">
             {tx('landing.signIn')}
           </ButtonLink>
         </div>
@@ -176,13 +178,13 @@ function Hero({ stats }: { stats: LandingStats | undefined }) {
             <span className="fx-liquid-dark grid size-16 shrink-0 place-items-center rounded-[22px] p-2">
               <img src="/jec-logo.png" alt={tx('landing.crestAlt')} className="size-full object-contain" width={48} height={48} />
             </span>
-            <p className="text-eyebrow leading-snug text-accent">
-              {tx('brand.college')}
-              <span className="mt-1 block text-white/70">{tx('landing.est', { year: FOUNDED })}</span>
-            </p>
+            <div>
+              <p className="text-eyebrow leading-snug text-accent">{tx('brand.college')}</p>
+              <p className="mt-1 text-[13px] font-medium text-white/70">{tx('landing.est', { year: FOUNDED })}</p>
+            </div>
           </div>
           <h1 id="hero-title" className="text-display-xl mt-7 max-w-[16ch] text-balance text-white">
-            <TextReveal as="span" text={tx('landing.heroA')} /> <span className="fx-gradient-text">{tx('landing.heroB')}</span>
+            <WordsIn text={tx('landing.heroA')} /> <WordsIn text={tx('landing.heroB')} start={tx('landing.heroA').split(' ').length} className="fx-gradient-text" />
           </h1>
           <p className="text-body-lg mt-5 max-w-xl text-white/78">{tx('landing.heroBody', { year: FOUNDED })}</p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -204,6 +206,25 @@ function Hero({ stats }: { stats: LandingStats | undefined }) {
         </div>
       </div>
     </section>
+  )
+}
+
+/**
+ * The headline rising in word by word. CSS only, so it never waits for JavaScript (it is the page's largest text) and is
+ * static under reduced motion.
+ */
+function WordsIn({ text, start = 0, className }: { text: string; start?: number; className?: string }) {
+  return (
+    <span>
+      {text.split(' ').map((w, i) => (
+        <span key={i}>
+          {i > 0 && ' '}
+          <span className={cn('inline-block [animation:rise-in_900ms_var(--ease-out)_both]', className)} style={{ animationDelay: `${120 + (start + i) * 70}ms` }}>
+            {w}
+          </span>
+        </span>
+      ))}
+    </span>
   )
 }
 

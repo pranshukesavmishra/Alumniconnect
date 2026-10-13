@@ -25,7 +25,7 @@ export function LandingWorld() {
           <p className="text-eyebrow text-accent">{tx('landing.worldEyebrow')}</p>
           <h2 id="world-title" className="text-display mt-3 text-white">{tx('landing.worldTitle')}</h2>
           <p className="text-body-lg mt-4 max-w-md text-white/75">{tx('landing.worldBody')}</p>
-          {places.length > 0 && (
+          {totals.cities >= 10 && totals.countries >= 3 && (
             <dl className="mt-6 flex gap-8">
               <div>
                 <dt className="text-[13px] text-white/60">{tx('world.cities')}</dt>
