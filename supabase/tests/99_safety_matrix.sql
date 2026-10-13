@@ -212,6 +212,12 @@ insert into public.t93_cases values
   ('admin_glimpse_reorder', $q$select public.admin_glimpse_reorder(array[gen_random_uuid()])$q$, 'a', 'gallery_manage'),
   ('admin_glimpse_set_meet', $q$select public.admin_glimpse_set_meet(gen_random_uuid(), null)$q$, 'a', 'gallery_manage'),
   ('admin_save_past_meet', $q$select public.admin_save_past_meet('{"title":"x"}'::jsonb)$q$, 'a', 'gallery_manage'),
+  -- yearbooks and the wall of fame: college gallery curators
+  ('admin_save_yearbook', $q$select public.admin_save_yearbook('{"grad_year":1990}'::jsonb)$q$, 'a', 'gallery_manage'),
+  ('admin_delete_yearbook', $q$select public.admin_delete_yearbook(gen_random_uuid())$q$, 'a', 'gallery_manage'),
+  ('admin_save_fame', $q$select public.admin_save_fame('{"name":"Matrix","title":"Matrix","category":"legend"}'::jsonb)$q$, 'a', 'gallery_manage'),
+  ('admin_delete_fame', $q$select public.admin_delete_fame(gen_random_uuid())$q$, 'a', 'gallery_manage'),
+  ('admin_reorder_fame', $q$select public.admin_reorder_fame(array[]::uuid[])$q$, 'a', 'gallery_manage'),
   ('admin_delete_past_meet', $q$select public.admin_delete_past_meet(gen_random_uuid())$q$, 'a', 'gallery_manage'),
   ('admin_giving_campaigns', $q$select public.admin_giving_campaigns()$q$, 'a', 'funds_manage,funds_verify,funds_reports'),
   ('admin_giving_campaign', $q$select public.admin_giving_campaign(gen_random_uuid())$q$, 'a', 'funds_manage'),
@@ -262,6 +268,43 @@ insert into public.t93_cases values
   ('create_story', $q$select public.create_story('{"kind":"text","text_body":"matrix","official":true,"audience":"all"}'::jsonb)$q$, 'a', 'stories_post'),
   ('add_story_to_highlight', $q$select public.add_story_to_highlight('93000000-0000-0000-0000-0000000000f6', '93000000-0000-0000-0000-0000000000f5')$q$, 'a', 'stories_post');
 
+
+-- signature features: what anon, an unverified member and a verified member may call
+do $$
+declare
+  f text; r text;
+  unverified constant uuid := '93000000-0000-0000-0000-0000000000c4';
+begin
+  update public.profiles set verification = 'pending' where id = unverified;
+  foreach f in array array['select public.alumni_world()', 'select public.alumni_world_city(1)', 'select public.batch_yearbook(2001)',
+                           'select public.wall_of_fame_list()', 'select public.member_achievements(''93000000-0000-0000-0000-0000000000c1'')',
+                           'select public.home_highlights()', 'select public.my_id_card()', 'select public.my_batchmates_summary()',
+                           'select public.my_showcase_prefs()', 'select public.regenerate_my_id_card_token()'] loop
+    -- anon: always refused
+    set local role anon;
+    perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+    perform set_config('request.jwt.claim.sub', '', true);
+    r := public.t93_try(f);
+    reset role;
+    assert r like '42501%', 'anon must be refused: ' || f || ' -> ' || coalesce(r, 'allowed');
+  end loop;
+  foreach f in array array['select public.alumni_world()', 'select public.alumni_world_city(1)', 'select public.batch_yearbook(2001)',
+                           'select public.member_achievements(''93000000-0000-0000-0000-0000000000c1'')', 'select public.regenerate_my_id_card_token()'] loop
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', unverified, 'role', 'authenticated')::text, true);
+    perform set_config('request.jwt.claim.sub', unverified::text, true);
+    r := public.t93_try(f);
+    reset role;
+    assert r like '42501%', 'an unverified member must be refused: ' || f || ' -> ' || coalesce(r, 'allowed');
+    set local role authenticated;
+    perform set_config('request.jwt.claims', json_build_object('sub', '93000000-0000-0000-0000-0000000000c2', 'role', 'authenticated')::text, true);
+    perform set_config('request.jwt.claim.sub', '93000000-0000-0000-0000-0000000000c2', true);
+    r := public.t93_try(f);
+    reset role;
+    assert r is null, 'a verified member may call: ' || f || ' -> ' || coalesce(r, '');
+  end loop;
+  update public.profiles set verification = 'verified' where id = unverified;
+end $$;
 
 -- callers: anon, a plain member, each event role, a moderator, a legacy full admin (no grants row), a super admin, and one limited admin per permission
 create table public.t93_actors (label text, uid text, perm text);
@@ -576,7 +619,9 @@ begin
    where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')
      and p.proname not in ('is_admin', 'is_verified', 'is_event_manager', 'is_event_staff', 'is_blocked_between', 'can_see_group_content',
                            'are_connected', 'event_public_stats', 'is_group_member', 'is_group_admin', 'can_view_event_photos',
-                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try', 'is_super_admin', '_admin_can', '_admin_can_any', '_scope_is_all', '_scope_ok', '_scope_ok_member');
+                           'search_members', 'touch_updated_at', 'handle_new_user', 't93_try', 'is_super_admin', '_admin_can', '_admin_can_any', '_scope_is_all', '_scope_ok', '_scope_ok_member',
+                           -- the signed-out landing page and the ID-card check (aggregates / minimal data only; see 99_wow_features.sql)
+                           'public_landing_stats', 'public_alumni_world', 'public_wall_of_fame', 'verify_id_card');
   assert bad is null, 'anon can execute: ' || coalesce(bad, '');
   select string_agg(p.proname, ', ') into bad
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
