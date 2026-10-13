@@ -1,0 +1,12 @@
+/* BadgeMedallion: soft coloured glow, a slow light sweep on earned medals, matte grey when locked. */
+.medal { filter: drop-shadow(0 10px 18px rgb(0 0 0 / 0.35)) drop-shadow(0 0 22px var(--medal-glow)); }
+.medal-locked { filter: grayscale(1) contrast(0.85) brightness(1.05); opacity: 0.55; }
+[data-theme="dark"] .medal-locked { opacity: 0.45; }
+.medal-sweep { animation: medal-sweep 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes medal-sweep {
+  0%, 55% { transform: skewX(-18deg) translateX(0); }
+  100% { transform: skewX(-18deg) translateX(220px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .medal-sweep { animation: none; opacity: 0; }
+}

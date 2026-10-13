@@ -1,0 +1,86 @@
+/* Digital alumni ID card. Sizes are in container units (cqw) so the card is the same design at any width:
+   the base is 1012 x 638 (credit-card ratio), 1cqw = 10.12 base units. */
+.idc { container-type: inline-size; aspect-ratio: 1012 / 638; width: 100%; border-radius: 4.6cqw; }
+.idc-flipper {
+  position: relative; width: 100%; height: 100%; border-radius: inherit;
+  transform-style: preserve-3d;
+  transition: transform 0.85s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.idc[data-flipped="true"] .idc-flipper { transform: rotateY(180deg); }
+.idc-face {
+  position: absolute; inset: 0; overflow: hidden; border-radius: inherit;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.28), 0 1px 2px rgb(0 0 0 / 0.3), 0 30px 60px -24px rgb(0 0 0 / 0.75), 0 18px 36px -18px rgb(6 42 32 / 0.8);
+}
+.idc-back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .idc-flipper { transition: none; transform: none !important; }
+  .idc-face { transition: opacity 0.2s; }
+  .idc-back { transform: none; opacity: 0; }
+  .idc[data-flipped="true"] .idc-front { opacity: 0; }
+  .idc[data-flipped="true"] .idc-back { opacity: 1; }
+}
+
+.idc-front {
+  background:
+    radial-gradient(70% 90% at 8% 0%, rgb(111 200 165 / 0.42), transparent 60%),
+    radial-gradient(50% 70% at 100% 100%, rgb(3 23 15 / 0.9), transparent 70%),
+    linear-gradient(135deg, #13875f 0%, #0a5540 42%, #03170f 100%);
+}
+.idc-back {
+  background:
+    radial-gradient(60% 80% at 100% 0%, rgb(228 173 69 / 0.18), transparent 60%),
+    linear-gradient(160deg, #0b4a37 0%, #062a20 50%, #020e0a 100%);
+}
+/* gold foil frame */
+.idc-frame {
+  position: absolute; inset: 1.6cqw; border-radius: 3.2cqw; pointer-events: none;
+  padding: 1px;
+  background: linear-gradient(135deg, #fff1c4, #e4ad45 30%, rgb(181 116 28 / 0.4) 55%, #f4dc9e 80%, #b5741c);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: 0.6;
+}
+/* holographic foil: follows the tilt (TiltCard sets --fx-gx / --fx-gy); drifts slowly on its own */
+.idc-holo {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.32;
+  background:
+    linear-gradient(115deg, transparent 25%, rgb(120 255 214 / 0.55) 38%, rgb(255 222 140 / 0.7) 46%, rgb(255 150 210 / 0.45) 54%, rgb(140 170 255 / 0.5) 62%, transparent 75%);
+  background-size: 260% 260%;
+  background-position: calc(var(--fx-gx, 50%) * 1.2) calc(var(--fx-gy, 30%) * 1.2);
+  animation: idc-holo 9s ease-in-out infinite alternate;
+}
+@keyframes idc-holo { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(40deg); } }
+.idc-shine::after {
+  content: ""; position: absolute; inset: -30% auto -30% -50%; width: 35%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.22), transparent);
+  transform: skewX(-20deg);
+  animation: idc-sweep 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes idc-sweep { 0%, 70% { transform: skewX(-20deg) translateX(0); } 100% { transform: skewX(-20deg) translateX(520%); } }
+@media (prefers-reduced-motion: reduce) {
+  .idc-holo { animation: none; background-position: 50% 40%; }
+  .idc-shine::after { animation: none; display: none; }
+}
+.idc-pattern { position: absolute; pointer-events: none; }
+
+.idc-gold { background: linear-gradient(100deg, #fff1c4, #ecc56a 40%, #f4dc9e 60%, #d4922a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.idc-cap { font-size: 1.75cqw; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.2; }
+:lang(hi) .idc-cap { letter-spacing: 0; font-size: 2cqw; }
+.idc-name { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.02em; line-height: 1.04; text-shadow: 0 1px 2px rgb(0 0 0 / 0.35); }
+:lang(hi) .idc-name { letter-spacing: 0; line-height: 1.25; }
+.idc-mono { font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.idc-qr > div { width: 100% !important; height: 100% !important; padding: 6% !important; border-radius: 1.6cqw !important; }
+.idc-photo {
+  border-radius: 2.2cqw; padding: 0.35cqw;
+  background: linear-gradient(135deg, #fff1c4, #e4ad45 40%, #915719 70%, #f4dc9e);
+  box-shadow: 0 1.2cqw 2.4cqw -0.8cqw rgb(0 0 0 / 0.55);
+}
+.idc-chip {
+  display: inline-flex; align-items: center; border-radius: 99px; padding: 0.5cqw 1.4cqw;
+  border: 1px solid rgb(244 220 158 / 0.55); background: rgb(244 220 158 / 0.14); color: #f4dc9e;
+  font-size: 1.6cqw; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap;
+}
+:lang(hi) .idc-chip { letter-spacing: 0; font-size: 1.9cqw; }
