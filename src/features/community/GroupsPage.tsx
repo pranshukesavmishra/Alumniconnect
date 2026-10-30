@@ -41,6 +41,7 @@ function useMembersLabel() {
 }
 
 function JoinButton({ g, className, glass }: { g: GroupWithMe; className?: string; glass?: boolean }) {
+  const tx = useT()
   const join = useJoinGroup()
   return (
     <Button
@@ -54,7 +55,7 @@ function JoinButton({ g, className, glass }: { g: GroupWithMe; className?: strin
         join.mutate({ id: g.id, join: !g.joined }, { onError: (err) => toast.error(friendlyError(err)) })
       }}
     >
-      {g.joined ? (g.kind === 'channel' ? 'Following' : 'Joined') : g.kind === 'channel' ? 'Follow' : 'Join'}
+      {g.joined ? (g.kind === 'channel' ? tx('cx.following') : tx('cx.joined')) : g.kind === 'channel' ? tx('cx.follow') : tx('cx.join')}
     </Button>
   )
 }
@@ -307,7 +308,7 @@ export function GroupPage() {
                   loading={join.isPending}
                   onClick={() => join.mutate({ id: g.id, join: !g.joined }, { onError: (e) => toast.error(friendlyError(e)) })}
                 >
-                  {g.joined ? 'Leave' : g.kind === 'channel' ? 'Follow' : 'Join'}
+                  {g.joined ? tx('cx.leave') : g.kind === 'channel' ? tx('cx.follow') : tx('cx.join')}
                 </Button>
               )}
             </div>
@@ -319,13 +320,13 @@ export function GroupPage() {
         {canRead && <GroupChatLink groupId={g.id} channel={g.kind === 'channel' || g.post_mode === 'staff_only'} />}
         {canPost && <Composer fixedGroup={g} />}
         {canRead ? (
-          <FeedList scope={`group:${g.id}`} showGroup={false} empty={g.kind === 'channel' || g.post_mode === 'staff_only' ? 'No announcements yet.' : 'Start the conversation.'} />
+          <FeedList scope={`group:${g.id}`} showGroup={false} empty={g.kind === 'channel' || g.post_mode === 'staff_only' ? tx('cx.noAnnouncements') : tx('cx.startConversation')} />
         ) : (
           <Card variant="gradient-border" className="flex flex-col items-center p-6 text-center">
             <IconTile icon={Users} tone="emerald" variant="solid" size="lg" />
-            <p className="text-title mt-3">Join to see posts</p>
+            <p className="text-title mt-3">{tx('cx.joinToSee')}</p>
             <Button className="mt-4" onClick={() => join.mutate({ id: g.id, join: true })}>
-              Join {g.name}
+              {tx('cx.joinNamed', { name: g.name })}
             </Button>
           </Card>
         )}
@@ -336,14 +337,15 @@ export function GroupPage() {
 
 /** Entry to the group's chat (full history is visible to every member, including new joiners). */
 function GroupChatLink({ groupId, channel }: { groupId: string; channel: boolean }) {
+  const tx = useT()
   const { data: chatId } = useGroupChatId(groupId)
   if (!chatId) return null
   return (
     <Link to={`/chat/${chatId}`} className="fx-press fx-lift flex min-h-16 items-center gap-3.5 rounded-3xl border border-border/80 bg-surface p-3.5 shadow-card">
       <IconTile icon={channel ? Megaphone : MessagesSquare} tone={channel ? 'ink' : 'emerald'} variant="solid" />
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold">{channel ? 'Channel updates' : 'Group chat'}</span>
-        <span className="text-caption block text-muted">{channel ? 'Announcements from the admins' : 'Talk with everyone in this group'}</span>
+        <span className="block font-semibold">{channel ? tx('cx.channelUpdates') : tx('cx.groupChat')}</span>
+        <span className="text-caption block text-muted">{channel ? tx('cx.channelUpdatesHint') : tx('cx.groupChatHint')}</span>
       </span>
       <ChevronRight className="size-5 text-subtle" aria-hidden />
     </Link>

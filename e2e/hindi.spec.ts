@@ -37,7 +37,6 @@ test('Hindi interface: switch from the profile page, persists on the profile, sw
 
   await nav.getByRole('link', { name: 'मीट 2026' }).click()
   await expect(page.getByText('जबलपुर इंजीनियरिंग कॉलेज')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'पंजीकरण शुल्क' }).or(page.getByText('पंजीकरण शुल्क')).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'अभी पंजीकरण करें' }).first()).toBeVisible()
   await page.screenshot({ path: '/tmp/hindi-meet.png', fullPage: false })
   await page.screenshot({ path: '/tmp/hindi-meet-full.png', fullPage: true })

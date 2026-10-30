@@ -236,14 +236,14 @@ export function PostCard({ post, showGroup = true }: { post: Post; showGroup?: b
           className={clsx(action, post.liked ? 'text-primary' : 'text-muted hover:bg-surface-2')}
         >
           {post.liked ? <ReactionIcon reaction="like" size={22} /> : <ReactionIcon reaction="like" size={22} className="opacity-35 grayscale" />}
-          Like
+          {tx('cx.like')}
         </button>
         <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className={clsx(action, 'text-muted hover:bg-surface-2')}>
           <MessageCircle className="size-5" aria-hidden />
-          Comment
+          {tx('cx.comment')}
         </button>
         <button type="button" onClick={share} className={clsx(action, 'text-muted hover:bg-surface-2')}>
-          <Share2 className="size-5" aria-hidden /> Share
+          <Share2 className="size-5" aria-hidden /> {tx('cx.share')}
         </button>
       </div>
       {open && <Comments postId={post.id} />}

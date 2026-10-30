@@ -59,7 +59,7 @@ export function Composer({ groups, fixedGroup }: { groups?: GroupWithMe[]; fixed
             onClick={() => setOpen(true)}
             className="fx-press min-h-12 min-w-0 flex-1 truncate rounded-full border border-border bg-surface-2/60 px-4 text-left text-[15px] text-muted hover:bg-surface-2"
           >
-            {fixedGroup ? `Post in ${fixedGroup.name}…` : 'Share news, a question or a memory…'}
+            {fixedGroup ? tx('cx.postIn', { name: fixedGroup.name }) : tx('cx.shareNews')}
           </button>
           <label className="fx-press grid size-12 shrink-0 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={tx('feed.addPhotos')}>
             <ImagePlus className="size-5" aria-hidden />

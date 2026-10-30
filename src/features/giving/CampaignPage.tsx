@@ -127,12 +127,12 @@ export function CampaignPage() {
           <div className="space-y-4 p-5">
             {c.summary && <p className="text-body-lg text-muted">{c.summary}</p>}
             <div className="flex items-center gap-5">
-              <GoalRing raised={c.raised_paise} goal={c.goal_paise} size={112} label={tx('give.progress')}>
+              <GoalRing raised={c.raised_paise} goal={c.goal_paise} size={104} label={tx('give.progress')}>
                 <span className="text-stat text-2xl leading-none" data-testid="percent">{percentOf(c.raised_paise, c.goal_paise)}%</span>
               </GoalRing>
               <div className="min-w-0 flex-1">
                 <p className="text-caption text-muted">{tx('evx.raised')}</p>
-                <p className="text-stat text-[2rem] leading-tight" data-testid="raised"><Money paise={c.raised_paise} /></p>
+                <p className="text-stat text-[1.65rem] leading-tight sm:text-[2rem]" data-testid="raised"><Money paise={c.raised_paise} /></p>
                 <p className="text-caption text-muted">{tx('give.ofGoal', { goal: formatPaise(c.goal_paise, { zeroAsFree: false }) })}</p>
               </div>
             </div>

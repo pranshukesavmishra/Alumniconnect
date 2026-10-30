@@ -105,15 +105,15 @@ export function ProfileActions({ profile }: { profile: Profile }) {
   return (
     <div className="flex w-full items-center gap-2">
       <Button className="flex-1" icon={<MessageCircle className="size-4" />} loading={busy === 'message'} onClick={message}>
-        Message
+        {tx('cx.message')}
       </Button>
       {state === 'connected' ? (
         <span className="inline-flex min-h-12 flex-1 items-center justify-center gap-1.5 rounded-full border border-success/25 bg-success-soft px-4 text-[15px] font-semibold text-success">
-          <Check className="size-4" aria-hidden /> Connected
+          <Check className="size-4" aria-hidden /> {tx('cx.connected')}
         </span>
       ) : (
         <Button className="flex-1" variant="secondary" icon={state === 'sent' ? <Check className="size-4" /> : <UserPlus className="size-4" />} loading={busy === 'connect'} disabled={state === 'sent'} onClick={connect}>
-          {state === 'sent' ? 'Request sent' : state === 'received' ? 'Accept request' : 'Connect'}
+          {state === 'sent' ? tx('cx.requestSent') : state === 'received' ? tx('cx.acceptRequest') : tx('cx.connect')}
         </Button>
       )}
       <IconButton label={tx('pp.more')} variant="secondary" size="md" onClick={() => setMore(true)}>
@@ -123,14 +123,14 @@ export function ProfileActions({ profile }: { profile: Profile }) {
         <div className="pb-2">
           {profile.verification !== 'verified' && (
             <SheetAction icon={<BadgeCheck />} onClick={() => { setMore(false); void vouch() }}>
-              I know them from JEC
+              {tx('cx.vouch')}
             </SheetAction>
           )}
           <SheetAction icon={<Share2 />} onClick={() => { setMore(false); void share() }}>
             {tx('pp.shareProfile')}
           </SheetAction>
           <SheetAction danger icon={<Ban />} onClick={() => { setMore(false); void block() }}>
-            Block
+            {tx('cx.block')}
           </SheetAction>
         </div>
       </Sheet>
