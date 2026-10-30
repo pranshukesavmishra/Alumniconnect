@@ -8,11 +8,15 @@ import { Notice } from '../../components/ui/Display'
 import { Textarea } from '../../components/ui/Form'
 import { useLang, useT } from '../../i18n'
 import { PreviewCard } from './PreviewCard'
-import { AI_OFF_CODES, AiFillError, useAiFill } from './queries'
+import { AI_OFF_CODES, AiFillError, MAGIC_FILL_ON, useAiFill } from './queries'
 import { MAX_CHARS, useFoundProfile } from './useFoundProfile'
 import { useSpeech } from './useSpeech'
 
-export function MagicFill({ onSaved, onUnavailable, autoFocus }: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean }) {
+export function MagicFill(props: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean }) {
+  return MAGIC_FILL_ON ? <MagicFillBox {...props} /> : null
+}
+
+function MagicFillBox({ onSaved, onUnavailable, autoFocus }: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean }) {
   const tx = useT()
   const { lang } = useLang()
   const [text, setText] = useState('')

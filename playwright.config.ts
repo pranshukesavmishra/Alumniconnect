@@ -22,6 +22,7 @@ export default defineConfig({
   projects: [{ name: 'phone', use: { ...devices['Pixel 7'], launchOptions: { executablePath } } }],
   webServer: {
     command: `npm run dev -- --port ${port} --strictPort`,
+    env: { VITE_MAGIC_FILL: 'on' },
     url: `http://localhost:${port}`,
     reuseExistingServer: true,
     timeout: 60_000,

@@ -168,3 +168,6 @@ export function useAdminPrefillDelete() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-prefill'] }),
   })
 }
+
+/** Magic fill (type or speak one sentence) needs a paid AI key. It stays hidden unless the site is built with VITE_MAGIC_FILL=on. */
+export const MAGIC_FILL_ON = import.meta.env.VITE_MAGIC_FILL === 'on'
