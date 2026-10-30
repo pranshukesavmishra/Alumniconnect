@@ -27,7 +27,7 @@ for f in supabase/migrations/*.sql; do
   if [ "${DB_TEST_CRLF:-}" = 1 ]; then sed 's/$/\r/' "$f" | psql_run -U postgres -f -; else psql_run -U postgres -f "$f"; fi
 done
 psql_run -U postgres -f supabase/seed.sql
-for f in supabase/tests/[1-9]*.sql; do
+for f in ${DB_TEST_FILES:-supabase/tests/[1-9]*.sql}; do
   echo "test: $f"
   psql_run -U postgres -At -f "$f"
 done
