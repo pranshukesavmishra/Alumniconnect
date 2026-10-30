@@ -40,6 +40,8 @@ export function collectErrors(page: Page, into: string[]) {
   page.on('response', (r) => {
     if (r.status() < 400) return
     const u = r.url()
+    // the cheap "is the AI on?" check: the local edge runtime cannot fetch the AI SDK from npm (certificate), so it answers 503 here; production answers 200
+    if (r.status() === 503 && /\/functions\/v1\/profile-ai-fill/.test(u)) return
     into.push(`[http ${r.status()}] ${r.request().method()} ${u.replace(/^https?:\/\/[^/]+/, '')} (on ${new URL(page.url()).pathname})`)
   })
   page.on('pageerror', (e) => into.push(`[pageerror] ${page.url()} :: ${e.message}`))
