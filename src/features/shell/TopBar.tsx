@@ -32,7 +32,7 @@ export function Wordmark({ compact, className }: { compact?: boolean; className?
       </span>
       {!compact && (
         <span className="min-w-0 truncate font-display text-[17px] font-semibold leading-none tracking-[-0.025em] text-text">
-          JEC Alumni<span className="hidden min-[375px]:inline"> Connect</span>
+          JEC Alumni<span className="hidden min-[430px]:inline"> Connect</span>
         </span>
       )}
     </span>

@@ -192,7 +192,7 @@ export function WorldTile({ enabled }: { enabled: boolean }) {
         data-theme="dark"
         data-testid="home-world"
       >
-        <div aria-hidden className="pointer-events-none absolute -bottom-[38%] -right-[22%] w-[92%] md:-bottom-[10%] md:-right-[12%] md:w-[95%]">
+        <div aria-hidden className="pointer-events-none absolute -bottom-[48%] -right-[26%] w-[84%] md:-bottom-[10%] md:-right-[12%] md:w-[95%]">
           {near && points.length > 0 && (
             <Suspense fallback={null}>
               <Globe points={points} labels={0} interactive={false} ariaLabel={tx('world.globeAria')} />
@@ -200,9 +200,9 @@ export function WorldTile({ enabled }: { enabled: boolean }) {
           )}
         </div>
         <TileHead eyebrow={tx('home.worldTitle')} onDark />
-        <h2 className="mt-1 max-w-[16ch] font-display text-[24px] font-semibold leading-tight">{tx('landing.worldTitle')}</h2>
-        {places.length > 0 && <p className="mt-1.5 max-w-[22ch] text-sm text-white/75">{tx('home.worldBody', { cities: totals.cities, countries: totals.countries })}</p>}
-        <p className="mt-auto inline-flex items-center gap-1.5 pt-6 font-semibold text-accent">
+        <h2 className="relative z-10 mt-1 max-w-[16ch] font-display text-[24px] font-semibold leading-tight">{tx('landing.worldTitle')}</h2>
+        {places.length > 0 && <p className="relative z-10 mt-1.5 max-w-[22ch] text-sm text-white/75">{tx('home.worldBody', { cities: totals.cities, countries: totals.countries })}</p>}
+        <p className="relative z-10 mt-auto inline-flex items-center gap-1.5 pt-6 font-semibold text-accent">
           {tx('home.worldCta')} <ArrowUpRight className="size-4" aria-hidden />
         </p>
         <TileLink to={ROUTES.world} label={tx('home.worldCta')}>

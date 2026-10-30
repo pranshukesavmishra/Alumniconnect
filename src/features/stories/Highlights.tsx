@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowDown, ArrowUp, Check, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, Plus, Quote, Sparkles, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
@@ -24,7 +24,7 @@ export function StoryThumb({ card, url, className }: { card: Pick<StoryCard, 'ki
   if (card.kind === 'text') {
     return (
       <span className={clsx('grid place-items-center overflow-hidden p-1 text-center text-[10px] font-bold leading-tight text-white', className)} style={{ background: bgStyle(card.bg_key) }} aria-hidden>
-        <span className="line-clamp-3 break-words">{card.text_body}</span>
+        {className?.includes('rounded-full') ? <Quote className="size-5 opacity-90" aria-hidden /> : <span className="line-clamp-3 break-words">{card.text_body}</span>}
       </span>
     )
   }
