@@ -16,6 +16,7 @@ import { formatPaise } from '../../lib/money'
 import type { EventRow, TicketType } from '../../lib/types'
 import { glimpsePoster, useLiveGlimpses } from '../glimpses/api'
 import { clock, groupByDay, type ProgrammeItem } from './programme'
+import { PriceTag } from './PriceTag'
 
 import './events.css'
 
@@ -254,10 +255,7 @@ export function TierCards({ tickets, hrefFor }: { tickets: TicketType[]; hrefFor
         <p className={clsx('text-title mt-4', full && 'text-white')}>{t.label}</p>
         {t.description && <p className={clsx('text-caption mt-1', full ? 'text-hero-text' : 'text-muted')}>{t.description}</p>}
         <div className="mt-auto flex items-end justify-between gap-3 pt-5">
-          <p className={clsx('text-stat text-[2rem] leading-none', full ? 'text-white' : 'text-text')}>
-            {price(t.price_paise)}
-            {t.price_paise > 0 && <span className={clsx('ml-1 font-sans text-caption font-medium', full ? 'text-white/70' : 'text-muted')}>{tx('evx.perPerson')}</span>}
-          </p>
+          <PriceTag t={t} size="lg" tone={full ? 'dark' : 'light'} perPerson={tx('evx.perPerson')} />
           {t.is_primary && (
             <span className={clsx('inline-flex min-h-10 items-center gap-1 rounded-full px-3 text-sm font-semibold', full ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary')}>
               {tx('evx.choose')} <ArrowRight className="size-4" aria-hidden />
@@ -268,7 +266,7 @@ export function TierCards({ tickets, hrefFor }: { tickets: TicketType[]; hrefFor
     )
     const wrapped = full ? <BorderBeam className="h-full rounded-[1.6rem]">{body}</BorderBeam> : body
     return t.is_primary ? (
-      <Link key={t.id} to={hrefFor(t.id)} className="fx-press block rounded-[1.6rem]" aria-label={`${t.label} · ${price(t.price_paise)}`}>
+      <Link key={t.id} to={hrefFor(t.id)} className="fx-press block rounded-[1.6rem]" aria-label={`${t.label} · ${price(t.price_paise)}${t.list_price_paise && t.list_price_paise > t.price_paise ? `, was ${price(t.list_price_paise)}` : ''}`}>
         {wrapped}
       </Link>
     ) : (
@@ -290,7 +288,7 @@ export function TierCards({ tickets, hrefFor }: { tickets: TicketType[]; hrefFor
                   <p className="text-title">{t.label}</p>
                   {t.description && <p className="text-caption text-muted">{t.description}</p>}
                 </div>
-                <p className="text-stat shrink-0 text-xl">{price(t.price_paise)}</p>
+                <PriceTag t={t} className="shrink-0 items-end" />
               </div>
             ))}
           </div>

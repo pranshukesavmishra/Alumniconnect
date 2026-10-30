@@ -21,6 +21,8 @@ import type { CustomAnswer, EventRow, FoodPref, Guest, TicketType } from '../../
 import { useAuth, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useMyPrivate } from '../profile/queries'
 import { registrationOpen, useEvent, useEventQuestions, useMyExperiences, useMyRegistration, useTicketTypes, useUpsertRegistration } from './queries'
+import { PriceTag } from './PriceTag'
+import { discountInfo, totalSavings } from './ticketPricing'
 import { FundPicker, MultiChoice, ProfileCard, QuestionField, YesNo, boolToYn, ynToBool, type YN } from './RegisterParts'
 import { answerText, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
 import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
@@ -257,6 +259,7 @@ export function RegisterPage() {
   const people = (tickets ?? []).reduce((sum, t) => sum + (form.qty[t.id] ?? 0), 0)
   const fundPaise = fundPaiseOf(form)
   const total = ticketsTotal + (fundOk(fundPaise) ? fundPaise : 0)
+  const savings = totalSavings(tickets ?? [], form.qty)
 
   if (le || lt || lm || lq || !profile) return <PageSkeleton />
   if (!event) return <Navigate to="/meet" replace />
@@ -538,7 +541,11 @@ export function RegisterPage() {
             {primaryTickets.length > 1 ? (
               <ChoiceGroup
                 label={reunion ? tx('rr.whichDays') : tx('reg.yourTicket')}
-                options={primaryTickets.map((t) => ({ value: t.id, label: `${t.label} · ${formatPaise(t.price_paise)}`, hint: t.description ?? undefined }))}
+                options={primaryTickets.map((t) => {
+                  const d = discountInfo(t)
+                  const offer = d ? `Was ${formatPaise(d.listPaise)} · Save ${d.percent}%${t.discount_label ? ` · ${t.discount_label}` : ''}` : null
+                  return { value: t.id, label: `${t.label} · ${formatPaise(t.price_paise)}`, hint: [offer, t.description].filter(Boolean).join(' — ') || undefined }
+                })}
                 value={selectedPrimary?.id ?? null}
                 onChange={(id) => !locked && setPrimary(id)}
                 error={err('primary')}
@@ -552,7 +559,7 @@ export function RegisterPage() {
                       <p className="font-semibold">{selectedPrimary.label}</p>
                       {selectedPrimary.description && <p className="text-sm text-muted">{selectedPrimary.description}</p>}
                     </div>
-                    <p className="text-lg font-bold">{formatPaise(selectedPrimary.price_paise)}</p>
+                    <PriceTag t={selectedPrimary} className="shrink-0 items-end" />
                   </Card>
                 </div>
               )
@@ -578,6 +585,7 @@ export function RegisterPage() {
                               <p className="font-semibold">{t.label}</p>
                               <p className="text-sm text-muted">
                                 {formatPaise(t.price_paise)} {t.price_paise > 0 && tx('reg.each')}
+                                {discountInfo(t) && ` (was ${formatPaise(discountInfo(t)!.listPaise)}, save ${discountInfo(t)!.percent}%)`}
                                 {t.description && ` · ${t.description}`}
                               </p>
                             </div>
@@ -887,6 +895,11 @@ export function RegisterPage() {
               <Card className="px-4">
                 <dl className="divide-y divide-border">
                   <KeyValue label={tx('rr.ticketsSubtotal', { people: tx('common.people', { count: people }) })}>{formatPaise(ticketsTotal, { zeroAsFree: false })}</KeyValue>
+                  {savings > 0 && (
+                    <KeyValue label="You save">
+                      <span className="font-semibold text-success" data-testid="reg-savings">{formatPaise(savings)}</span>
+                    </KeyValue>
+                  )}
                   {reunion && <KeyValue label={tx('rr.fundLine')}>{formatPaise(fundOk(fundPaise) ? fundPaise : 0, { zeroAsFree: false })}</KeyValue>}
                   <div className="flex items-center justify-between py-3.5">
                     <dt className="font-semibold">{tx('reg.total', { people: tx('common.people', { count: people }) })}</dt>

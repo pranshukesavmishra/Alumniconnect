@@ -102,6 +102,10 @@ export interface TicketType {
   label: string
   description: string | null
   price_paise: number
+  /** optional original price shown crossed out; must be higher than price_paise */
+  list_price_paise?: number | null
+  /** name of the offer, e.g. "Early bird" */
+  discount_label?: string | null
   is_primary: boolean
   max_per_registration: number
   sort: number

@@ -13,6 +13,7 @@ import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import type { EventRow, TicketType } from '../../lib/types'
 import { isValidUpiId } from '../../lib/upi'
 import { dayLabel, eventDayCount } from '../events/reunion'
+import { discountInfo, percentFromPrice, priceFromPercent } from '../events/ticketPricing'
 import { DriveArchive } from './DriveArchive'
 import { QuestionsEditor } from './AdminQuestions'
 import { useSaveEvent } from './queries'
@@ -28,11 +29,66 @@ function fromLocalIst(v: string): string | null {
   return v ? new Date(`${v}:00+05:30`).toISOString() : null
 }
 
+/** Optional discount: original price + percent off → the price now. Members see the original crossed out, the new price and "Save X%". */
+function TicketDiscountEditor({ t, onChange }: { t: TicketDraft; onChange: (patch: Partial<TicketDraft>) => void }) {
+  const [open, setOpen] = useState(!!t.list.trim())
+  const lp = t.list.trim() ? parseRupeesToPaise(t.list) : null
+  const np = parseRupeesToPaise(t.price)
+  const info = lp != null && np != null ? discountInfo({ price_paise: np, list_price_paise: lp }) : null
+  const percent = lp != null && np != null ? percentFromPrice(lp, np) : null
+  if (!open) {
+    return (
+      <button type="button" className="min-h-11 rounded-full border border-dashed border-border-strong px-4 text-sm font-semibold text-primary hover:bg-primary-soft" onClick={() => setOpen(true)}>
+        + Add a discount
+      </button>
+    )
+  }
+  return (
+    <fieldset className="space-y-3 rounded-2xl border border-accent/40 bg-accent-soft/40 p-3">
+      <legend className="px-1 text-sm font-semibold">Discount</legend>
+      <p className="text-sm text-muted">Enter the original price and the percent off. “Price (₹)” above becomes the price members pay; the original shows crossed out.</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Field label="Original price (₹)">{(p) => <Input {...p} inputMode="decimal" value={t.list} onChange={(ev) => onChange({ list: ev.target.value })} />}</Field>
+        <Field label="Percent off" hint={info ? `Members save ${formatPaise(info.savePaise)}` : undefined}>
+          {(p) => (
+            <Input
+              {...p}
+              inputMode="numeric"
+              value={percent != null ? String(percent) : ''}
+              onChange={(ev) => {
+                const v = ev.target.value.replace(/[^0-9]/g, '')
+                if (lp != null && v !== '') onChange({ price: String(priceFromPercent(lp, Number(v)) / 100) })
+              }}
+              placeholder="e.g. 20"
+            />
+          )}
+        </Field>
+        <Field label="Offer name" optional>{(p) => <Input {...p} value={t.offer} maxLength={40} placeholder="Early bird" onChange={(ev) => onChange({ offer: ev.target.value })} />}</Field>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {info ? (
+          <p className="text-sm font-semibold" data-testid="discount-preview">
+            Members see <s className="text-muted">{formatPaise(info.listPaise)}</s> {formatPaise(info.pricePaise)} · Save {info.percent}%
+          </p>
+        ) : (
+          <p className="text-sm text-muted">Set the original price higher than the price now.</p>
+        )}
+        <button type="button" className="min-h-11 rounded-full px-3 text-sm font-semibold text-danger hover:bg-danger-soft" onClick={() => { onChange({ list: '', offer: '' }); setOpen(false) }}>
+          Remove discount
+        </button>
+      </div>
+    </fieldset>
+  )
+}
+
 interface TicketDraft {
   id?: string
   label: string
   description: string
   price: string
+  /** original price (crossed out) and the offer's name; empty = no discount */
+  list: string
+  offer: string
   is_primary: boolean
   max: string
   days: number[]
@@ -67,12 +123,12 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   })
   const [tickets, setTickets] = useState<TicketDraft[]>(
     existing?.tickets.length
-      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), is_primary: t.is_primary, max: String(t.max_per_registration), days: t.days ?? [] }))
+      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, max: String(t.max_per_registration), days: t.days ?? [] }))
       : [
-          { label: 'Alumnus / Alumna', description: '', price: '', is_primary: true, max: '1', days: [] },
-          { label: 'Spouse', description: '', price: '', is_primary: false, max: '1', days: [] },
-          { label: 'Child (5–12 years)', description: '', price: '', is_primary: false, max: '4', days: [] },
-          { label: 'Child (under 5)', description: 'Free', price: '0', is_primary: false, max: '4', days: [] },
+          { label: 'Alumnus / Alumna', description: '', price: '', list: '', offer: '', is_primary: true, max: '1', days: [] },
+          { label: 'Spouse', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] },
+          { label: 'Child (5–12 years)', description: '', price: '', list: '', offer: '', is_primary: false, max: '4', days: [] },
+          { label: 'Child (under 5)', description: 'Free', price: '0', list: '', offer: '', is_primary: false, max: '4', days: [] },
         ],
   )
   const [errors, setErrors] = useState<string[]>([])
@@ -110,6 +166,12 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       if (!t.label.trim()) errs.push('Every ticket needs a name.')
       if (parseRupeesToPaise(t.price) === null) errs.push(`Price for “${t.label || 'ticket'}” is not a valid amount.`)
       if (!(Number(t.max) >= 1 && Number(t.max) <= 20)) errs.push(`“${t.label}”: max per registration must be 1–20.`)
+      if (t.list.trim()) {
+        const lp = parseRupeesToPaise(t.list)
+        const np = parseRupeesToPaise(t.price)
+        if (lp === null) errs.push(`Original price for “${t.label || 'ticket'}” is not a valid amount.`)
+        else if (np !== null && lp <= np) errs.push(`“${t.label || 'ticket'}”: the original price must be higher than the price now, or leave it empty for no discount.`)
+      }
     }
     if (f.is_published && !f.upi_id && live.some((t) => (parseRupeesToPaise(t.price) ?? 0) > 0)) errs.push('Add the UPI ID before publishing an event with paid tickets.')
     return errs
@@ -152,6 +214,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           label: t.label.trim(),
           description: n(t.description),
           price_paise: parseRupeesToPaise(t.price) ?? 0,
+          list_price_paise: t.list.trim() ? parseRupeesToPaise(t.list) : null,
+          discount_label: t.list.trim() && t.offer.trim() ? t.offer.trim() : null,
           is_primary: t.is_primary,
           max_per_registration: Number(t.max),
           days: t.days.length === 0 || t.days.length >= nDays ? null : [...t.days].sort((a, b) => a - b),
@@ -218,7 +282,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-3">
         <SectionTitle
           action={
-            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', is_primary: false, max: '1', days: [] }])}>
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] }])}>
               Add ticket
             </Button>
           }
@@ -235,6 +299,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                 </Field>
                 <Field label="Max each">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
               </div>
+              <TicketDiscountEditor t={t} onChange={(patch) => setT(i, patch)} />
               <Field label="What it includes" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
               {nDays > 1 && (
                 <fieldset>
