@@ -162,7 +162,7 @@ export function PageHeader({ title, subtitle, back, action }: { title: ReactNode
         <div className="min-w-0 flex-1 py-2">
           <h1
             className={clsx(
-              'origin-left line-clamp-2 break-words text-[26px] font-semibold leading-tight transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none',
+              'origin-left line-clamp-2 text-[24px] font-semibold leading-tight sm:text-[26px] transition-transform duration-300 ease-[var(--ease-out)] motion-reduce:transition-none',
               scrolled && 'scale-[0.78]',
             )}
           >

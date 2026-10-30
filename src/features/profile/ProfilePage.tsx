@@ -108,7 +108,7 @@ export function ProfilePage({ self }: { self?: boolean }) {
   const { profile: p, experiences, educations } = data
   const comp = profileCompleteness(p, !!(mySocial?.instagram_url || mySocial?.facebook_url))
   const role = p.current_title && p.current_company ? tx('pp.roleAt', { title: p.current_title, company: p.current_company }) : p.current_title || p.headline
-  const subline = role !== p.headline ? p.headline : null
+  const subline = p.headline && role && role.toLowerCase() !== p.headline.toLowerCase() && !role.toLowerCase().startsWith(p.headline.toLowerCase()) ? p.headline : null
   const place = [p.city, p.country !== 'India' ? p.country : null].filter(Boolean).join(', ')
   const verified = p.verification === 'verified'
   const website = p.website_url && /^https?:\/\//i.test(p.website_url) ? p.website_url : null

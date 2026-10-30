@@ -156,7 +156,7 @@ export function HomePage() {
 function Hero({ profile, percent, next }: { profile: Profile; percent: number; next: { label: MsgKey; to: string } | null }) {
   const tx = useT()
   const part = dayPart(istHour())
-  const first = profile.full_name.split(' ')[0] || tx('home.there')
+  const first = profile.full_name.split(' ').find((w) => !/^(dr|mr|mrs|ms|shri|smt|prof|er|ca)\.?$/i.test(w)) || tx('home.there')
   const today = new Intl.DateTimeFormat(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date())
   const sub = [profile.grad_year ? tx('home.batchOf', { year: profile.grad_year }) : null, profile.branch?.replace(/^B\.E\. in /, '')].filter(Boolean).join(' · ')
   return (

@@ -177,8 +177,8 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
   await seedGlimpse(4, { caption: 'Hidden one', visible: false })
   await seedGlimpse(5, { caption: 'Not sent yet', sent: false })
 
-  // a logged-out visitor opens the app
-  const v = await open(browser, null, '/')
+  // a logged-out visitor opens the sign-in page (the new landing hero has no carousel)
+  const v = await open(browser, null, '/signin')
   const media = await mockDrive(v.page, { origin: ORIGIN })
   await v.go()
   const carousel = v.page.getByTestId('glimpse-carousel')
@@ -266,7 +266,7 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
 
   // Data Saver and a 2G connection: poster only (3G and reduced motion still autoplay, muted)
   for (const conn of [{ saveData: true, effectiveType: '4g' }, { saveData: false, effectiveType: '2g' }]) {
-    const s = await open(browser, null, '/')
+    const s = await open(browser, null, '/signin')
     await s.page.addInitScript((c) => Object.defineProperty(navigator, 'connection', { value: c, configurable: true }), conn)
     const sm = await mockDrive(s.page, { origin: ORIGIN })
     await s.go()
@@ -277,7 +277,7 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
   }
 
   // Hindi
-  const h = await open(browser, null, '/')
+  const h = await open(browser, null, '/signin')
   await h.page.addInitScript(() => localStorage.setItem('jec-lang', 'hi'))
   await mockDrive(h.page, { origin: ORIGIN })
   await h.go()
@@ -286,7 +286,7 @@ test('everyone sees the glimpses: one video plays at a time, muted and inline; t
 
   // signed-in members: at the top of Home and of the registration page
   const member = await makeUser(`gm${ts}`.slice(0, 12), { name: `Mina ${ts}` })
-  for (const path of ['/', '/meet/register']) {
+  for (const path of ['/meet/register']) {
     const m = await open(browser, member, path)
     await mockDrive(m.page, { origin: ORIGIN })
     await m.go()
