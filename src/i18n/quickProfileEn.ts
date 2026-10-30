@@ -149,4 +149,6 @@ export const quickProfileEn = {
   'qp.br.civil': 'Civil',
   'qp.br.it': 'IT',
   'qp.br.ip': 'Industrial & Production',
+  'qp.hint.fill': 'Offer "Fill from LinkedIn" to members',
+  'qp.hint.fillHint': 'Switch on after setting the provider key (see the setup guide). Each found profile uses one provider credit.',
 }

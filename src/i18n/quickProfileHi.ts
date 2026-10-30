@@ -150,4 +150,6 @@ export const quickProfileHi = {
   'qp.br.civil': 'सिविल',
   'qp.br.it': 'आईटी',
   'qp.br.ip': 'इंडस्ट्रियल और प्रोडक्शन',
+  'qp.hint.fill': 'सदस्यों को "LinkedIn से भरें" दिखाएँ',
+  'qp.hint.fillHint': 'प्रोवाइडर की कुंजी सेट करने के बाद चालू करें (सेटअप गाइड देखें)। हर मिली प्रोफ़ाइल पर प्रोवाइडर का एक क्रेडिट लगता है।',
 } satisfies Record<keyof typeof quickProfileEn, string>

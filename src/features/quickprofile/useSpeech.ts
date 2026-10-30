@@ -41,7 +41,9 @@ export function useSpeech(lang: 'en' | 'hi', onText: (text: string) => void) {
   const [error, setError] = useState<'denied' | 'failed' | null>(null)
   const rec = useRef<Recognition | null>(null)
   const cb = useRef(onText)
-  cb.current = onText
+  useEffect(() => {
+    cb.current = onText
+  })
   const supported = speechSupported()
 
   useEffect(() => () => rec.current?.abort(), [])

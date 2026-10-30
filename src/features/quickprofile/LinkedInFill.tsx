@@ -10,7 +10,7 @@ import { LinkedInIcon } from '../../components/ui/Icons'
 import { useT } from '../../i18n'
 import { normaliseLinkedInUrl } from '../../../supabase/functions/linkedin-enrich/rules.ts'
 import { enrichFromLinkedIn, useEnrichAvailable, type EnrichJec } from './enrichQueries'
-import { useFoundProfile } from './MagicFill'
+import { useFoundProfile } from './useFoundProfile'
 import { PreviewCard } from './PreviewCard'
 import { AiFillError } from './queries'
 

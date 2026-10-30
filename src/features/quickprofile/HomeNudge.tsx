@@ -1,7 +1,7 @@
 // One tiny question on Home, at most one a day, always dismissible: "Is this you?" (reunion list), "What do you do
 // now?" (Magic fill), "Open to mentoring?", "Add 3 skills".
 import { MessageCircleQuestion, Sparkles, X } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card, Chip } from '../../components/ui/Display'
@@ -13,7 +13,7 @@ import { useUpdateProfile } from '../profile/queries'
 import { suggestSkills, unionList } from './mapping'
 import { nudgeCandidates, nudgeDone, pickNudge, type NudgeId } from './nudges'
 import { PrefillClaimCard } from './PrefillClaimCard'
-import { usePrefillMatch } from './queries'
+import { usePrefillMatch, type PrefillMatch } from './queries'
 
 const KEY = 'jec.qp.nudge'
 const read = () => {
@@ -32,28 +32,30 @@ const write = (v: string) => {
 }
 
 export function HomeNudge({ profile }: { profile: Profile }) {
-  const tx = useT()
   const claim = usePrefillMatch()
+  if (claim.isLoading) return null
+  return <Nudge profile={profile} claim={claim.data ?? null} />
+}
+
+function Nudge({ profile, claim }: { profile: Profile; claim: PrefillMatch | null }) {
+  const tx = useT()
   const update = useUpdateProfile()
   const today = istDay()
   const [closed, setClosed] = useState(false)
-  const candidates = useMemo(() => nudgeCandidates(profile, !!claim.data), [profile, claim.data])
-  const chosen = useRef({ value: null as NudgeId | null, set: false }).current
-  if (claim.isLoading) return null
-  if (!chosen.set) {
+  const candidates = useMemo(() => nudgeCandidates(profile, !!claim), [profile, claim])
+  // chosen once per visit (the stored day keeps it to one question a day)
+  const [id] = useState<NudgeId | null>(() => {
     const pick = pickNudge(candidates, read(), today)
     if (pick.store) write(pick.store)
-    chosen.value = pick.id
-    chosen.set = true
-  }
-  const id = chosen.value
+    return pick.id
+  })
   if (closed || !id || !candidates.includes(id)) return null
   const finish = () => {
     write(nudgeDone(today, id))
     setClosed(true)
   }
 
-  if (id === 'claim' && claim.data) return <PrefillClaimCard match={claim.data} onClaimed={finish} />
+  if (id === 'claim' && claim) return <PrefillClaimCard match={claim} onClaimed={finish} />
 
   return (
     <Card className="relative p-4" data-testid="home-nudge" data-nudge={id}>
