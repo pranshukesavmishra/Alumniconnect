@@ -1,7 +1,10 @@
 // Hindi for the admin screens, keyed by the exact English text on screen. `{}` stands for a changing part (a name, a number);
 // the Hindi side refers to those parts as {1}, {2}... in the order they appear in the English key. A key that starts with
 // `{} ` only matches a number first (so "{} members" never swallows "Select members"). Used by adminTranslate.ts.
+import { ADMIN_HI_WOW } from './adminHiWow'
+
 export const ADMIN_HI: Record<string, string> = {
+  ...ADMIN_HI_WOW,
   "Content": "सामग्री",
   "Added a glimpse video": "झलक वीडियो जोड़ा",
   "Changed a glimpse video": "झलक वीडियो बदला",
@@ -726,6 +729,7 @@ export const ADMIN_HI: Record<string, string> = {
   "Each day can only be listed once.": "हर दिन केवल एक बार सूचीबद्ध हो सकता है।",
   "Day limits saved": "दिन की सीमाएँ सहेजी गईं",
   "Remove {} from the waiting list?": "{1} को प्रतीक्षा सूची से हटाएँ?",
+  "Hold the QR code inside the frame": "QR कोड को फ़्रेम के अंदर रखें",
   "Check in": "चेक-इन करें",
   "Share of confirmed people who have arrived": "पक्के लोगों में से पहुँचे हुए का हिस्सा",
   "Find an attendee": "उपस्थित व्यक्ति खोजें",

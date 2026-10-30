@@ -81,7 +81,11 @@ export function DownloadMyData() {
   const uid = useUserId()
   const [busy, setBusy] = useState(false)
   return (
-    <div className="space-y-1">
+    <div className="flex flex-wrap items-center gap-3.5 rounded-3xl border border-border/80 bg-surface p-4 shadow-card">
+      <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[linear-gradient(135deg,#4f6fb5,#24356b)] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]">
+        <Download className="size-[18px]" />
+      </span>
+      <p className="min-w-0 flex-1 basis-48 text-sm text-muted">A copy of your profile, posts, stories and highlights, registrations and messages you sent, as one file.</p>
       <Button
         variant="secondary"
         icon={<Download className="size-4" />}
@@ -102,7 +106,6 @@ export function DownloadMyData() {
       >
         Download my data
       </Button>
-      <p className="text-sm text-muted">A copy of your profile, posts, stories and highlights, registrations and messages you sent, as one file.</p>
     </div>
   )
 }

@@ -1,6 +1,7 @@
-import { ArrowLeft, Mail } from 'lucide-react'
+import { ArrowLeft, Mail, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Navigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useSearchParams } from 'react-router'
+import { GlowOrbs, Meteors } from '../../components/ui/Fx'
 import { Button } from '../../components/ui/Button'
 import { Notice } from '../../components/ui/Display'
 import { LinkedInIcon } from '../../components/ui/Icons'
@@ -93,24 +94,28 @@ export function SignInPage() {
 
   return (
     <div className="min-h-dvh bg-bg md:grid md:grid-cols-[1.1fr_1fr]">
-      {/* brand panel */}
-      <section className="relative overflow-hidden bg-hero px-6 pb-12 pt-[calc(env(safe-area-inset-top)+2.5rem)] text-white max-md:rounded-b-[2.5rem] md:flex md:flex-col md:justify-center md:px-16">
-        <div aria-hidden className="absolute -right-24 -top-28 size-80 rounded-full bg-hero-2" />
-        <div aria-hidden className="absolute -bottom-16 -left-10 size-48 rounded-full bg-accent/15" />
+      {/* brand panel: aurora, crest, a glimpse, tagline */}
+      <section className="relative isolate overflow-hidden px-6 pb-12 pt-[calc(env(safe-area-inset-top)+2rem)] text-white max-md:rounded-b-[2.5rem] md:flex md:min-h-dvh md:flex-col md:justify-center md:px-16" data-theme="dark">
+        <div aria-hidden className="aurora absolute inset-0 -z-10" />
+        <GlowOrbs className="-z-10 opacity-60" />
+        <div aria-hidden className="fx-grid fx-grid-light absolute inset-0 -z-10 opacity-60" />
+        <Meteors count={6} className="-z-10" />
         <div className="relative mx-auto w-full max-w-md md:mx-0">
-          <div className="flex items-center gap-3">
-            <img src="/jec-logo.png" alt="" className="h-14 w-auto drop-shadow" />
-            <div>
-              <p className="text-lg font-bold leading-tight">JEC Alumni Connect</p>
-              <p className="text-sm text-hero-text">{tx('brand.college')}</p>
-              <p className="text-xs text-hero-text/70">{tx('brand.formerly')}</p>
-            </div>
-          </div>
-          <h2 className="mt-8 text-[32px] font-extrabold leading-[1.1] tracking-tight md:text-5xl">{tx('auth.tagline1')}<br />{tx('auth.tagline2')}</h2>
-          <p className="mt-3 max-w-sm text-hero-text">{tx('auth.sub')}</p>
+          <Link to="/" className="inline-flex min-h-11 items-center gap-3" aria-label={tx('signin.back')}>
+            <span className="fx-liquid-dark grid size-14 place-items-center rounded-[20px] p-2">
+              <img src="/jec-logo.png" alt="" className="size-full object-contain" />
+            </span>
+            <span>
+              <span className="block font-display text-lg font-semibold leading-tight">JEC Alumni Connect</span>
+              <span className="block text-sm text-hero-text">{tx('brand.college')}</span>
+              <span className="block text-xs text-hero-text/70">{tx('brand.formerly')}</span>
+            </span>
+          </Link>
+          <h2 className="text-display mt-8 text-balance text-white">{tx('auth.tagline1')} <span className="fx-gradient-text">{tx('auth.tagline2')}</span></h2>
+          <p className="text-body-lg mt-3 max-w-sm text-white/75">{tx('auth.sub')}</p>
           <ul className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
             {(['auth.chip1', 'auth.chip2', 'auth.chip3'] as const).map((k) => (
-              <li key={k} className="rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15">{tx(k)}</li>
+              <li key={k} className="fx-liquid-dark rounded-full px-3 py-1.5">{tx(k)}</li>
             ))}
           </ul>
           <GlimpseCarousel className="mt-6" />
@@ -118,7 +123,7 @@ export function SignInPage() {
       </section>
 
       <div className="mx-auto flex w-full max-w-md flex-col px-5 pb-safe md:justify-center md:px-10">
-      <div className="flex-1 pt-8 md:flex-none md:pt-0">
+      <div className="flex-1 pt-8 md:flex-none md:pt-0 md:fx-hairline md:relative md:rounded-[2rem] md:bg-surface md:p-8 md:shadow-e3">
         <div className="mb-5 flex justify-end">
           <LanguageSwitch compact />
         </div>
@@ -211,6 +216,11 @@ export function SignInPage() {
 
         {error && <Notice tone="danger" className="mt-5" title={error} />}
       </div>
+      <ul className="mt-4 grid gap-2 text-sm text-muted">
+        {(['signin.trustVerified', 'signin.trustPrivate', 'signin.trustFree'] as const).map((k) => (
+          <li key={k} className="flex items-center gap-2"><ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden /> {tx(k)}</li>
+        ))}
+      </ul>
       <p className="py-6 text-center text-sm text-muted">
         {tx('auth.agree')} <a className="inline-flex min-h-11 items-center text-primary underline" href="/privacy">{tx('reg.privacyNotice')}</a>.
       </p>
