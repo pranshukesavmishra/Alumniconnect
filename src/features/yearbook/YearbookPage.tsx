@@ -126,7 +126,11 @@ function YearRail({ year }: { year: number }) {
   const years = Array.from({ length: thisYear() + 4 - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i)
   useEffect(() => {
     const el = rail.current?.querySelector<HTMLElement>(`[data-year="${year}"]`)
-    if (el && rail.current) rail.current.scrollLeft = el.offsetLeft - rail.current.clientWidth / 2 + el.clientWidth / 2
+    if (el && rail.current) {
+      const r = rail.current.getBoundingClientRect()
+      const e = el.getBoundingClientRect()
+      rail.current.scrollLeft += e.left - r.left - r.width / 2 + e.width / 2
+    }
   }, [year])
   const go = (y: number) => navigate(`/yearbook/${y}`)
   return (
@@ -134,7 +138,7 @@ function YearRail({ year }: { year: number }) {
       <IconButton label={tx('wow.yb.prevYear')} variant="secondary" onClick={() => go(year - 1)} disabled={year <= FIRST_YEAR}>
         <ChevronLeft className="size-5" />
       </IconButton>
-      <div ref={rail} className="flex min-w-0 flex-1 snap-x gap-1 overflow-x-auto scroll-smooth py-1 [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)] [scrollbar-width:none]">
+      <div ref={rail} className="flex min-w-0 flex-1 gap-1 overflow-x-auto scroll-smooth py-1 [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)] [scrollbar-width:none]">
         {years.map((y) => (
           <Link
             key={y}
