@@ -66,9 +66,30 @@ export function normalizeLinkedInUrl(input: string): string | null {
   return `https://www.linkedin.com/in/${encodeURIComponent(slug)}`
 }
 
-/** Is this education entry Jabalpur Engineering College? */
+/** Lower-case words with the college's spelling variants folded: "Govt. Engg. Collage", "J.E.C.", "G.E.C." */
+export function foldCollegeName(school: string): string {
+  return school
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\b(govt|gov|govermment|goverment|govenment|governmnt)\b/g, 'government')
+    .replace(/\b(engg|enggineering|enginering|engineerng|engineeing|eng)\b/g, 'engineering')
+    .replace(/\b(collage|colege|collge|clg)\b/g, 'college')
+    .replace(/\b([jg]) e c\b/g, '$1ec')
+}
+
+/**
+ * Is this education entry the college - Jabalpur Engineering College (JEC) or its earlier name Government Engineering
+ * College Jabalpur (GEC), with abbreviations and typos? A university name alone (RDVV, Jabalpur University) is not.
+ * Same rules as supabase/functions/linkedin-enrich/rules.ts.
+ */
 export function isJec(school: string): boolean {
-  return /jabalpur engineering college|\bjec\b.*jabalpur|government engineering college,? jabalpur/i.test(school)
+  const s = foldCollegeName(school)
+  if (/\bjabalpur engineering\b/.test(s)) return true
+  if (/\bgovernment engineering\b/.test(s) && /\b(jabalpur|jbp)\b/.test(s)) return true
+  if (/\b(jec|gec|gecj)\b/.test(s) && /\b(jabalpur|jbp)\b/.test(s)) return true
+  return /^(jec|gec|j e c|g e c)( jbp)?$/.test(s)
 }
 
 /** A web address typed by a member: adds https:// when missing; returns null for anything that isn't a real http(s) address. */

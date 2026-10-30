@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildPreview, previewToSave } from './mapping'
 import { FIXTURES, JUNK } from './pasteFixtures'
+import { isJec } from '../../lib/linkedin/common'
 import { cleanLines, parsedHasContent, parsePastedProfile } from './pasteParser'
 
 const EMPTY_PROFILE = { full_name: 'Test Member', headline: null, current_title: null, current_company: null, city: null, country: null, grad_year: null, branch: null, about: null, linkedin_url: null, skills: [], help_tags: [], interests: [] }
@@ -95,5 +96,25 @@ describe('paste parser: through the preview and save mapping', () => {
     const city = preview.scalars.find((s) => s.key === 'city')!
     expect(city.replaces).toBe(true)
     expect(city.checked).toBe(false)
+  })
+})
+
+describe('the college under both its names', () => {
+  it.each([
+    'Jabalpur Engineering College', 'JEC Jabalpur', 'J.E.C. Jabalpur', 'JEC', 'jabalpur engg. college', 'Jabalpur Engineering Collage',
+    'Government Engineering College Jabalpur', 'Govt. Engineering College, Jabalpur', 'Govt Engg College Jabalpur (M.P.)', 'GEC Jabalpur', 'G.E.C. Jabalpur', 'G E C, Jabalpur',
+  ])('%s is the college', (s) => expect(isJec(s)).toBe(true))
+  it.each(['Rani Durgavati Vishwavidyalaya', 'RDVV Jabalpur', 'Jabalpur University', 'University of Jabalpur', 'Government Engineering College Rewa', 'IIT Bombay', 'Jabalpur Public School', ''])(
+    '%s is not the college',
+    (s) => expect(isJec(s)).toBe(false),
+  )
+  it('an RDVV-only education sets no batch, branch or verification note', () => {
+    const p = parsePastedProfile('Test Person\nEngineer\nPune, India\nContact info\nEducation\nRani Durgavati Vishwavidyalaya\nBachelor of Engineering - BE, Mechanical\n1985 - 1989')
+    expect(p.education).toHaveLength(1)
+    expect([p.grad_year, p.branch, p.verification_note]).toEqual([null, null, null])
+  })
+  it('writes the admin hint as written, with years', () => {
+    expect(parsePastedProfile(FIXTURES.find((f) => f.name.startsWith('older alumnus: old name'))!.text).verification_note).toBe('Education shows Govt. Engg. College, Jabalpur, 1985–1990')
+    expect(parsePastedProfile(FIXTURES.find((f) => f.name.includes('start + 4'))!.text).verification_note).toBe('Education shows G.E.C. Jabalpur, 1989–1993')
   })
 })

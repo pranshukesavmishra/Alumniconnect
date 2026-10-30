@@ -7,7 +7,7 @@ import { AiFillError, type AiFillErrorCode } from './queries'
 
 export interface EnrichJec {
   school: string
-  kind: 'jec' | 'affiliation'
+  kind: 'jec'
   start_year: number | null
   end_year: number | null
   branch: string | null
@@ -55,6 +55,7 @@ export interface VerificationHint {
   end_year: number | null
   linkedin_url: string | null
   created_at: string
+  source: 'linkedin_enrich' | 'paste' | 'ai_suggest'
 }
 
 export function useVerificationHints(enabled: boolean) {
@@ -106,4 +107,10 @@ export function useAppFlag(key: 'auto_verify_linkedin_jec' | 'linkedin_fill', en
     },
   })
   return { flag, set }
+}
+
+/** Tells the admin queue what the member's pasted education shows ("Education shows Govt. Engg. College, Jabalpur, 1985-1990"). Never verifies. */
+export async function submitEducationHint(e: { school: string; degree: string | null; field: string | null; start_year: number | null; end_year: number | null }, source: 'paste' | 'ai_suggest' = 'paste'): Promise<void> {
+  const { error } = await supabase.rpc('submit_my_education_hint', { p_school: e.school, p_degree: e.degree, p_field: e.field, p_start: e.start_year, p_end: e.end_year, p_source: source })
+  if (error) throw error
 }

@@ -579,6 +579,59 @@ Contact info
     jobs: [],
     schools: [],
   },
+  {
+    name: 'older alumnus: old name Government Engineering College Jabalpur, 1985 - 1990, start year only on a second entry',
+    text: `Dr. Mahesh Chandra Awasthi
+Retired Chief Engineer, MPEB
+Jabalpur, Madhya Pradesh, India
+Contact info
+Experience
+Chief Engineer
+Madhya Pradesh Electricity Board
+1990 - 2022
+Jabalpur, Madhya Pradesh, India
+Education
+Govt. Engg. College, Jabalpur
+Bachelor of Engineering - BE, Electrical Engineering
+1985 - 1990
+Rani Durgavati Vishwavidyalaya
+Master of Arts - MA, History
+1992 - 1994`,
+    full_name: 'Dr. Mahesh Chandra Awasthi',
+    headline: 'Retired Chief Engineer, MPEB',
+    city: 'Jabalpur',
+    country: 'India',
+    jobs: [['Chief Engineer', 'Madhya Pradesh Electricity Board', 1990, 2022, false]],
+    schools: [
+      ['Govt. Engg. College, Jabalpur', 'Bachelor of Engineering - BE', 'Electrical Engineering', 1985, 1990],
+      ['Rani Durgavati Vishwavidyalaya', 'Master of Arts - MA', 'History', 1992, 1994],
+    ],
+    grad_year: 1990,
+    branch: 'B.E. in Electrical Engineering',
+  },
+  {
+    name: 'older alumnus: G.E.C. Jabalpur with only a start year (batch = start + 4)',
+    text: `Ramesh Pandey
+Consultant
+Bhopal, Madhya Pradesh, India
+Contact info
+Experience
+Consultant
+Self-employed
+2008 - Present
+Education
+G.E.C. Jabalpur
+B.E., Mechanical Engineering
+1989 -`,
+    full_name: 'Ramesh Pandey',
+    headline: 'Consultant',
+    city: 'Bhopal',
+    country: 'India',
+    jobs: [['Consultant', 'Self-employed', 2008, null, true]],
+    schools: [['G.E.C. Jabalpur', 'B.E.', 'Mechanical Engineering', 1989, null]],
+    grad_year: 1993,
+    branch: 'B.E. in Mechanical Engineering',
+  },
 ]
 
 /** Text that must never make the parser throw or invent a profile. */

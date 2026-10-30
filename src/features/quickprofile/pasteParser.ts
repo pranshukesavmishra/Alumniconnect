@@ -16,6 +16,8 @@ import { mapBranch, type AiEducation, type AiExperience, type AiProfile } from '
 export interface ParsedPaste extends AiProfile {
   /** names of licenses and certifications (the app has no field for them yet; shown nowhere, kept for later) */
   certifications: string[]
+  /** 'Education shows <as written>, <years>' for the admin verification queue; null when the college is not in the education list */
+  verification_note: string | null
 }
 
 export const PASTE_MAX_CHARS = 20_000
@@ -23,7 +25,7 @@ export const PASTE_MAX_CHARS = 20_000
 export function emptyParsed(): ParsedPaste {
   return {
     full_name: null, headline: null, current_title: null, current_company: null, city: null, country: null, grad_year: null, branch: null,
-    degree: null, experiences: [], education: [], skills: [], help_tags: [], interests: [], about: null, linkedin_url: null, certifications: [],
+    degree: null, experiences: [], education: [], skills: [], help_tags: [], interests: [], about: null, linkedin_url: null, certifications: [], verification_note: null,
   }
 }
 
@@ -37,6 +39,7 @@ export function parsedHasContent(p: AiProfile): boolean {
 const MON = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?'
 const YEAR = '(?:19|20)\\d{2}'
 const DATE_RANGE = new RegExp(`^(?:(?:${MON})\\.?\\s+)?(${YEAR})\\s*(?:-|–|—|\\bto\\b)\\s*(?:(present|current|now)|(?:(?:${MON})\\.?\\s+)?(${YEAR}))\\s*(?:[·•|(].*)?$`, 'i')
+const EDU_START_ONLY = new RegExp(`^(?:(?:${MON})\\.?\\s+)?(${YEAR})\\s*(?:-|–|—)$`, 'i')
 const EDU_SINGLE = new RegExp(`^(?:expected\\s+|class of\\s+)?(?:(?:${MON})\\.?\\s+)?(${YEAR})$`, 'i')
 const TRAILING_YEARS = new RegExp(`\\s*[·•|]?\\s*\\(\\s*(${YEAR})\\s*(?:-|–|—)?\\s*(${YEAR})?\\s*\\)\\s*$`)
 const EMP_TYPE = /^(full[- ]?time|part[- ]?time|self[- ]?employed|freelance|contract|internship|apprenticeship|seasonal|temporary|permanent|volunteer)$/i
@@ -316,10 +319,12 @@ function parseEducation(L: string[]): AiEducation[] {
   let cur: AiEducation | null = null
   let hasDates = false
   const isDegreeLine = (s: string) => DEGREE_LIKE.test(s) && !SCHOOL_LIKE.test(s)
-  const isDateish = (s: string | undefined) => !!s && (isDateLine(s) || EDU_SINGLE.test(s))
+  const isDateish = (s: string | undefined) => !!s && (isDateLine(s) || EDU_SINGLE.test(s) || EDU_START_ONLY.test(s))
   const dates = (s: string) => {
     const r = rangeOf(s)
     if (r) return { sy: r.sy, ey: r.ey }
+    const st = EDU_START_ONLY.exec(s)
+    if (st) return { sy: Number(st[1]), ey: null }
     const m = EDU_SINGLE.exec(s)
     return m ? { sy: null, ey: Number(m[1]) } : null
   }
@@ -459,11 +464,15 @@ function parse(input: string): ParsedPaste {
     p.current_company = cur.company
   }
 
-  const jec = p.education.find((e) => isJec(e.school) && /bachelor|\bb\.?\s?e\b|b\.?\s?tech/i.test(e.degree ?? '')) ?? p.education.find((e) => isJec(e.school))
+  const isBachelor = (e: AiEducation) => /bachelor|\bb\.?\s?e\b|b\.?\s?tech/i.test(e.degree ?? '')
+  const jec = p.education.find((e) => isJec(e.school) && isBachelor(e)) ?? p.education.find((e) => isJec(e.school))
   if (jec) {
-    p.grad_year = jec.end_year
+    // older profiles often show only the first year ("1989 -"): a B.E. is four years
+    p.grad_year = jec.end_year ?? (jec.start_year && isBachelor(jec) ? jec.start_year + 4 : null)
     p.degree = jec.degree
     p.branch = mapBranch(jec.field) ?? mapBranch(jec.degree)
+    const years = [jec.start_year, p.grad_year].filter(Boolean).join('–')
+    p.verification_note = `Education shows ${jec.school}${years ? `, ${years}` : ''}`
   }
 
   const about = parseAbout(body('about'))

@@ -1,5 +1,6 @@
 // Visual building blocks for the profile, Me and member cards (Layer 3c). Pure presentation: data comes from the
 // existing queries (profile, experiences, member_achievements, group_members, connections).
+import { isJec as isJecSchool } from '../../lib/linkedin/common'
 import { useQuery } from '@tanstack/react-query'
 import {
   BadgeCheck, BookOpen, Camera, ChevronRight, ClipboardList, Crown, Flag, Gem, Gift, GraduationCap, HandHeart, HeartHandshake, Link as LinkIcon,
@@ -178,7 +179,7 @@ export function OrgLogo({ name, size = 44, className, jec }: { name: string; siz
   )
 }
 
-export const isJec = (s: string | null | undefined) => /jabalpur engineering|^jec\b|\bjec jabalpur/i.test(s ?? '')
+export const isJec = (s: string | null | undefined) => isJecSchool(s ?? '') || /^jec\b/i.test(s ?? '')
 
 // ------------------------------------------------------------------ badges
 
