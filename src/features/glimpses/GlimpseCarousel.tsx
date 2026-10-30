@@ -102,7 +102,7 @@ export function GlimpseCarousel({ className }: { className?: string }) {
   const btn = 'grid size-11 place-items-center rounded-full bg-black/45 text-white backdrop-blur hover:bg-black/65'
 
   return (
-    <section ref={setRoot} aria-roledescription="carousel" aria-label={tx('glimpse.title')} className={clsx('relative overflow-hidden rounded-3xl bg-black shadow-pop', className)} data-testid="glimpse-carousel">
+    <section ref={setRoot} aria-roledescription="carousel" aria-label={tx('glimpse.title')} className={clsx('relative overflow-hidden rounded-3xl bg-hero shadow-pop', className)} data-testid="glimpse-carousel">
       <div className="relative aspect-video w-full">
         {playing ? (
           <DriveVideo
@@ -138,7 +138,7 @@ export function GlimpseCarousel({ className }: { className?: string }) {
           <ul className="pointer-events-auto flex shrink-0 items-center gap-1.5" aria-label={tx('glimpse.slides')}>
             {items.map((g, i) => (
               <li key={g.id}>
-                <button type="button" aria-label={tx('glimpse.goTo', { n: i + 1 })} aria-current={i === index} onClick={() => setIndex(i)} className="grid size-6 place-items-center">
+                <button type="button" aria-label={tx('glimpse.goTo', { n: i + 1 })} aria-current={i === index} onClick={() => setIndex(i)} className="relative grid size-6 place-items-center before:absolute before:-inset-2.5 before:content-['']">
                   <span className={clsx('block h-1.5 rounded-full transition-all', i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/50')} />
                 </button>
               </li>

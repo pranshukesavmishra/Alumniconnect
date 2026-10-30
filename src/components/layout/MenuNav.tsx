@@ -522,7 +522,7 @@ export function MenuSheet({ open, onClose }: { open: boolean; onClose: () => voi
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={t}
-            className="grain absolute inset-y-0 left-0 flex w-[min(90vw,392px)] flex-col overflow-hidden rounded-r-[30px] bg-bg pt-safe shadow-[inset_-1px_0_0_var(--border),var(--shadow-5)]"
+            className="absolute inset-y-0 left-0 flex w-[min(90vw,392px)] flex-col overflow-hidden rounded-r-[30px] bg-bg pt-safe shadow-[inset_-1px_0_0_var(--border),var(--shadow-5)]"
           >
             <div className="flex shrink-0 items-center gap-2 px-4 pb-2 pt-2.5">
               <Wordmark className="flex-1" />

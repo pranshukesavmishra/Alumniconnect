@@ -61,7 +61,7 @@ export function Hero({ c }: { c: CampaignSummary }) {
             </GoalRing>
           </div>
           {c.summary && <p className="text-body line-clamp-2 text-hero-text">{c.summary}</p>}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div className="fx-liquid-dark min-w-0 rounded-2xl p-3">
               <p className="text-caption text-white/70">{tx('evx.raised')}</p>
               <TickerMoney paise={c.raised_paise} className="text-stat block truncate text-lg" />
@@ -70,7 +70,7 @@ export function Hero({ c }: { c: CampaignSummary }) {
               <p className="text-caption text-white/70">{tx('evx.goal')}</p>
               <p className="text-stat truncate text-lg">{formatPaise(c.goal_paise, { zeroAsFree: false })}</p>
             </div>
-            <div className="fx-liquid-dark min-w-0 rounded-2xl p-3">
+            <div className="fx-liquid-dark col-span-2 min-w-0 rounded-2xl p-3 sm:col-span-1">
               <p className="text-caption text-white/70">{tx('evx.donorsShort')}</p>
               <p className="text-stat text-lg">{c.donor_count.toLocaleString('en-IN')}</p>
             </div>
