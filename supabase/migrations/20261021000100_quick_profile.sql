@@ -128,6 +128,9 @@ begin
     branch = case when p_profile ? 'branch' then left(nullif(btrim(p_profile ->> 'branch'), ''), 80) else p.branch end,
     grad_year = case when p_profile ? 'grad_year' and (p_profile ->> 'grad_year') ~ '^(19|20)[0-9]{2}$' then (p_profile ->> 'grad_year')::int else p.grad_year end,
     about = case when p_profile ? 'about' then left(nullif(btrim(p_profile ->> 'about'), ''), 3000) else p.about end,
+    linkedin_url = case when p_profile ? 'linkedin_url' and (p_profile ->> 'linkedin_url') ~ '^https://www\.linkedin\.com/in/[^/?#[:space:]]+$'
+                             and char_length(p_profile ->> 'linkedin_url') <= 300
+                        then p_profile ->> 'linkedin_url' else p.linkedin_url end,
     skills = case when jsonb_typeof(p_profile -> 'skills') = 'array'
                   then (select coalesce(array_agg(distinct left(btrim(x), 80)), '{}') from (select jsonb_array_elements_text(p_profile -> 'skills') x limit 50) s where btrim(x) <> '')
                   else p.skills end,
@@ -209,7 +212,8 @@ grant all on public.prefill_dismissals to service_role;
 
 create or replace function public._name_initial(p text)
 returns text language sql immutable set search_path = '' as $$
-  select left(regexp_replace(lower(coalesce(p, '')), '[^[:alpha:]]', '', 'g'), 1);
+  -- "Dr. Asha Rao" and "asha rao" both give "a" (titles first, then anything that is not a letter is ignored)
+  select left(regexp_replace(regexp_replace(lower(btrim(coalesce(p, ''))), '^(dr|er|mr|mrs|ms|prof|shri|smt)\.?\s+', ''), '[^[:alpha:]]', '', 'g'), 1);
 $$;
 revoke execute on function public._name_initial(text) from anon, authenticated, public;
 
