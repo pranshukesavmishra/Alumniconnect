@@ -118,7 +118,7 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
   const who = c.last_message && c.kind === 'group' && c.last_sender_name ? `${mine ? tx('chat.you') : c.last_sender_name}: ` : ''
   return (
     <li>
-      <Link to={`/chat/${c.id}`} className="flex items-center gap-3 px-4 py-3 hover:bg-surface-2 active:bg-surface-2">
+      <Link to={`/chat/${c.id}`} className="fx-press flex items-center gap-3.5 px-4 py-3.5 hover:bg-surface-2 active:bg-surface-2">
         <ChatAvatar c={c} size={52} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
@@ -140,7 +140,7 @@ function ChatRow({ c, uid }: { c: ChatSummary; uid: string | null }) {
             })()}
             {c.muted && <BellOff className="size-4 shrink-0 text-muted" aria-label={tx('chat.muted')} />}
             {unread && (
-              <span className={clsx('min-w-5.5 shrink-0 rounded-full px-1.5 text-center text-xs font-bold leading-5.5 text-white', c.muted ? 'bg-muted' : 'bg-primary')} aria-label={tx('chat.unreadN', { n: c.unread })}>
+              <span className={clsx('min-w-5.5 shrink-0 rounded-full px-1.5 text-center text-xs font-bold leading-5.5 text-white', c.muted ? 'bg-muted' : 'bg-primary shadow-[0_4px_10px_-4px_var(--primary-glow)]')} aria-label={tx('chat.unreadN', { n: c.unread })}>
                 {c.unread >= 100 ? '99+' : c.unread}
               </span>
             )}
@@ -312,8 +312,8 @@ function Bubble({ m, me, mine, showName, isGroup, seen, interactive, quote, onMe
         <div ref={gestures} style={{ touchAction: 'pan-y' }} className="[-webkit-touch-callout:none] [@media(pointer:coarse)]:select-none">
           <div
             className={clsx(
-              'min-w-16 whitespace-pre-line break-words rounded-2xl px-3 py-1.5 text-[16px] leading-snug shadow-sm [overflow-wrap:anywhere]',
-              mine ? 'bg-primary text-on-primary [&_a]:text-on-primary' : 'bg-surface text-text',
+              'min-w-16 whitespace-pre-line break-words rounded-[20px] px-3.5 py-2 text-[16px] leading-snug shadow-sm [overflow-wrap:anywhere]',
+              mine ? 'bg-(image:--grad-primary) bg-primary text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_6px_16px_-10px_var(--primary-glow)] [&_a]:text-on-primary' : 'border border-border/70 bg-surface text-text',
               mine ? (showName ? 'rounded-tr-md' : '') : showName ? 'rounded-tl-md' : '',
               m.failed && 'ring-2 ring-danger',
             )}
@@ -711,7 +711,7 @@ export function ChatThreadPage() {
                 const interactive = !m.pending && !m.failed && !m.deleted_at && m.kind !== 'system'
                 return (
                   <li key={m.id} id={`msg-${m.id}`} ref={i === unreadIdx ? unreadRef : undefined} className={clsx('rounded-xl', !cont && 'pt-2', (m.reactions?.length ?? 0) > 0 && 'pb-1')}>
-                    {newDay && <p className="sticky top-1 z-10 mx-auto my-2 w-fit rounded-full bg-surface-2/95 px-3 py-1 text-xs font-semibold text-muted shadow-sm">{dayLabel(m.created_at)}</p>}
+                    {newDay && <p className="fx-liquid sticky top-1 z-10 mx-auto my-2 w-fit rounded-full px-3.5 py-1 text-xs font-semibold text-muted">{dayLabel(m.created_at)}</p>}
                     {i === unreadIdx && <p className="my-2 rounded-full bg-primary-soft py-1 text-center text-xs font-bold text-primary">{tx('chat.unreadDivider')}</p>}
                     <Bubble
                       m={m}
