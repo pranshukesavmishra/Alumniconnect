@@ -1,5 +1,14 @@
 // Events & Giving UI layer (Layer 3b) strings, English. Spread into en.ts; eventsUiHi.ts must have the same keys.
 export const eventsUiEn = {
+  // Optional extras (add-on tickets)
+  'addon.title': 'Optional extras',
+  'addon.perPerson': 'Optional, priced per person',
+  'addon.me': 'Me',
+  'addon.join': '{name}: also join {what}',
+  'addon.save': 'Save {percent}%',
+  'addon.all': 'Add {what} for all {count} people',
+  'addon.none': 'Remove for everyone',
+  'addon.heading': 'Optional · {when}',
   // Meet page
   'evx.heroEyebrow': 'Jabalpur Engineering College · Since 1947',
   'evx.countdownTitle': 'The gates open in',

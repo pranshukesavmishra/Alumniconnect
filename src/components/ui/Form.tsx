@@ -163,10 +163,12 @@ export function Checkbox({
   checked,
   onChange,
   children,
+  disabled,
 }: {
   checked: boolean
   onChange: (v: boolean) => void
   children: ReactNode
+  disabled?: boolean
 }) {
   const id = useId()
   // The box has its own 44px tap target; the text is a label too, but links inside it stay tappable on their own.
@@ -178,6 +180,7 @@ export function Checkbox({
           type="checkbox"
           className="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
           checked={checked}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
         <span

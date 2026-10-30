@@ -2,6 +2,14 @@ import type { eventsUiEn } from './eventsUiEn'
 
 // Events & Giving UI layer (Layer 3b) strings, Hindi. Same keys as eventsUiEn.ts.
 export const eventsUiHi = {
+  'addon.title': 'वैकल्पिक अतिरिक्त',
+  'addon.perPerson': 'वैकल्पिक, प्रति व्यक्ति शुल्क',
+  'addon.me': 'मैं',
+  'addon.join': '{name}: {what} में भी शामिल होंगे',
+  'addon.save': '{percent}% बचत',
+  'addon.all': 'सभी {count} लोगों के लिए {what} जोड़ें',
+  'addon.none': 'सभी के लिए हटाएँ',
+  'addon.heading': 'वैकल्पिक · {when}',
   'evx.heroEyebrow': 'जबलपुर इंजीनियरिंग कॉलेज · 1947 से',
   'evx.countdownTitle': 'द्वार खुलने में',
   'evx.underway': 'पुनर्मिलन अभी चल रहा है',

@@ -24,7 +24,7 @@ import { registrationOpen, useEvent, useEventQuestions, useMyExperiences, useMyR
 import { PriceTag } from './PriceTag'
 import { discountInfo, totalSavings } from './ticketPricing'
 import { FundPicker, MultiChoice, ProfileCard, QuestionField, YesNo, boolToYn, ynToBool, type YN } from './RegisterParts'
-import { answerText, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
+import { addonCount, answerText, groupPersons, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
 import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 interface GuestDraft {
@@ -36,6 +36,8 @@ interface FormState {
   qty: Record<string, number>
   guestNames: Record<string, string[]>
   guestFood: Record<string, string[]>
+  /** optional extras: which people tick each extra ('me' or `${guestTicketId}:${row}`) */
+  addonOn?: Record<string, string[]>
   tshirt_size: string
   food_pref: string
   needs_accommodation: YN
@@ -81,6 +83,7 @@ const blank = (): FormState => ({
   qty: {},
   guestNames: {},
   guestFood: {},
+  addonOn: {},
   tshirt_size: '',
   food_pref: '',
   needs_accommodation: '',
@@ -163,7 +166,7 @@ export function RegisterPage() {
       const guestNames: Record<string, string[]> = {}
       const guestFood: Record<string, string[]> = {}
       const pool: Guest[] = [...reg.guests]
-      const extras = tickets.filter((t) => !t.is_primary)
+      const extras = tickets.filter((t) => !t.is_primary && !t.is_addon)
       const taken: Record<string, GuestDraft[]> = {}
       for (const t of extras) {
         const n = qty[t.id] ?? 0
@@ -186,6 +189,9 @@ export function RegisterPage() {
         guestNames[t.id] = list.map((g) => g.name)
         guestFood[t.id] = list.map((g) => g.food)
       }
+      const personKeys = groupPersons(extras, qty)
+      const addonOn: Record<string, string[]> = {}
+      for (const a of tickets.filter((t) => t.is_addon)) addonOn[a.id] = personKeys.slice(0, qty[a.id] ?? 0)
       const fund = reg.fund_paise > 0
       const preset = (FUND_PRESETS as readonly number[]).includes(reg.fund_paise)
       setForm((f) => ({
@@ -193,6 +199,7 @@ export function RegisterPage() {
         qty,
         guestNames,
         guestFood,
+        addonOn,
         tshirt_size: reg.tshirt_size ?? '',
         food_pref: reg.food_pref ?? '',
         needs_accommodation: boolToYn(reg.needs_accommodation),
@@ -241,7 +248,7 @@ export function RegisterPage() {
       const wanted = primary.find((p) => p.id === wantTicket)
       if (wanted) {
         for (const p of primary) cleaned[p.id] = p.id === wanted.id ? 1 : 0
-        for (const t of tickets) if (!t.is_primary && !ticketFits(wanted, t)) cleaned[t.id] = 0
+        for (const t of tickets) if (!t.is_primary && !t.is_addon && !ticketFits(wanted, t)) cleaned[t.id] = 0
       }
       setForm((f) => ({ ...f, qty: cleaned }))
     }
@@ -253,13 +260,20 @@ export function RegisterPage() {
   }, [stepIdx])
 
   const primaryTickets = useMemo(() => tickets?.filter((t) => t.is_primary) ?? [], [tickets])
-  const extraTickets = useMemo(() => tickets?.filter((t) => !t.is_primary) ?? [], [tickets])
+  const extraTickets = useMemo(() => tickets?.filter((t) => !t.is_primary && !t.is_addon) ?? [], [tickets])
+  const addonTickets = useMemo(() => tickets?.filter((t) => t.is_addon) ?? [], [tickets])
   const activeQuestions = useMemo(() => (questions ?? []).filter((q) => q.is_active), [questions])
-  const ticketsTotal = (tickets ?? []).reduce((sum, t) => sum + t.price_paise * (form.qty[t.id] ?? 0), 0)
-  const people = (tickets ?? []).reduce((sum, t) => sum + (form.qty[t.id] ?? 0), 0)
+  // people in the registration: the main person and the guests. Optional extras are per person on top of those.
+  const guestTicketsAll = extraTickets.filter((t) => ticketFits(primaryTickets.find((p) => (form.qty[p.id] ?? 0) > 0), t))
+  const persons = groupPersons(guestTicketsAll, form.qty)
+  // the quantity of an extra is the number of ticked people; everything else is the plain ticket quantity
+  const qtyAll: Record<string, number> = { ...form.qty }
+  for (const a of addonTickets) qtyAll[a.id] = addonCount(form.addonOn?.[a.id], persons)
+  const ticketsTotal = (tickets ?? []).reduce((sum, t) => sum + t.price_paise * (qtyAll[t.id] ?? 0), 0)
+  const people = (tickets ?? []).filter((t) => !t.is_addon).reduce((sum, t) => sum + (form.qty[t.id] ?? 0), 0)
   const fundPaise = fundPaiseOf(form)
   const total = ticketsTotal + (fundOk(fundPaise) ? fundPaise : 0)
-  const savings = totalSavings(tickets ?? [], form.qty)
+  const savings = totalSavings(tickets ?? [], qtyAll)
 
   if (le || lt || lm || lq || !profile) return <PageSkeleton />
   if (!event) return <Navigate to="/meet" replace />
@@ -310,6 +324,14 @@ export function RegisterPage() {
       for (const t of extraTickets) if (!ticketFits(chosen, t)) qty[t.id] = 0
       return { ...f, qty }
     })
+  const toggleAddon = (a: TicketType, key: string, on: boolean) =>
+    setForm((f) => {
+      const cur = new Set(f.addonOn?.[a.id] ?? [])
+      if (on) cur.add(key)
+      else cur.delete(key)
+      return { ...f, addonOn: { ...f.addonOn, [a.id]: [...cur] } }
+    })
+  const setAddonAll = (a: TicketType, on: boolean) => setForm((f) => ({ ...f, addonOn: { ...f.addonOn, [a.id]: on ? persons : [] } }))
   const setGuest = (t: TicketType, i: number, key: 'guestNames' | 'guestFood', v: string) =>
     setForm((f) => {
       const list = [...(f[key][t.id] ?? [])]
@@ -440,7 +462,7 @@ export function RegisterPage() {
           feedback: form.feedback,
           custom_answers: cleanCustomAnswers(questions ?? [], form.custom),
         },
-        items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: form.qty[t.id] ?? 0 })),
+        items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: qtyAll[t.id] ?? 0 })),
       })
       clearDraft()
       if (!locked && saved.amount_paise !== total) {
@@ -625,6 +647,54 @@ export function RegisterPage() {
                     })}
                   </Card>
                 )}
+              </div>
+            )}
+
+            {addonTickets.length > 0 && selectedPrimary && (
+              <div data-testid="optional-extras">
+                <SectionTitle>{tx('addon.title')}</SectionTitle>
+                <Card className="divide-y divide-border">
+                  {addonTickets.map((a) => {
+                    const d = discountInfo(a)
+                    const when = (a.days ?? []).map((x) => dayLabel(event, x)).join(' & ')
+                    const n = qtyAll[a.id] ?? 0
+                    const ticked = new Set(form.addonOn?.[a.id] ?? [])
+                    const personName = (k: string): string => {
+                      if (k === 'me') return tx('addon.me')
+                      const [tid, idx] = k.split(':')
+                      const g = extraTickets.find((t) => t.id === tid)
+                      const nm = (form.guestNames[tid!]?.[Number(idx)] ?? '').trim()
+                      return nm || `${g?.label ?? ''} ${Number(idx) + 1}`.trim()
+                    }
+                    return (
+                      <div key={a.id} className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold">{[when, a.label].filter(Boolean).join(' · ')}</p>
+                            <p className="text-sm text-muted">{[tx('addon.perPerson'), a.description].filter(Boolean).join(' · ')}</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          {persons.map((k) => (
+                            <Checkbox key={k} checked={ticked.has(k)} disabled={locked} onChange={(on) => toggleAddon(a, k, on)}>
+                              {tx('addon.join', { name: personName(k), what: a.label })}
+                              <span className="ml-1 text-muted">
+                                {`(+${formatPaise(a.price_paise)}`}
+                                {d && <>{' '}<s>{formatPaise(d.listPaise)}</s>{` · ${tx('addon.save', { percent: d.percent })}`}</>}
+                                {')'}
+                              </span>
+                            </Checkbox>
+                          ))}
+                        </div>
+                        {!locked && persons.length > 1 && (
+                          <Button type="button" variant="secondary" size="sm" onClick={() => setAddonAll(a, n < persons.length)}>
+                            {n < persons.length ? tx('addon.all', { count: persons.length, what: a.label }) : tx('addon.none')}
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </Card>
               </div>
             )}
 
@@ -836,10 +906,10 @@ export function RegisterPage() {
               'days',
               <>
                 {(tickets ?? [])
-                  .filter((t) => (form.qty[t.id] ?? 0) > 0)
+                  .filter((t) => (qtyAll[t.id] ?? 0) > 0)
                   .map((t) => (
-                    <KeyValue key={t.id} label={`${t.label} × ${form.qty[t.id]}`}>
-                      {formatPaise(t.price_paise * (form.qty[t.id] ?? 0))}
+                    <KeyValue key={t.id} label={`${t.label} × ${qtyAll[t.id]}`}>
+                      {formatPaise(t.price_paise * (qtyAll[t.id] ?? 0))}
                     </KeyValue>
                   ))}
                 {fitting.some((t) => (form.qty[t.id] ?? 0) > 0) && (

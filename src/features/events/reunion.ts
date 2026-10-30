@@ -42,6 +42,24 @@ export function ticketFits(primary: Pick<TicketType, 'days'> | undefined, t: Pic
   return t.days.every((d) => primary.days!.includes(d))
 }
 
+/** Optional extras (add-ons) are per person and can be added whichever main ticket was chosen. */
+export function isAddon(t: { is_addon?: boolean | null }): boolean {
+  return !!t.is_addon
+}
+
+/** Keys of the people in a registration, in order: the main person ('me'), then each guest row `${ticketId}:${index}`. */
+export function groupPersons(guestTickets: { id: string }[], qty: Record<string, number>): string[] {
+  const out = ['me']
+  for (const t of guestTickets) for (let i = 0; i < (qty[t.id] ?? 0); i++) out.push(`${t.id}:${i}`)
+  return out
+}
+
+/** How many people tick an extra: only people still in the registration count (a removed guest drops their tick). */
+export function addonCount(ticked: string[] | undefined, persons: string[]): number {
+  const set = new Set(persons)
+  return new Set((ticked ?? []).filter((k) => set.has(k))).size
+}
+
 /** People per day for a ticket selection: { 1: 1, 2: 4 }. */
 export function dayHeads(tickets: Pick<TicketType, 'id' | 'days'>[], qty: Record<string, number>, days: number): Record<number, number> {
   const out: Record<number, number> = {}

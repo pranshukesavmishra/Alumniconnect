@@ -107,6 +107,8 @@ export interface TicketType {
   /** name of the offer, e.g. "Early bird" */
   discount_label?: string | null
   is_primary: boolean
+  /** optional per-person extra (e.g. an outdoor tour) any registrant can add, whichever main ticket; never the main ticket */
+  is_addon?: boolean
   max_per_registration: number
   sort: number
   /** event days this ticket covers (1 = first day); null = every day */
