@@ -252,56 +252,52 @@ function parseTop(raw: string[], pdf: boolean): { name: string | null; headline:
 
 // ---------------------------------------------------------------- experience
 
-function parseExperience(L: string[]): AiExperience[] {
+function parseExperience(L: string[], pdf: boolean): AiExperience[] {
   const dates: number[] = []
   L.forEach((s, i) => {
     if (isDateLine(s)) dates.push(i)
   })
+  // the PDF writes the duration as "(7 years 9 months)" and puts the company above the title; the web puts it below
+  const pdfOrder = pdf || L.some((s) => isDateLine(s) && /\(\s*\d+\s*(?:years?|months?)/i.test(s))
   const out: AiExperience[] = []
   let group: string | null = null
   let prev = -1
   for (const di of dates) {
     const r = rangeOf(L[di]!)
-    const titleIdx = di - 1
-    if (!r || titleIdx <= prev) {
-      prev = di
-      continue
-    }
-    let title = L[titleIdx]!
-    const tParts = title.split(SEP)
-    if (hasEmpType(tParts)) title = tParts[0]!
-    if (isDurationOnly(title) || EMP_TYPE.test(title)) {
-      prev = di
-      continue
-    }
-    const c1i = di - 2
-    const c1 = c1i > prev ? L[c1i] : undefined
-    let company: string | null = null
-    if (c1 === undefined) {
-      company = group
-    } else {
-      const parts = c1.split(SEP).map((x) => x.trim())
+    const d1 = di - 1 > prev ? L[di - 1] : undefined
+    const d2 = di - 2 > prev ? L[di - 2] : undefined
+    const d3 = di - 3 > prev ? L[di - 3] : undefined
+    let title: string | undefined
+    let company: string | undefined
+    if (r && d1 !== undefined) {
+      const parts = d1.split(SEP).map((x) => x.trim())
       if (hasEmpType(parts)) {
-        company = parts[0]!
+        company = parts[0]
+        title = d2
         group = null
-      } else if (isDurationOnly(c1)) {
-        const ci = di - 3
-        const heading = ci > prev ? L[ci] : undefined
-        company = heading ? (heading.split(SEP)[0] ?? heading) : group
-        group = company
-      } else if (group && (bodyLike(c1) || c1i === prev + 1)) {
+      } else if (d2 !== undefined && isDurationOnly(d2)) {
+        title = d1
+        company = d3 === undefined ? (group ?? undefined) : (d3.split(SEP)[0] ?? d3)
+        group = company ?? null
+      } else if (group && (d2 === undefined || bodyLike(d2))) {
+        title = d1
         company = group
-      } else {
-        company = parts[0]!
+      } else if (d2 !== undefined) {
+        title = pdfOrder ? d1 : d2
+        company = pdfOrder ? (d2.split(SEP)[0] ?? d2) : (parts[0] ?? d1)
         group = null
       }
     }
+    prev = di
+    if (!r || !title || !company) continue
+    const tParts = title.split(SEP).map((x) => x.trim())
+    if (hasEmpType(tParts)) title = tParts[0]!
+    if (isDurationOnly(title) || isDateLine(title)) continue
     const locLine = L[di + 1]
     const nextIsRole = L[di + 2] !== undefined && isDateLine(L[di + 2]!)
     const location = locLine && !nextIsRole && !isDateLine(locLine) && (locationLike(locLine) || /\b(remote|hybrid|on-?site)\b/i.test(locLine)) ? expLocation(locLine) : null
-    prev = di
     const t = clip(title, 160)
-    const c = company ? clip(company, 160) : ''
+    const c = clip(company, 160)
     if (!t || !c) continue
     if (out.some((e) => e.title === t && e.company === c && e.start_year === r.sy)) continue
     out.push({ title: t, company: c, start_year: r.sy, end_year: r.ey, is_current: r.current, location })
@@ -345,7 +341,7 @@ function parseEducation(L: string[]): AiEducation[] {
       continue
     }
     const next = L[i + 1]
-    const startsSchool = !cur || hasDates || (cur.degree !== null && SCHOOL_LIKE.test(line)) || (!cur.degree && SCHOOL_LIKE.test(line) && !isDegreeLine(line))
+    const startsSchool = !cur || hasDates || (cur.degree !== null && (SCHOOL_LIKE.test(line) || isDegreeLine(next ?? '') || isDateish(next))) || (!cur.degree && SCHOOL_LIKE.test(line) && !isDegreeLine(line))
     if (startsSchool) {
       if (cur && hasDates && !SCHOOL_LIKE.test(line) && !(isDegreeLine(next ?? '') || isDateish(next))) continue // description text
       if (!cur || SCHOOL_LIKE.test(line) || isDegreeLine(next ?? '') || isDateish(next)) {
@@ -455,7 +451,7 @@ function parse(input: string): ParsedPaste {
   p.city = loc.city ? clip(loc.city, 80) : null
   p.country = loc.country ? clip(loc.country, 80) : null
 
-  p.experiences = parseExperience(body('experience'))
+  p.experiences = parseExperience(body('experience'), pdf)
   p.education = parseEducation(body('education'))
   const cur = p.experiences.find((e) => e.is_current)
   if (cur) {
