@@ -943,7 +943,13 @@ export function RegisterPage() {
               {tx('common.people', { count: people })}
               {reunion && fundOk(fundPaise) && ` · ${tx('rr.inclFund', { amount: formatPaise(fundPaise) })}`}
             </span>
-            <span className="flex items-baseline gap-2">
+            <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+              {savings > 0 && (
+                <span className="flex items-center gap-2" data-testid="bar-savings">
+                  <s className="text-sm text-muted">{formatPaise(ticketsTotal + savings, { zeroAsFree: false })}</s>
+                  <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-success">Save {Math.floor((savings / (ticketsTotal + savings)) * 100)}%</span>
+                </span>
+              )}
               <span className="text-caption text-muted">{tx('evx.total')}</span>
               <NumberTicker value={total} startOnView={false} duration={600} format={(n) => formatPaise(Math.round(n / 100) * 100)} className="text-stat text-2xl" />
             </span>
