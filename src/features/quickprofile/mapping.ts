@@ -37,6 +37,8 @@ export interface AiProfile {
   help_tags: string[]
   interests: string[]
   about: string | null
+  /** only from "Fill from LinkedIn" */
+  linkedin_url?: string | null
 }
 
 // ---------------------------------------------------------------- lists
@@ -110,9 +112,9 @@ export function unionList(current: readonly string[], incoming: readonly string[
 
 // ---------------------------------------------------------------- preview
 
-export type ScalarKey = 'full_name' | 'headline' | 'current_title' | 'current_company' | 'city' | 'country' | 'grad_year' | 'branch' | 'about'
+export type ScalarKey = 'full_name' | 'headline' | 'current_title' | 'current_company' | 'city' | 'country' | 'grad_year' | 'branch' | 'about' | 'linkedin_url'
 export type ListKey = 'skills' | 'help_tags' | 'interests'
-export const SCALAR_KEYS: ScalarKey[] = ['full_name', 'current_title', 'current_company', 'headline', 'city', 'country', 'branch', 'grad_year', 'about']
+export const SCALAR_KEYS: ScalarKey[] = ['full_name', 'current_title', 'current_company', 'headline', 'city', 'country', 'branch', 'grad_year', 'about', 'linkedin_url']
 export const LIST_KEYS: ListKey[] = ['skills', 'help_tags', 'interests']
 const LIST_MAX: Record<ListKey, number> = { skills: 50, help_tags: 12, interests: 30 }
 
@@ -158,6 +160,7 @@ export function buildPreview(ai: AiProfile, current: ProfileLike, existingExperi
     grad_year: ai.grad_year && ai.grad_year >= 1947 && ai.grad_year <= 2100 ? String(ai.grad_year) : '',
     branch: mapBranch(ai.branch) ?? '',
     about: str(ai.about).slice(0, 400),
+    linkedin_url: /^https:\/\/www\.linkedin\.com\/in\/[^/?#\s]+$/.test(str(ai.linkedin_url)) ? str(ai.linkedin_url) : '',
   }
   const scalars: ScalarItem[] = []
   for (const key of SCALAR_KEYS) {
