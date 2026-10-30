@@ -113,6 +113,13 @@ insert into public.t93_cases values
   ('admin_import_preview', $q$select public.admin_import_preview('[{"full_name":"A B"}]'::jsonb)$q$, 'a', 'members_import'),
   ('admin_import_retry', $q$select public.admin_import_retry('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_import'),
   ('admin_import_start', $q$select public.admin_import_start('[{"full_name":"A B"}]'::jsonb, false, null)$q$, 'a', 'members_import'),
+  -- quick profile: reunion list (prefill), LinkedIn verification hints, feature switches
+  ('admin_prefill_import', $q$select public.admin_prefill_import('[{"full_name":"A B","email":"ab@m93.com"}]'::jsonb, 'M93')$q$, 'a', 'members_import'),
+  ('admin_prefill_list', $q$select * from public.admin_prefill_list(null, 'all', 10, 0)$q$, 'a', 'members_view'),
+  ('admin_prefill_delete', $q$select public.admin_prefill_delete('93000000-0000-0000-0000-0000000000c2')$q$, 'a', 'members_import'),
+  ('admin_verification_hints', $q$select * from public.admin_verification_hints()$q$, 'a', 'members_verify'),
+  ('admin_review_hint', $q$select public.admin_review_hint('93000000-0000-0000-0000-0000000000c2', true)$q$, 'a', 'members_verify'),
+  ('admin_set_flag', $q$select public.admin_set_flag('linkedin_fill', true)$q$, 's', ''),
   ('admin_list_members', $q$select public.admin_list_members('{}'::jsonb, 10, 0, false)$q$, 'a', 'members_view'),
   ('admin_member_duplicates', $q$select * from public.admin_member_duplicates('all')$q$, 'a', 'members_merge'),
   ('admin_member_email', $q$select public.admin_member_email('93000000-0000-0000-0000-0000000000c1')$q$, 'a', 'members_view'),
@@ -638,5 +645,42 @@ begin
    where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity and c.relname not like 't93\_%';
   assert bad is null, 'tables without RLS: ' || coalesce(bad, '');
 end $$;
+-- quick profile: the server-only limit / hint functions and the reunion list are out of reach for members and anon
+do $$
+declare f text; r text;
+begin
+  foreach f in array array[
+    'select public.ai_fill_take(''93000000-0000-0000-0000-0000000000c1'', 500, 10)',
+    'select public.enrich_take(''93000000-0000-0000-0000-0000000000c1'', 50)',
+    'select public.record_verification_hint(''93000000-0000-0000-0000-0000000000c1'', ''Jabalpur Engineering College'', null, null, null, 2004, 2008, null)',
+    'select count(*) from public.prefill_records',
+    'select count(*) from public.prefill_dismissals',
+    'select count(*) from public.verification_hints'] loop
+    foreach r in array array['anon', 'authenticated'] loop
+      execute format('set local role %s', r);
+      perform set_config('request.jwt.claims', case when r = 'anon' then '{"role":"anon"}' else json_build_object('sub', '93000000-0000-0000-0000-0000000000c1', 'role', 'authenticated')::text end, true);
+      perform set_config('request.jwt.claim.sub', case when r = 'anon' then '' else '93000000-0000-0000-0000-0000000000c1' end, true);
+      begin
+        execute f;
+        reset role;
+        raise exception 'should be refused for %: %', r, f;
+      exception when insufficient_privilege then reset role;
+      end;
+    end loop;
+  end loop;
+  -- anon cannot use the member functions either
+  set local role anon;
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  foreach f in array array['select * from public.my_prefill_match(null, null)', 'select public.claim_prefill(gen_random_uuid(), null, null)',
+                           'select public.save_my_quick_profile(''{}''::jsonb, ''[]''::jsonb, ''[]''::jsonb)', 'select public.quick_profile_flags()'] loop
+    begin
+      execute f;
+      raise exception 'anon should be refused: %', f;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  reset role;
+end $$;
+
 select 'ALL SAFETY MATRIX TESTS PASSED';
 rollback;

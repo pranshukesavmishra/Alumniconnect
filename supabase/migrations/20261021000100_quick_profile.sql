@@ -319,14 +319,14 @@ begin
   end if;
   select * into p from public.profiles where id = me;
 
-  if char_length(btrim(coalesce(p.full_name, ''))) < 2 then v_filled := v_filled || 'full_name'; end if;
-  if p.member_type is null and r.member_type is not null then v_filled := v_filled || 'member_type'; end if;
-  if nullif(btrim(coalesce(p.branch, '')), '') is null and r.branch is not null then v_filled := v_filled || 'branch'; end if;
-  if p.grad_year is null and r.grad_year is not null then v_filled := v_filled || 'grad_year'; end if;
-  if p.join_year is null and r.join_year is not null then v_filled := v_filled || 'join_year'; end if;
-  if nullif(btrim(coalesce(p.city, '')), '') is null and r.city is not null then v_filled := v_filled || 'city'; end if;
-  if nullif(btrim(coalesce(p.current_title, '')), '') is null and r.designation is not null then v_filled := v_filled || 'current_title'; end if;
-  if nullif(btrim(coalesce(p.current_company, '')), '') is null and r.organisation is not null then v_filled := v_filled || 'current_company'; end if;
+  if char_length(btrim(coalesce(p.full_name, ''))) < 2 then v_filled := array_append(v_filled, 'full_name'); end if;
+  if p.member_type is null and r.member_type is not null then v_filled := array_append(v_filled, 'member_type'); end if;
+  if nullif(btrim(coalesce(p.branch, '')), '') is null and r.branch is not null then v_filled := array_append(v_filled, 'branch'); end if;
+  if p.grad_year is null and r.grad_year is not null then v_filled := array_append(v_filled, 'grad_year'); end if;
+  if p.join_year is null and r.join_year is not null then v_filled := array_append(v_filled, 'join_year'); end if;
+  if nullif(btrim(coalesce(p.city, '')), '') is null and r.city is not null then v_filled := array_append(v_filled, 'city'); end if;
+  if nullif(btrim(coalesce(p.current_title, '')), '') is null and r.designation is not null then v_filled := array_append(v_filled, 'current_title'); end if;
+  if nullif(btrim(coalesce(p.current_company, '')), '') is null and r.organisation is not null then v_filled := array_append(v_filled, 'current_company'); end if;
 
   update public.profiles x set
     full_name = case when 'full_name' = any (v_filled) then r.full_name else x.full_name end,
@@ -346,7 +346,7 @@ begin
   if v_phone is not null then
     insert into public.profile_private (id) values (me) on conflict (id) do nothing;
     update public.profile_private pp set phone = v_phone where pp.id = me and nullif(btrim(coalesce(pp.phone, '')), '') is null;
-    if found then v_filled := v_filled || 'phone'; end if;
+    if found then v_filled := array_append(v_filled, 'phone'); end if;
   end if;
   return v_filled;
 end;
@@ -524,7 +524,7 @@ begin
     and ((nullif(btrim(p.city), '') is null and nullif(btrim(new.city), '') is not null)
       or (nullif(btrim(p.current_title), '') is null and nullif(btrim(new.designation), '') is not null)
       or (nullif(btrim(p.current_company), '') is null and nullif(btrim(new.company), '') is not null));
-  if nullif(btrim(new.phone), '') is not null and new.phone ~ '^\+?[0-9 ]{8,16}$' then
+  if nullif(btrim(new.phone), '') is not null and new.phone ~ '^\+?[0-9 ]{7,16}$' then
     update public.profile_private pp set phone = btrim(new.phone)
      where pp.id = new.user_id and nullif(btrim(coalesce(pp.phone, '')), '') is null;
   end if;
