@@ -74,7 +74,7 @@ export function EntryPass({ pass, footer }: { pass: PassData; footer?: ReactNode
           <div
             aria-hidden
             data-testid="pass-holo"
-            className="pointer-events-none absolute inset-0 z-0 opacity-40 mix-blend-color-dodge"
+            className="pointer-events-none absolute inset-0 z-0 opacity-50 mix-blend-soft-light"
             style={{
               backgroundImage:
                 'linear-gradient(115deg, transparent 20%, rgb(255 236 179 / 0.55) 36%, rgb(160 255 220 / 0.45) 44%, rgb(255 190 240 / 0.35) 52%, rgb(170 210 255 / 0.4) 60%, transparent 76%)',
