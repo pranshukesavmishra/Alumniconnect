@@ -171,3 +171,14 @@ export async function typeSlow(page, loc, text, { delay = 80, label } = {}) {
   await loc.pressSequentially(text, { delay })
   await sleep(450)
 }
+
+/** the element with this text that is actually inside the phone viewport (the drawer item, not a hidden twin) */
+export async function inView(page, text, role) {
+  const all = role ? page.getByRole(role, { name: text }) : page.getByText(text)
+  const n = await all.count()
+  for (let i = 0; i < n; i++) {
+    const b = await all.nth(i).boundingBox()
+    if (b && b.y >= 0 && b.y + b.height <= VH && b.x >= 0 && b.width > 0) return all.nth(i)
+  }
+  return all.first()
+}
