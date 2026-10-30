@@ -88,7 +88,7 @@ export function GoalRing({ raised, goal, size = 132, label, tone = 'brand', chil
             <stop offset="1" stopColor={stops[1]} />
           </linearGradient>
         </defs>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={tone === 'light' ? 'rgb(255 255 255 / 0.14)' : 'var(--surface-2)'} strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={tone === 'light' ? 'rgb(255 255 255 / 0.14)' : 'var(--border)'} strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}

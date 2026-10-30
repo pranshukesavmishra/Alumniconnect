@@ -145,8 +145,8 @@ export function CampaignPage() {
             {c.my_total_paise > 0 && <p className="text-sm font-semibold text-success" data-testid="my-total">{tx('give.youGave', { amount: formatPaise(c.my_total_paise, { zeroAsFree: false }) })}</p>}
             {open ? (
               <div className="flex flex-wrap gap-2">
-                <Button variant="gold" size="lg" className="fx-shine flex-1" icon={<HeartHandshake className="size-4" />} onClick={() => setGive({ item: null })} data-testid="give-btn">{tx('give.giveNow')}</Button>
-                <Button variant="secondary" size="lg" icon={<CalendarClock className="size-4" />} onClick={() => setPledgeOpen(true)} data-testid="pledge-btn">{c.my_pledge ? tx('give.pledged') : tx('give.pledge')}</Button>
+                <Button variant="gold" size="lg" className="fx-shine w-full" icon={<HeartHandshake className="size-4" />} onClick={() => setGive({ item: null })} data-testid="give-btn">{tx('give.giveNow')}</Button>
+                <Button variant="secondary" size="lg" className="w-full" icon={<CalendarClock className="size-4" />} onClick={() => setPledgeOpen(true)} data-testid="pledge-btn">{c.my_pledge ? tx('give.pledged') : tx('give.pledge')}</Button>
               </div>
             ) : (
               <Notice tone="info" title={c.status === 'completed' ? tx('give.completedNote') : c.status === 'paused' ? tx('give.pausedNote') : tx('give.closedNote')} />
