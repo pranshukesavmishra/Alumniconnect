@@ -6,6 +6,7 @@ import { mediaHi } from './mediaHi'
 import { storiesHi } from './storiesHi'
 import { designHi } from './designHi'
 import { shellHi } from './shellHi'
+import { eventsUiHi } from './eventsUiHi'
 import { wowHi } from './wowHi'
 import { peopleUiHi } from './peopleUiHi'
 import { landingHi } from './landingHi'
@@ -1341,6 +1342,7 @@ export const hi = {
   ...storiesHi,
   ...designHi,
   ...shellHi,
+  ...eventsUiHi,
   ...wowHi,
   ...peopleUiHi,
   ...landingHi,

@@ -28,7 +28,7 @@ const SCOPES: PhotoScope[] = ['approved', 'tagged', 'mine', 'pending', 'hidden',
 function Thumb({ p, selecting, order, onOpen }: { p: PhotoRow; selecting: boolean; order: number; onOpen: () => void }) {
   const tx = useT()
   return (
-    <button type="button" className={clsx('relative aspect-square overflow-hidden rounded-lg bg-surface-2', order > 0 && 'ring-4 ring-primary')} onClick={onOpen} aria-label={p.caption ?? p.alt_text ?? tx('photos.photoN', { n: p.id.slice(0, 4) })} aria-pressed={selecting ? order > 0 : undefined} data-photo-id={p.id}>
+    <button type="button" className={clsx('fx-press relative aspect-square overflow-hidden rounded-2xl bg-surface-2 shadow-e1', order > 0 && 'ring-4 ring-primary')} onClick={onOpen} aria-label={p.caption ?? p.alt_text ?? tx('photos.photoN', { n: p.id.slice(0, 4) })} aria-pressed={selecting ? order > 0 : undefined} data-photo-id={p.id}>
       <img src={thumbUrl(p)} alt="" loading="lazy" className="size-full object-cover" />
       <span className="absolute left-1 top-1 flex gap-1">
         {p.source === 'official' && <span className="grid size-6 place-items-center rounded-full bg-primary text-on-primary" title={tx('photos.official')}><BadgeCheck className="size-4" aria-hidden /></span>}
@@ -207,13 +207,13 @@ export function PhotosPage() {
 
         {photos.error && <Notice tone="danger" title={friendlyError(photos.error)} />}
         {photos.isLoading ? (
-          <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">{Array.from({ length: 9 }, (_, i) => <Skeleton key={i} className="aspect-square rounded-lg" />)}</div>
+          <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">{Array.from({ length: 9 }, (_, i) => <Skeleton key={i} className="aspect-square rounded-2xl" />)}</div>
         ) : list.length === 0 ? (
           <EmptyState icon={<Images />} title={scope === 'tagged' ? tx('photos.noneTagged') : scope === 'pending' ? tx('photos.noneWaiting') : tx('photos.empty')}>
             {scope === 'tagged' ? tx('photos.noneTaggedBody') : scope === 'approved' ? tx('photos.emptyBody') : null}
           </EmptyState>
         ) : (
-          <div className="grid grid-cols-3 gap-1 sm:grid-cols-4" data-testid="photo-grid">
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4" data-testid="photo-grid">
             {list.map((p) => <Thumb key={p.id} p={p} selecting={selecting} order={sel.indexOf(p.id) + 1} onOpen={() => (selecting ? toggle(p) : set('photo', p.id))} />)}
           </div>
         )}

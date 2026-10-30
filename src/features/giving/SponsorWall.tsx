@@ -7,7 +7,7 @@ function Logo({ s, h }: { s: WallTier['sponsors'][number]; h: string }) {
   const src = publicUrl('giving', s.logo_path)
   const web = safeWebsite(s.website)
   const inner = src ? (
-    <img src={src} alt={s.name} loading="lazy" className={`${h} w-auto max-w-[9rem] object-contain`} />
+    <img src={src} alt={s.name} className={`${h} w-auto min-w-12 max-w-[9rem] object-contain`} />
   ) : (
     <span className="px-2 text-sm font-semibold">{s.name}</span>
   )

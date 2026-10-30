@@ -29,10 +29,13 @@ export function MyGivingPage() {
       <PageHeader title={tx('give.myGiving')} back="/give" />
       <Page className="space-y-5">
         {error && <Notice tone="danger" title={friendlyError(error)} />}
-        <Card className="p-4">
-          <p className="text-sm text-muted">{tx('give.myTotal')}</p>
-          <p className="text-3xl font-bold tabular-nums" data-testid="my-giving-total"><Money paise={total} /></p>
-        </Card>
+        <section className="aurora relative isolate overflow-hidden rounded-[1.75rem] p-5 text-white shadow-pop">
+          <div aria-hidden className="fx-dots-light absolute inset-0 -z-10 opacity-30" />
+          <p className="text-eyebrow text-accent">{tx('evx.myTotalEyebrow')}</p>
+          <p className="text-caption mt-2 text-white/70">{tx('give.myTotal')}</p>
+          <p className="text-stat text-[2.75rem] leading-tight" data-testid="my-giving-total"><Money paise={total} /></p>
+          <p className="fx-liquid-dark text-caption mt-3 rounded-2xl p-3 text-hero-text">{tx('evx.badgesTeaser')}</p>
+        </section>
         {!data?.donations.length ? (
           <EmptyState icon={<HeartHandshake />} title={tx('give.noGifts')} action={<ButtonLink to="/give">{tx('give.browse')}</ButtonLink>}>{tx('give.noGiftsBody')}</EmptyState>
         ) : (
