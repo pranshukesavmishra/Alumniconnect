@@ -7,6 +7,7 @@ import { PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Form'
 import { PageSkeleton } from '../../components/ui/Display'
+import './../events/events.css'
 import { friendlyError } from '../../lib/errors'
 import { formatDateTime } from '../../lib/format'
 import { supabase } from '../../lib/supabase'
@@ -32,6 +33,7 @@ export function CheckInPage() {
   const [manual, setManual] = useState('')
   const [busy, setBusy] = useState(false)
   const [count, setCount] = useState(0)
+  const [flashKey, setFlashKey] = useState(0)
   const qc = useQueryClient()
 
   const eventId = data?.event.id
@@ -48,6 +50,7 @@ export function CheckInPage() {
       void qc.invalidateQueries({ queryKey: ['event-arrivals', eventId] })
       if (error) {
         setResult({ kind: 'error', message: friendlyError(error) })
+        setFlashKey((k) => k + 1)
         navigator.vibrate?.([80, 60, 80])
         return
       }
@@ -60,6 +63,7 @@ export function CheckInPage() {
         setResult({ kind: 'ok', reg })
         setCount((c) => c + reg.headcount)
       }
+      setFlashKey((k) => k + 1)
       navigator.vibrate?.(reg.status === 'confirmed' && !row.already_checked_in ? 60 : [80, 60, 80])
     },
     [eventId, qc],
@@ -108,6 +112,24 @@ export function CheckInPage() {
       <PageHeader title="Check-in" subtitle={`${data.event.title} · ${count} people this session`} back={`/admin/events/${slug}`} />
       <div className="relative mx-auto aspect-square w-full max-w-md overflow-hidden bg-black text-white sm:mt-4 sm:rounded-3xl">
         <video ref={video} className="size-full object-cover" muted playsInline />
+        {/* scan frame with corner brackets and a sweeping line */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 grid place-items-center">
+          <div className="relative size-[68%] [--evx-frame:220px]">
+            {['left-0 top-0 border-l-4 border-t-4 rounded-tl-3xl', 'right-0 top-0 border-r-4 border-t-4 rounded-tr-3xl', 'bottom-0 left-0 border-b-4 border-l-4 rounded-bl-3xl', 'bottom-0 right-0 border-b-4 border-r-4 rounded-br-3xl'].map((c) => (
+              <span key={c} className={clsx('absolute size-10 border-white/90', c)} />
+            ))}
+            {!camError && <span className="absolute inset-x-3 top-1 h-0.5 rounded-full bg-accent shadow-[0_0_14px_var(--accent)] [animation:evx-scanline_2.4s_ease-in-out_infinite] motion-reduce:hidden" />}
+          </div>
+        </div>
+        {/* colour flash on every result: green welcome, amber duplicate, red help desk */}
+        {result && (
+          <div
+            key={flashKey}
+            aria-hidden
+            className={clsx('pointer-events-none absolute inset-0 [animation:evx-flash_900ms_ease-out_forwards] motion-reduce:hidden', result.kind === 'ok' ? 'bg-success' : result.kind === 'again' ? 'bg-accent' : 'bg-danger')}
+          />
+        )}
+        {!result && !camError && <p className="absolute inset-x-0 bottom-3 text-center text-sm font-semibold text-white/85 drop-shadow">Hold the QR code inside the frame</p>}
         {camError && (
           <div className="absolute inset-0 grid place-items-center p-6 text-center">
             <div>
@@ -120,7 +142,7 @@ export function CheckInPage() {
 
       <div className="mx-auto max-w-md space-y-4 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))]">
         {result && (
-          <div role="status" aria-live="assertive" className={clsx('rounded-3xl p-5', tone)}>
+          <div role="status" aria-live="assertive" className={clsx('rounded-[1.75rem] p-5 shadow-pop [animation:pop-in_260ms_var(--ease-out)] motion-reduce:animate-none', tone)}>
             {result.kind === 'error' ? (
               <p className="flex items-center gap-2 text-lg font-bold">
                 <XCircle className="size-6" aria-hidden /> {result.message}
@@ -132,7 +154,7 @@ export function CheckInPage() {
                   {result.kind === 'again' && <><TriangleAlert className="size-5" aria-hidden /> Already checked in {formatDateTime(result.reg.checked_in_at)}</>}
                   {result.kind === 'unpaid' && <><XCircle className="size-5" aria-hidden /> Not confirmed: send to the help desk</>}
                 </p>
-                <p className="mt-2 text-2xl font-bold">{result.reg.full_name}</p>
+                <p className="text-display mt-2">{result.reg.full_name}</p>
                 <p className="opacity-90">
                   {[result.reg.branch, result.reg.grad_year].filter(Boolean).join(' ')} · admits <strong>{result.reg.headcount}</strong>
                 </p>

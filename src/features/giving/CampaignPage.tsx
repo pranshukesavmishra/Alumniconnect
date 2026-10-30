@@ -15,7 +15,7 @@ import { formatPaise } from '../../lib/money'
 import { cancelPledge, coverUrl, setPledge, sponsorInterest, useAct, useCampaign, useDonors, useLeaderboard, usePublicPackages, type CampaignDetail } from './api'
 import { GiveSheet } from './GiveSheet'
 import { daysLeft, donorLabel, itemRemaining, percentOf, whatsappShareUrl } from './helpers'
-import { Cover, Money, ProgressBar, StatusBadge, TYPE_KEY, copyText } from './parts'
+import { Cover, GoalRing, Money, ProgressBar, StatusBadge, TYPE_KEY, copyText } from './parts'
 import { SponsorStrip } from './SponsorWall'
 
 function PledgeSheet({ c, onClose }: { c: CampaignDetail; onClose: () => void }) {
@@ -113,21 +113,30 @@ export function CampaignPage() {
     <div>
       <PageHeader title={c.title} back="/give" />
       <Page className="space-y-5">
-        <div className="overflow-hidden rounded-3xl border border-border/80 shadow-card">
-          <Cover c={c} className="h-44 sm:h-64" />
-          <div className="space-y-3 bg-surface p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="primary">{tx(TYPE_KEY[c.type] ?? 'give.type.project')}</Badge>
+        <div className="fx-hairline overflow-hidden rounded-[1.75rem] bg-surface shadow-pop">
+          <div className="relative">
+            <Cover c={c} className="h-48 sm:h-64" />
+            <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,transparent_40%,rgb(4_20_15/0.75))]" />
+            <div className="absolute inset-x-4 bottom-3 flex flex-wrap items-center gap-2 text-white">
+              <Badge tone="solid">{tx(TYPE_KEY[c.type] ?? 'give.type.project')}</Badge>
               <StatusBadge c={c} />
               {c.department && <Badge>{c.department}</Badge>}
               {c.batch_from && <Badge>{tx('give.batches', { from: c.batch_from, to: c.batch_to ?? c.batch_from })}</Badge>}
             </div>
-            {c.summary && <p className="text-[15px] text-muted">{c.summary}</p>}
-            <ProgressBar raised={c.raised_paise} goal={c.goal_paise} label={tx('give.progress')} />
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <p><span className="text-2xl font-bold tabular-nums" data-testid="raised"><Money paise={c.raised_paise} /></span> <span className="text-sm text-muted">{tx('give.ofGoal', { goal: formatPaise(c.goal_paise, { zeroAsFree: false }) })}</span></p>
-              <span className="text-sm font-semibold" data-testid="percent">{percentOf(c.raised_paise, c.goal_paise)}%</span>
+          </div>
+          <div className="space-y-4 p-5">
+            {c.summary && <p className="text-body-lg text-muted">{c.summary}</p>}
+            <div className="flex items-center gap-5">
+              <GoalRing raised={c.raised_paise} goal={c.goal_paise} size={112} label={tx('give.progress')}>
+                <span className="text-stat text-2xl leading-none" data-testid="percent">{percentOf(c.raised_paise, c.goal_paise)}%</span>
+              </GoalRing>
+              <div className="min-w-0 flex-1">
+                <p className="text-caption text-muted">{tx('evx.raised')}</p>
+                <p className="text-stat text-[2rem] leading-tight" data-testid="raised"><Money paise={c.raised_paise} /></p>
+                <p className="text-caption text-muted">{tx('give.ofGoal', { goal: formatPaise(c.goal_paise, { zeroAsFree: false }) })}</p>
+              </div>
             </div>
+            <ProgressBar raised={c.raised_paise} goal={c.goal_paise} label={tx('give.progress')} size="sm" />
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
               <span data-testid="donor-count">{tx('give.donors', { count: c.donor_count })}</span>
               {d !== null && <span className="inline-flex items-center gap-1" data-testid="countdown"><CalendarClock className="size-4" aria-hidden /> {d === 0 ? tx('give.ended') : tx('give.daysLeft', { count: d })}</span>}
@@ -136,8 +145,8 @@ export function CampaignPage() {
             {c.my_total_paise > 0 && <p className="text-sm font-semibold text-success" data-testid="my-total">{tx('give.youGave', { amount: formatPaise(c.my_total_paise, { zeroAsFree: false }) })}</p>}
             {open ? (
               <div className="flex flex-wrap gap-2">
-                <Button className="flex-1" icon={<HeartHandshake className="size-4" />} onClick={() => setGive({ item: null })} data-testid="give-btn">{tx('give.giveNow')}</Button>
-                <Button variant="secondary" icon={<CalendarClock className="size-4" />} onClick={() => setPledgeOpen(true)} data-testid="pledge-btn">{c.my_pledge ? tx('give.pledged') : tx('give.pledge')}</Button>
+                <Button variant="gold" size="lg" className="fx-shine flex-1" icon={<HeartHandshake className="size-4" />} onClick={() => setGive({ item: null })} data-testid="give-btn">{tx('give.giveNow')}</Button>
+                <Button variant="secondary" size="lg" icon={<CalendarClock className="size-4" />} onClick={() => setPledgeOpen(true)} data-testid="pledge-btn">{c.my_pledge ? tx('give.pledged') : tx('give.pledge')}</Button>
               </div>
             ) : (
               <Notice tone="info" title={c.status === 'completed' ? tx('give.completedNote') : c.status === 'paused' ? tx('give.pausedNote') : tx('give.closedNote')} />
@@ -157,19 +166,19 @@ export function CampaignPage() {
         {c.milestones.length > 0 && (
           <section aria-label={tx('give.milestones')}>
             <SectionTitle>{tx('give.milestones')}</SectionTitle>
-            <Card className="divide-y divide-border">
+            <ol className="relative space-y-3 pl-8 before:absolute before:bottom-4 before:left-[13px] before:top-4 before:w-0.5 before:bg-border">
               {c.milestones.map((m) => (
-                <div key={m.percent} className="flex items-start gap-3 p-3.5" data-testid="milestone" data-reached={m.reached}>
-                  <span className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${m.reached ? 'bg-success text-white' : 'bg-surface-2 text-muted'}`}>
-                    {m.reached ? <Check className="size-4" aria-hidden /> : `${m.percent}%`}
+                <li key={m.percent} className="relative" data-testid="milestone" data-reached={m.reached}>
+                  <span className={`absolute -left-8 top-3 grid size-7 place-items-center rounded-full ${m.reached ? 'bg-success text-white shadow-[0_0_0_4px_var(--success-soft)]' : 'bg-surface-2 ring-1 ring-border'}`}>
+                    {m.reached && <Check className="size-4" aria-hidden />}
                   </span>
-                  <div className="min-w-0">
+                  <Card className="p-3.5">
                     <p className="font-semibold">{m.percent}% · {m.title} <span className="font-normal text-muted">({formatPaise(m.amount_paise, { zeroAsFree: false })})</span></p>
                     {m.unlocks && <p className="text-sm text-muted">{tx('give.unlocks')}: {m.unlocks}</p>}
-                  </div>
-                </div>
+                  </Card>
+                </li>
               ))}
-            </Card>
+            </ol>
           </section>
         )}
 

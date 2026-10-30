@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card, KeyValue, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { NumberTicker } from '../../components/ui/Motion'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Stepper, Textarea } from '../../components/ui/Form'
 import { PhoneInput, usePhoneError } from '../../components/ui/PhoneInput'
 import { useT, type MsgKey } from '../../i18n'
@@ -473,19 +474,9 @@ export function RegisterPage() {
       <PageHeader title={locked ? tx('reg.updateTitle') : tx('reg.title')} subtitle={event.title} back="/meet" />
       <Page className="space-y-6">
         <GlimpseCarousel />
-        {/* step indicator */}
-        <div>
-          <ol className="flex items-center gap-1.5" aria-label={tx('reg.progress')}>
-            {steps.map((s, i) => (
-              <li key={s} className="flex-1" aria-current={i === stepIdx ? 'step' : undefined}>
-                <span className={clsx('block h-1.5 rounded-full', i <= stepIdx ? 'bg-primary' : 'bg-surface-2')} />
-                <span className="sr-only">
-                  {i + 1}. {stepLabel(s)}
-                </span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-2 flex items-center justify-between gap-2 text-sm">
+        {/* step indicator: animated progress + one dot per step */}
+        <div className="fx-hairline rounded-[1.6rem] bg-surface p-4 shadow-card">
+          <p className="flex items-center justify-between gap-2 text-sm">
             <span className="font-semibold text-primary" aria-live="polite">
               {tx('rr.stepOf', { n: stepIdx + 1, total: steps.length, label: stepLabel(step) })}
             </span>
@@ -493,8 +484,37 @@ export function RegisterPage() {
               <Clock className="size-3.5" aria-hidden /> {tx('rr.twoMinutes')}
             </span>
           </p>
+          <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-[linear-gradient(90deg,var(--emerald-400),var(--primary),var(--accent))] shadow-[0_0_12px_var(--primary-glow)] transition-[width] duration-500 ease-[var(--ease-out)] motion-reduce:transition-none"
+              style={{ width: `${((stepIdx + 1) / steps.length) * 100}%` }}
+            />
+          </div>
+          <ol className="mt-3 flex items-start justify-between gap-1" aria-label={tx('reg.progress')}>
+            {steps.map((s, i) => (
+              <li key={s} className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center" aria-current={i === stepIdx ? 'step' : undefined}>
+                <span
+                  aria-hidden
+                  className={clsx(
+                    'grid size-7 place-items-center rounded-full text-xs font-bold transition-colors duration-300',
+                    i < stepIdx ? 'bg-primary text-on-primary' : i === stepIdx ? 'bg-accent text-on-accent shadow-[0_0_0_4px_color-mix(in_srgb,var(--accent)_25%,transparent)]' : 'bg-surface-2 text-muted',
+                  )}
+                >
+                  {i < stepIdx ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                </span>
+                <span className={clsx('hidden text-[11px] font-semibold leading-tight sm:block', i === stepIdx ? 'text-text' : 'text-muted')} aria-hidden>
+                  {stepLabel(s)}
+                </span>
+                <span className="sr-only">
+                  {i + 1}. {stepLabel(s)}
+                </span>
+              </li>
+            ))}
+          </ol>
         </div>
 
+        <div key={step} className="space-y-6 [animation:rise-in_420ms_var(--ease-out)_both] motion-reduce:animate-none">
+        {step !== 'details' && <h2 className="text-h1">{stepLabel(step)}</h2>}
         {step === 'details' && (
           <section className="space-y-5">
             <WelcomeHeader event={event} />
@@ -900,14 +920,20 @@ export function RegisterPage() {
           </section>
         )}
 
-        {/* actions */}
-        <div className="sticky bottom-0 -mx-4 border-t border-border bg-bg/95 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:bottom-0">
-          <div className="mb-2 flex items-center justify-between text-[15px]">
-            <span className="text-muted">
+        </div>
+
+        {/* actions: floating glass bar with the running total */}
+        <div className="sticky bottom-0 z-20 -mx-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2">
+          <div className="fx-liquid rounded-[1.75rem] p-3" style={{ backgroundColor: 'color-mix(in oklab, var(--surface) 88%, transparent)' }}>
+          <div className="mb-2 flex items-end justify-between gap-3 px-1">
+            <span className="text-caption text-muted">
               {tx('common.people', { count: people })}
               {reunion && fundOk(fundPaise) && ` · ${tx('rr.inclFund', { amount: formatPaise(fundPaise) })}`}
             </span>
-            <span className="font-bold tabular-nums">{formatPaise(total)}</span>
+            <span className="flex items-baseline gap-2">
+              <span className="text-caption text-muted">{tx('evx.total')}</span>
+              <NumberTicker value={total} startOnView={false} duration={600} format={(n) => formatPaise(Math.round(n / 100) * 100)} className="text-stat text-2xl" />
+            </span>
           </div>
           <div className="flex gap-3">
             {stepIdx > 0 && (
@@ -916,16 +942,17 @@ export function RegisterPage() {
               </Button>
             )}
             {step !== 'review' ? (
-              <Button size="lg" className="flex-1" onClick={nextStep}>
+              <Button size="lg" className="fx-shine flex-1" onClick={nextStep}>
                 {tx('common.continue')}
               </Button>
             ) : (
-              <Button size="lg" className="flex-1" loading={upsert.isPending} onClick={submit} icon={locked ? <Save className="size-5" /> : <Check className="size-5" />}>
+              <Button size="lg" variant="gold" haptic className="fx-shine flex-1" loading={upsert.isPending} onClick={submit} icon={locked ? <Save className="size-5" /> : <Check className="size-5" />}>
                 {locked ? tx('reg.save') : total > 0 ? tx('reg.confirmPay') : tx('reg.confirm')}
               </Button>
             )}
           </div>
           <p className="mt-2 text-center text-xs text-muted">{tx('rr.draftSaved')}</p>
+          </div>
         </div>
       </Page>
     </div>
@@ -941,24 +968,23 @@ function shiftDate(iso: string | null, n: number): string | undefined {
 function WelcomeHeader({ event }: { event: EventRow }) {
   const tx = useT()
   return (
-    <Card className="overflow-hidden">
-      <div className="bg-hero px-5 py-4 text-white">
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent">{tx('rr.welcome')}</p>
-        <h2 className="mt-0.5 text-xl font-bold leading-tight">{event.title}</h2>
-        {event.tagline && <p className="mt-1 text-[15px] text-hero-text">{event.tagline}</p>}
-        <ul className="mt-3 space-y-1.5 text-sm text-hero-text">
-          <li className="flex items-start gap-2">
-            <CalendarDays className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden /> {formatDateRange(event.starts_at, event.ends_at)}
-          </li>
-          {event.venue && (
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden /> <span className="min-w-0">{event.venue}</span>
-            </li>
-          )}
-        </ul>
+    <div className="aurora relative isolate overflow-hidden rounded-[1.75rem] p-5 text-white shadow-pop">
+      <div aria-hidden className="fx-dots-light absolute inset-0 -z-10 opacity-30" />
+      <p className="text-eyebrow text-accent">{tx('rr.welcome')}</p>
+      <h2 className="text-h1 mt-1.5 text-white">{event.title}</h2>
+      {event.tagline && <p className="text-body mt-1 text-hero-text">{event.tagline}</p>}
+      <div className="mt-4 flex flex-wrap gap-2 text-sm">
+        <span className="fx-liquid-dark inline-flex min-h-9 items-center gap-2 rounded-full px-3 font-semibold">
+          <CalendarDays className="size-4 shrink-0 text-accent" aria-hidden /> {formatDateRange(event.starts_at, event.ends_at)}
+        </span>
+        {event.venue && (
+          <span className="fx-liquid-dark inline-flex min-h-9 max-w-full items-center gap-2 rounded-full px-3 font-semibold">
+            <MapPin className="size-4 shrink-0 text-accent" aria-hidden /> <span className="min-w-0">{event.venue.split(',')[0]}</span>
+          </span>
+        )}
       </div>
-      <p className="px-5 py-3 text-sm text-muted">{tx('rr.welcomeBody')}</p>
-    </Card>
+      <p className="text-caption mt-4 text-hero-text">{tx('rr.welcomeBody')}</p>
+    </div>
   )
 }
 
