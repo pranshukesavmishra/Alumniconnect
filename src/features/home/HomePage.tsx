@@ -32,6 +32,8 @@ import { useMySocialLinks } from '../profile/socialQueries'
 import { HighlightsStrip, StoryRow } from '../stories/StoryRow'
 import { useMyBatchmatesSummary } from '../yearbook/api'
 import { dayPart, istHour, type DayPart } from './homeLogic'
+import { HomeNudge } from '../quickprofile/HomeNudge'
+import { MagicFillLink } from '../quickprofile/MagicFillLink'
 import { ActivityChips, AnniversaryBanner, BadgesTile, BatchTile, FameTile, GiveTile, NextUpTile, QuickActionsTile, WorldTile } from './HomeTiles'
 
 /** `hasSocial` (an Instagram or Facebook link) is a pure bonus: it is not in the total, so nobody's score goes down, and it is capped at 100. */
@@ -95,6 +97,7 @@ export function HomePage() {
         </div>
       )}
 
+      <HomeNudge profile={profile} />
       <ActivityChips h={h.data} />
       <AnniversaryBanner h={h.data} />
 
@@ -188,6 +191,7 @@ function Hero({ profile, percent, next }: { profile: Profile; percent: number; n
             {tx('home.next')} {tx(next.label)} <ArrowRight className="size-4" aria-hidden />
           </Link>
         )}
+        {next && <MagicFillLink />}
       </div>
     </header>
   )

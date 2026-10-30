@@ -5,6 +5,8 @@ import { Link, Navigate, useSearchParams } from 'react-router'
 import { Sheet } from '../../components/ui/Sheet'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
+import { ReunionListLink } from '../quickprofile/ReunionListLink'
+import { VerificationHints } from '../quickprofile/VerificationHints'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, EmptyState, Notice, PageSkeleton, Skeleton } from '../../components/ui/Display'
 import { Checkbox, ChoiceGroup, Field, Input, Select, Textarea } from '../../components/ui/Form'
@@ -125,7 +127,9 @@ function AdminMembersPage() {
         <div className="flex flex-wrap gap-2">
           {can('members_import') && <ButtonLink to="/admin/members/import" size="sm" variant="secondary" icon={<Upload className="size-4" />}>Import from CSV</ButtonLink>}
           {can('members_merge') && <ButtonLink to="/admin/members/duplicates" size="sm" variant="secondary" icon={<Users className="size-4" />}>Find duplicates</ButtonLink>}
+          {(can('members_import') || can('members_view')) && <ReunionListLink />}
         </div>
+        <VerificationHints />
         <div className="grid gap-2 sm:grid-cols-[1fr_14rem_auto]">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />

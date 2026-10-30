@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { Page, PageHeader } from '../../components/layout/AppShell'
+import { MagicFillLink } from '../quickprofile/MagicFillLink'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Card, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
 import { Checkbox, Field, Input, Select, Textarea } from '../../components/ui/Form'
@@ -174,7 +175,7 @@ export function EditProfilePage() {
 
   return (
     <div>
-      <PageHeader title="Edit profile" back="/me" />
+      <PageHeader title="Edit profile" back="/me" action={<MagicFillLink next="/me/edit" className="text-primary hover:bg-primary-soft" />} />
       <Page>
         <form onSubmit={save} noValidate className="space-y-7">
           <section className="space-y-3" aria-label="Profile photo">
