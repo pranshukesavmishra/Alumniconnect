@@ -1,4 +1,6 @@
 import { Briefcase, FileText, FolderArchive, GraduationCap, Loader2, X } from 'lucide-react'
+import { LinkedInFill } from '../quickprofile/LinkedInFill'
+import { useEnrichAvailable } from '../quickprofile/enrichQueries'
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { safeNext } from '../../lib/safeNext'
@@ -59,6 +61,7 @@ export function LinkedInImportPage() {
   const [params] = useSearchParams()
   const next = params.get('next') ? safeNext(params.get('next')) : '/me'
   const [source, setSource] = useState<Source>(params.get('source') === 'zip' ? 'zip' : 'pdf')
+  const fillOn = !!useEnrichAvailable().data
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ImportedProfile | null>(null)
@@ -214,6 +217,10 @@ export function LinkedInImportPage() {
           <LinkedInIcon className="size-10" />
           <p className="text-[15px] text-muted">Bring your experience, education and skills over in about 30 seconds. Your file is read on your device; you review everything before it’s saved.</p>
         </div>
+
+        {/* The one-step way (paste your LinkedIn link) leads whenever the data provider is switched on; PDF and export stay as backups. */}
+        <LinkedInFill />
+        {fillOn && <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-muted">Other ways to import</h2>}
 
         <div role="tablist" aria-label="Import method" className="grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1">
           {(['pdf', 'zip'] as const).map((s) => (
