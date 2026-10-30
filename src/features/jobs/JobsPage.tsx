@@ -7,12 +7,13 @@ import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, Card, EmptyState, Notice, Skeleton } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
 import { relativeTime } from '../../lib/format'
+import { OrgLogo } from '../profile/ProfileParts'
 import { useMyProfile } from '../auth/AuthProvider'
 import { JOB_TYPES, modeLabel, typeLabel, useJobs, WORK_MODES, type JobFilters, type JobListItem, type JobType, type WorkMode } from './queries'
 
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={clsx('min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold', active ? 'bg-primary text-on-primary' : 'border border-border bg-surface')}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={clsx('min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold', active ? 'bg-primary bg-(image:--grad-primary) text-on-primary shadow-[0_6px_14px_-8px_var(--primary-glow)]' : 'border border-border bg-surface')}>
       {children}
     </button>
   )
@@ -20,14 +21,12 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 export function JobCard({ j }: { j: JobListItem }) {
   return (
-    <Link to={`/jobs/${j.id}`} className="block">
+    <Link to={`/jobs/${j.id}`} className="fx-press fx-lift block rounded-3xl">
       <Card className="p-4 transition-colors hover:bg-surface-2">
         <div className="flex items-start gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-soft text-primary" aria-hidden>
-            <BriefcaseBusiness className="size-6" />
-          </span>
+          <OrgLogo name={j.company} size={52} />
           <div className="min-w-0 flex-1">
-            <p className="font-bold leading-snug">{j.title}</p>
+            <p className="text-title leading-snug">{j.title}</p>
             <p className="text-[15px] text-muted">
               {j.company}
               {j.location && (
@@ -98,7 +97,7 @@ export function JobsPage() {
         <label className="relative block">
           <span className="sr-only">Search jobs</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted" aria-hidden />
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Role, company or city" className="min-h-12 w-full rounded-full border border-border bg-surface pl-12 pr-4 text-[16px] focus:border-primary focus:outline-none" />
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Role, company or city" className="fx-liquid min-h-12 w-full rounded-full border border-border pl-12 pr-4 text-[16px] focus:border-primary focus:outline-none" />
         </label>
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Filters">
           <Chip active={saved} onClick={() => setSaved((s) => !s)}>
