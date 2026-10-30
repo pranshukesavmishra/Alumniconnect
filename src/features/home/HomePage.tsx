@@ -178,7 +178,7 @@ function Hero({ profile, percent, next }: { profile: Profile; percent: number; n
         <div className="min-w-0">
           <p className="text-[15px] text-white/75">{tx(GREETING[part])},</p>
           <h1 className="text-display truncate leading-[1.05] text-white">{first}</h1>
-          {sub && <p className="mt-1 truncate text-sm text-white/70">{sub}</p>}
+          {sub && <p className="mt-1 text-sm text-white/70">{sub}</p>}
         </div>
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-white/12 bg-white/[0.07] px-4 py-3 backdrop-blur-md">
