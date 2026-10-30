@@ -150,7 +150,7 @@ export function GroupsPage() {
       <PageHeader
         title={tx('grp.title')}
         subtitle={tx('grp.subtitle')}
-        action={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setProposing(true)}>New circle</Button>}
+        action={<Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setProposing(true)}>{tx('groups.newCircle')}</Button>}
       />
       <Page className="space-y-8">
         {proposing && <ProposeCircle onDone={() => setProposing(false)} />}
