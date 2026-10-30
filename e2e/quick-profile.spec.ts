@@ -33,7 +33,8 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 async function mockAi(page: Page, reply: { status: number; body: unknown }, seen: unknown[] = []) {
   await page.route('**/functions/v1/profile-ai-fill', async (route: Route) => {
     if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: CORS })
-    seen.push(route.request().postDataJSON())
+    const asked = route.request().postDataJSON() as { status?: boolean }
+    if (!asked.status) seen.push(asked) // the AI status check is not a fill
     await route.fulfill({ status: reply.status, headers: CORS, contentType: 'application/json', body: JSON.stringify(reply.body) })
   })
   return seen

@@ -35,6 +35,10 @@ async function mockFn(page: Page, mode: Mode, seen: unknown[] = []) {
   return seen
 }
 
+let phoneN = Number(Date.now().toString().slice(-7))
+/** A different valid mobile number each time (numbers are unique per member). */
+const phone = () => `+91 98${String(++phoneN).padStart(8, '0')}`
+
 const uidOf = (email: string) => sql(`select id from auth.users where email = '${email}'`)
 
 async function step1(page: Page, name: string) {
@@ -45,7 +49,7 @@ async function step1(page: Page, name: string) {
   await page.getByLabel('Branch').selectOption('B.E. in Computer Science & Engineering')
   await page.getByLabel('Passing-out year', { exact: true }).selectOption('2016')
   await page.getByLabel('City you live in').fill('Pune')
-  await page.getByLabel('Mobile number').fill('+91 98765 43211')
+  await page.getByLabel('Mobile number').fill(phone())
   await page.getByRole('button', { name: 'Continue' }).click()
   await expect(page.getByRole('heading', { name: 'What do you do?' })).toBeVisible()
 }
@@ -178,7 +182,7 @@ test('a batch invite link prefills the batch on the welcome page; Home offers th
   await page.getByText('Alumnus / Alumna').click()
   await page.getByLabel('Branch').selectOption('B.E. in Mechanical Engineering')
   await page.getByLabel('City you live in').fill('Bhopal')
-  await page.getByLabel('Mobile number').fill('+91 98765 43212')
+  await page.getByLabel('Mobile number').fill(phone())
   await page.getByRole('button', { name: 'Continue' }).click()
   await page.getByRole('button', { name: 'Skip for now' }).click()
   await expect(page).toHaveURL(/\/$/)
