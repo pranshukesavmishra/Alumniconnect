@@ -42,7 +42,7 @@ export function MeetPage() {
   const from = primaryPrices.length ? formatPaise(Math.min(...primaryPrices)) : null
   const registerTo = session ? '/meet/register' : '/signin?next=/meet/register'
   const hrefFor = (id: string) => (active ? '/meet/register' : session ? `/meet/register?ticket=${id}` : `/signin?next=${encodeURIComponent(`/meet/register?ticket=${id}`)}`)
-  const hasFamily = (tickets ?? []).some((t) => !t.is_primary)
+  const hasFamily = (tickets ?? []).some((t) => !t.is_primary && !t.is_addon)
   const nDays = eventDayCount(event, tickets ?? [])
 
   // while a signed-in member's registration is still loading, show a placeholder, never the wrong button
@@ -119,7 +119,7 @@ export function MeetPage() {
 
         {tickets && tickets.length > 0 && (
           <Reveal>
-            <TierCards tickets={tickets} hrefFor={hrefFor} />
+            <TierCards tickets={tickets} hrefFor={hrefFor} event={event} />
           </Reveal>
         )}
 

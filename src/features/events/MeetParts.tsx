@@ -14,6 +14,7 @@ import { useT } from '../../i18n'
 import { formatDateRange } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
 import type { EventRow, TicketType } from '../../lib/types'
+import { dayLabel } from './reunion'
 import { glimpsePoster, useLiveGlimpses } from '../glimpses/api'
 import { clock, groupByDay, type ProgrammeItem } from './programme'
 import { PriceTag } from './PriceTag'
@@ -230,11 +231,13 @@ export function ProgrammeTimeline({ items, event }: { items: ProgrammeItem[]; ev
 }
 
 /** Ticket tiers as premium cards. The full pass (all days) wears the beam; family tickets get the gold hairline. */
-export function TierCards({ tickets, hrefFor }: { tickets: TicketType[]; hrefFor: (ticketId: string) => string }) {
+export function TierCards({ tickets, hrefFor, event }: { tickets: TicketType[]; hrefFor: (ticketId: string) => string; event?: Pick<EventRow, 'starts_at'> }) {
   const tx = useT()
   // the full pass (every day) leads
   const primary = tickets.filter((t) => t.is_primary).sort((a, b) => Number(!!a.days) - Number(!!b.days))
-  const family = tickets.filter((t) => !t.is_primary)
+  const family = tickets.filter((t) => !t.is_primary && !t.is_addon)
+  const addons = tickets.filter((t) => t.is_addon)
+  const addonWhen = (t: TicketType) => (t.days ?? []).map((d) => dayLabel(event ?? { starts_at: null }, d)).join(' & ')
   const price = (p: number) => (p === 0 ? tx('evx.free') : formatPaise(p))
   const card = (t: TicketType) => {
     const full = t.is_primary && !t.days
@@ -293,6 +296,23 @@ export function TierCards({ tickets, hrefFor }: { tickets: TicketType[]; hrefFor
             ))}
           </div>
         </>
+      )}
+      {addons.length > 0 && (
+        <div data-testid="addon-tiers">
+          <h3 className="text-h3 mb-3 mt-6">{tx('addon.heading', { when: [addons.map(addonWhen).filter(Boolean)[0], addons.length === 1 ? addons[0]!.label : ''].filter(Boolean).join(' ') || addons[0]!.label })}</h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {addons.map((t) => (
+              <div key={t.id} className="fx-hairline flex items-center gap-3 rounded-3xl border border-border/80 bg-surface p-4 shadow-card">
+                <IconTile icon={Ticket} tone="emerald" size="md" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-title">{t.label}</p>
+                  <p className="text-caption text-muted">{[addonWhen(t), tx('addon.perPerson'), t.description].filter(Boolean).join(' · ')}</p>
+                </div>
+                <PriceTag t={t} className="shrink-0 items-end" perPerson={tx('evx.perPerson')} />
+              </div>
+            ))}
+          </div>
+        </div>
       )}
       <p className="text-caption mt-3 text-muted">{tx('meet.payNote')}</p>
     </section>

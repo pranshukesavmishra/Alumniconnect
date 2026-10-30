@@ -23,7 +23,8 @@ export function perDay(event: Pick<EventRow, 'starts_at' | 'ends_at'>, regs: Reg
     return {
       day,
       label: dayLabel(event, day),
-      alumni: going.filter((r) => !r.days || r.days.includes(day)).length,
+      // everyone with heads on that day: the main ticket's days plus any optional extra for that day
+      alumni: going.length,
       people: going.reduce((s, r) => s + (r.day_heads?.[String(day)] ?? 0), 0),
     }
   })
@@ -104,7 +105,7 @@ const rupees = (p: number) => (p / 100).toFixed(2)
 export function daysText(event: EventRow, r: Registration, tickets: { days: number[] | null }[]): string {
   const n = eventDayCount(event, tickets)
   return Array.from({ length: n }, (_, i) => i + 1)
-    .filter((d) => !r.days || r.days.includes(d))
+    .filter((d) => !r.days || r.days.includes(d) || (r.day_heads?.[String(d)] ?? 0) > 0)
     .map((d) => dayLabel(event, d))
     .join(', ')
 }
