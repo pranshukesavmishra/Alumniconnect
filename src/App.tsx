@@ -1,3 +1,4 @@
+import { captureBatch } from './features/quickprofile/batchInvite'
 import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AdminTranslator } from './i18n/AdminTranslator'
@@ -119,6 +120,8 @@ if (typeof window !== 'undefined') {
     }
   }
 }
+
+if (typeof window !== 'undefined') captureBatch(window.location.search)
 
 function ClaimInvite() {
   const { data: profile } = useMyProfile()

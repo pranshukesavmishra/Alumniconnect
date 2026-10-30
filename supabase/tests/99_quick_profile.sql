@@ -282,5 +282,41 @@ do $$ begin
   exception when check_violation then null; end;
 end $$;
 
+-- pasted education: a member's own hint (pending only, one open per source, never verifies), shown to admins with its source
+update public.profiles set verification = 'pending' where id = '99a00000-0000-0000-0000-00000000000c';
+select pg_temp.login('99a00000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$ begin
+  perform public.submit_my_education_hint('Govt. Engg. College, Jabalpur', 'B.E.', 'Mechanical', 1989, null, 'paste');
+  perform public.submit_my_education_hint('Govt. Engg. College, Jabalpur', 'B.E.', 'Mechanical', 1989, 1993, 'paste');
+  begin perform public.submit_my_education_hint('X', null, null, null, null, 'linkedin_enrich'); assert false, 'members cannot forge the enrich source'; exception when raise_exception then null; end;
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1, 'one open paste hint';
+  assert (select end_year from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1993, 'latest wins';
+  assert (select verification from public.profiles where id = '99a00000-0000-0000-0000-00000000000c') = 'pending', 'a hint never verifies';
+end $$;
+select pg_temp.login('99a00000-0000-0000-0000-00000000000d');
+set local role authenticated;
+do $$ begin
+  assert exists (select 1 from public.admin_verification_hints() h where h.user_id = '99a00000-0000-0000-0000-00000000000c' and h.source = 'paste' and h.end_year = 1993), 'admin sees the paste hint';
+end $$;
+reset role;
+
+-- suggestion allowance: 3 a day, then refused; nobody but the service can call it
+do $$ begin
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'first';
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'second';
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'third';
+  assert not (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'fourth is refused';
+end $$;
+select pg_temp.login('99a00000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$ begin
+  begin perform public.ai_suggest_take('99a00000-0000-0000-0000-00000000000c', 1000); assert false, 'members cannot call it'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
 select 'ALL QUICK PROFILE TESTS PASSED';
 rollback;

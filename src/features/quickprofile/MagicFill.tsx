@@ -8,15 +8,16 @@ import { Notice } from '../../components/ui/Display'
 import { Textarea } from '../../components/ui/Form'
 import { useLang, useT } from '../../i18n'
 import { PreviewCard } from './PreviewCard'
-import { AI_OFF_CODES, AiFillError, MAGIC_FILL_ON, useAiFill } from './queries'
+import { AI_OFF_CODES, AiFillError, useAiAvailable, useAiFill } from './queries'
 import { MAX_CHARS, useFoundProfile } from './useFoundProfile'
 import { useSpeech } from './useSpeech'
 
 export function MagicFill(props: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean }) {
-  return MAGIC_FILL_ON ? <MagicFillBox {...props} /> : null
+  const ai = useAiAvailable()
+  return ai.available ? <MagicFillBox {...props} google={ai.provider === 'gemini'} /> : null
 }
 
-function MagicFillBox({ onSaved, onUnavailable, autoFocus }: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean }) {
+function MagicFillBox({ onSaved, onUnavailable, autoFocus, google }: { onSaved?: () => void; onUnavailable?: () => void; autoFocus?: boolean; google?: boolean }) {
   const tx = useT()
   const { lang } = useLang()
   const [text, setText] = useState('')
@@ -90,7 +91,7 @@ function MagicFillBox({ onSaved, onUnavailable, autoFocus }: { onSaved?: () => v
         )}
       </div>
       <div id="qp-box-hint" className="flex items-start justify-between gap-3 text-sm text-muted">
-        <span aria-live="polite">{speech.listening ? tx('qp.listening') : speech.error === 'denied' ? tx('qp.micDenied') : speech.error ? tx('qp.micFailed') : tx('qp.privacy')}</span>
+        <span aria-live="polite">{speech.listening ? tx('qp.listening') : speech.error === 'denied' ? tx('qp.micDenied') : speech.error ? tx('qp.micFailed') : google ? tx('qp.privacyGoogle') : tx('qp.privacy')}</span>
         <span className="shrink-0 tabular-nums">{tx('qp.count', { n: count.toLocaleString('en-IN'), max: MAX_CHARS.toLocaleString('en-IN') })}</span>
       </div>
       {problem && <Notice tone="danger" title={problem} />}

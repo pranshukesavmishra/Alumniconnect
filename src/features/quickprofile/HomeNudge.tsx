@@ -13,8 +13,7 @@ import { useUpdateProfile } from '../profile/queries'
 import { suggestSkills, unionList } from './mapping'
 import { nudgeCandidates, nudgeDone, pickNudge, type NudgeId } from './nudges'
 import { PrefillClaimCard } from './PrefillClaimCard'
-import { MAGIC_FILL_ON, usePrefillMatch, type PrefillMatch } from './queries'
-import { useEnrichAvailable } from './enrichQueries'
+import { usePrefillMatch, type PrefillMatch } from './queries'
 
 const KEY = 'jec.qp.nudge'
 const read = () => {
@@ -93,8 +92,6 @@ function Nudge({ profile, claim }: { profile: Profile; claim: PrefillMatch | nul
 
 function RoleNudge() {
   const tx = useT()
-  const linkedin = useEnrichAvailable().data
-  if (!MAGIC_FILL_ON && !linkedin) return null
   return (
     <div className="mt-2 space-y-3">
       <p className="font-semibold">{tx('qp.nudgeRoleQ')}</p>

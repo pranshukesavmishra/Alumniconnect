@@ -47,19 +47,31 @@ export interface JecMatch {
   branch: string | null
   start_year: number | null
   end_year: number | null
-  /** 'jec' names the college; 'affiliation' only names its university (weaker, admins decide) */
-  kind: 'jec' | 'affiliation'
+  kind: 'jec'
 }
 
 const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
-export function isJecSchool(school: string): 'jec' | 'affiliation' | null {
-  const s = flat(school)
-  if (/\bjabalpur engineering college\b/.test(s)) return 'jec'
-  if (/\b(government|govt) engineering college\b/.test(s) && /\bjabalpur\b/.test(s)) return 'jec'
-  if (/\b(jec|gec|gecj)\b/.test(s) && /\bjabalpur\b/.test(s)) return 'jec'
-  if (/^(jec|gec) jbp$|\bjec jbp\b/.test(s)) return 'jec'
-  if (/\brani durgavati\b/.test(s) || /\brdvv\b/.test(s)) return 'affiliation'
+/** Lower-case words with the college's spelling variants folded: "Govt. Engg. Collage", "J.E.C.", "G.E.C." */
+export function foldCollegeName(school: string): string {
+  return flat(school.replace(/\./g, ''))
+    .replace(/\b(govt|gov|govermment|goverment|govenment|governmnt)\b/g, 'government')
+    .replace(/\b(engg|enggineering|enginering|engineerng|engineeing|eng)\b/g, 'engineering')
+    .replace(/\b(collage|colege|collge|clg)\b/g, 'college')
+    .replace(/\b([jg]) e c\b/g, '$1ec')
+}
+
+/**
+ * The college has had two names: Government Engineering College (GEC) and Jabalpur Engineering College (JEC). Both, their
+ * abbreviations and common typos are one institution. A university name alone (RDVV, Jabalpur University) is NOT JEC.
+ * Keep in sync with src/lib/linkedin/common.ts (isJec).
+ */
+export function isJecSchool(school: string): 'jec' | null {
+  const s = foldCollegeName(school)
+  if (/\bjabalpur engineering\b/.test(s)) return 'jec'
+  if (/\bgovernment engineering\b/.test(s) && /\b(jabalpur|jbp)\b/.test(s)) return 'jec'
+  if (/\b(jec|gec|gecj)\b/.test(s) && /\b(jabalpur|jbp)\b/.test(s)) return 'jec'
+  if (/^(jec|gec|j e c|g e c)( jbp)?$/.test(s)) return 'jec'
   return null
 }
 
@@ -85,16 +97,14 @@ export function branchFromField(field: string | null | undefined, degree?: strin
   return null
 }
 
-/** The JEC entry in a list of education entries (the college itself before a university-only hint). */
+/** The JEC entry in a list of education entries. */
 export function findJec(education: readonly EducationLike[]): JecMatch | null {
-  let weak: JecMatch | null = null
   for (const e of education) {
     const kind = isJecSchool(e.school)
     if (!kind) continue
-    const m: JecMatch = { school: e.school, degree: e.degree, field: e.field, branch: branchFromField(e.field, e.degree), start_year: e.start_year, end_year: e.end_year, kind }
-    if (kind === 'jec') return m
-    // a university name alone only counts for an engineering degree
-    if (!weak && /engineer|b ?e\b|b ?tech|m ?e\b|m ?tech/.test(flat(`${e.degree ?? ''} ${e.field ?? ''}`))) weak = m
+    // only a start year ("1989 - ") on a four-year engineering degree: the batch is start + 4
+    const end = e.end_year ?? (e.start_year && /\bb ?e\b|b ?tech|bachelor/.test(flat(e.degree ?? '')) ? e.start_year + 4 : null)
+    return { school: e.school, degree: e.degree, field: e.field, branch: branchFromField(e.field, e.degree), start_year: e.start_year, end_year: end, kind }
   }
-  return weak
+  return null
 }

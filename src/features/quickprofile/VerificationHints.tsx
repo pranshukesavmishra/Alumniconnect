@@ -30,7 +30,12 @@ export function VerificationHints() {
             <Avatar src={h.avatar_url} name={h.full_name} size={40} />
             <div className="min-w-0 flex-1">
               <p className="break-words font-semibold">{h.full_name}</p>
-              <p className="break-words text-sm text-muted">{tx('qp.hint.line', { school: h.school, details: details || '–' })}</p>
+              <p className="break-words text-sm text-muted">
+                {h.source === 'linkedin_enrich'
+                  ? tx('qp.hint.line', { school: h.school, details: details || '–' })
+                  : tx('qp.hint.linePaste', { school: h.school, years: [h.start_year, h.end_year].filter(Boolean).join('–') || '–' })}
+              </p>
+              {h.source !== 'linkedin_enrich' && h.end_year && <p className="text-sm font-semibold">{tx('qp.hint.batch', { year: h.end_year })}</p>}
             </div>
             {h.linkedin_url && (
               <a href={h.linkedin_url} target="_blank" rel="noreferrer" className="grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft" aria-label={tx('qp.hint.open', { name: h.full_name })}>

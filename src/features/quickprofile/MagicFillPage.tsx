@@ -7,6 +7,7 @@ import { useT } from '../../i18n'
 import { useMyProfile } from '../auth/AuthProvider'
 import { LinkedInFill } from './LinkedInFill'
 import { MagicFill } from './MagicFill'
+import { PasteProfile } from './PasteProfile'
 import { PrefillClaimCard } from './PrefillClaimCard'
 import { usePrefillMatch } from './queries'
 
@@ -24,8 +25,9 @@ export function MagicFillPage() {
       <PageHeader title={tx('qp.magicTitle')} subtitle={tx('qp.magicSub')} back={next} />
       <Page className="space-y-5">
         {claim.data && <PrefillClaimCard match={claim.data} onClaimed={done} />}
+        <PasteProfile onSaved={done} autoFocus />
         <LinkedInFill onSaved={done} />
-        <MagicFill onSaved={done} autoFocus />
+        <MagicFill onSaved={done} />
       </Page>
     </div>
   )

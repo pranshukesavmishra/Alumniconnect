@@ -1,8 +1,9 @@
 // The request handling of profile-ai-fill, with its outside world (sign-in check, usage limits, Claude) passed in so the
 // tests can run it without a network. index.ts wires the real ones.
 import { corsHeaders, json } from '../_shared/http.ts'
-import { ExtractError, extractProfile, type ExtractErrorCode, type MessagesClient } from './extract.ts'
+import { ExtractError, extractProfile, type AiProfile, type ExtractErrorCode, type MessagesClient } from './extract.ts'
 import { MAX_INPUT_CHARS } from './lists.ts'
+import type { SuggestInput, SuggestResult } from './suggest.ts'
 
 export interface Quota {
   ok: boolean
@@ -16,8 +17,18 @@ export interface Deps {
   /** null when ANTHROPIC_API_KEY is not set: the app then shows the manual fields */
   client(): MessagesClient | null
   model: string
+  /**
+   * Another provider (AI_PROVIDER=gemini) used instead of Claude. `run` is null when its key is missing. Leave undefined for
+   * the default Claude path.
+   */
+  alternate?: { name: string; run: ((text: string) => Promise<{ profile: AiProfile; usage: { input: number; output: number } }>) | null }
   /** takes one call from the member's and the global daily allowance */
   take(userId: string, chars: number): Promise<Quota>
+  /**
+   * "Suggest my profile" (Gemini with search grounding). `run` is null unless the Gemini provider is on. The name comes from
+   * profile(), i.e. the signed-in member's own profile, never from the request. take() is its own small daily allowance.
+   */
+  suggester?: { run: ((input: SuggestInput) => Promise<SuggestResult>) | null; profile(userId: string): Promise<SuggestInput | null>; take(userId: string): Promise<Quota> }
   log?(line: Record<string, unknown>): void
 }
 
@@ -42,6 +53,33 @@ const MESSAGES: Record<ExtractErrorCode, string> = {
 
 export function makeHandler(deps: Deps) {
   const log = deps.log ?? ((l) => console.log(JSON.stringify({ fn: 'profile-ai-fill', ...l })))
+  async function suggest(req: Request, userId: string): Promise<Response> {
+    const sg = deps.suggester
+    if (!sg?.run) return json(req, { error: 'ai_not_configured', message: 'Suggestions are not switched on yet. Please paste your profile instead.' }, 503)
+    let quota: Quota
+    try {
+      quota = await sg.take(userId)
+    } catch {
+      return json(req, { error: 'ai_unavailable', message: MESSAGES.ai_unavailable }, 503)
+    }
+    if (!quota.ok) {
+      log({ ok: false, code: quota.reason ?? 'limit', mode: 'suggest' })
+      return json(req, { error: 'limit', reason: quota.reason, message: 'You have used the suggestion for today. Please paste your profile instead, or try again tomorrow.' }, 429)
+    }
+    try {
+      const input = await sg.profile(userId)
+      if (!input) return json(req, { found: false, profile: null, sources: [] })
+      const r = await sg.run(input)
+      // counts only: never the name, the search answer or the suggestion
+      log({ ok: true, mode: 'suggest', found: r.found, sources: r.sources.length, input_tokens: r.usage.input, output_tokens: r.usage.output })
+      return json(req, { found: r.found, profile: r.profile, sources: r.sources })
+    } catch (e) {
+      const code = e instanceof ExtractError ? e.code : 'ai_unavailable'
+      log({ ok: false, code, mode: 'suggest' })
+      return json(req, { error: code, message: MESSAGES[code] }, STATUS[code])
+    }
+  }
+
   return async (req: Request): Promise<Response> => {
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(req) })
     if (req.method !== 'POST') return json(req, { error: 'method' }, 405)
@@ -49,15 +87,19 @@ export function makeHandler(deps: Deps) {
     const user = await deps.currentUser(req.headers.get('Authorization'))
     if (!user) return json(req, { error: 'unauthorized' }, 401)
 
-    const body = (await req.json().catch(() => ({}))) as { text?: unknown }
+    const body = (await req.json().catch(() => ({}))) as { text?: unknown; status?: unknown; suggest?: unknown }
+    // cheap "is the AI switched on?" check for the app: no quota taken, nothing sent anywhere
+    if (body.status === true) return json(req, { available: deps.alternate ? !!deps.alternate.run : !!deps.client(), provider: deps.alternate?.name ?? 'anthropic', suggest: !!deps.suggester?.run })
+    if (body.suggest === true) return suggest(req, user.id)
     const text = typeof body.text === 'string' ? body.text.replace(/\u0000/g, '').trim() : ''
     if (!text) return json(req, { error: 'empty', message: 'Please write a line or two about yourself first.' }, 400)
     if (text.length > MAX_INPUT_CHARS) {
       return json(req, { error: 'too_long', max: MAX_INPUT_CHARS, message: `Please keep it under ${MAX_INPUT_CHARS.toLocaleString('en-IN')} characters.` }, 413)
     }
 
-    const client = deps.client()
-    if (!client) return json(req, { error: 'ai_not_configured', message: MESSAGES.ai_not_configured }, 503)
+    const client = deps.alternate ? null : deps.client()
+    const run = deps.alternate ? deps.alternate.run : client ? (t: string) => extractProfile(client, deps.model, t) : null
+    if (!run) return json(req, { error: 'ai_not_configured', message: MESSAGES.ai_not_configured }, 503)
 
     let quota: Quota
     try {
@@ -82,7 +124,7 @@ export function makeHandler(deps: Deps) {
     }
 
     try {
-      const { profile, usage } = await extractProfile(client, deps.model, text)
+      const { profile, usage } = await run(text)
       // counts only: the member's text and the extracted details are never logged or stored here
       log({ ok: true, chars: text.length, input_tokens: usage.input, output_tokens: usage.output, model: deps.model })
       return json(req, { profile, remaining: quota.limit !== undefined && quota.used !== undefined ? Math.max(0, quota.limit - quota.used) : null })

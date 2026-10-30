@@ -40,7 +40,7 @@ describe('lists shared with the edge function', () => {
   it('branches, help tags and limits are the same as the app’s', () => {
     expect([...fnLists.BRANCHES]).toEqual([...BRANCHES])
     expect([...fnLists.HELP_TAGS]).toEqual([...HELP_TAGS])
-    expect(fnLists.MAX_INPUT_CHARS).toBe(12_000)
+    expect(fnLists.MAX_INPUT_CHARS).toBe(20_000)
     expect(fnLists.MAX_SKILLS).toBe(15)
     expect(fnLists.MAX_ABOUT).toBe(400)
   })

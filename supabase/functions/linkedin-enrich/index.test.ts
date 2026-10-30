@@ -144,7 +144,7 @@ Deno.test('LinkedIn link normalisation and JEC detection', () => {
   eq(normaliseLinkedInUrl('https://www.linkedin.com/company/tata'), null, 'not a profile')
   eq(findJec([{ school: 'Govt. Engineering College, Jabalpur', degree: 'B.E.', field: 'Civil', start_year: 1990, end_year: 1994 }])?.branch, 'B.E. in Civil Engineering', 'GEC Jabalpur')
   eq(findJec([{ school: 'JEC Jabalpur', degree: null, field: 'Electronics and Telecommunication', start_year: null, end_year: 2005 }])?.kind, 'jec', 'JEC Jabalpur')
-  eq(findJec([{ school: 'Rani Durgavati Vishwavidyalaya', degree: 'Bachelor of Engineering', field: 'Mechanical', start_year: 2000, end_year: 2004 }])?.kind, 'affiliation', 'university hint')
+  eq(findJec([{ school: 'Rani Durgavati Vishwavidyalaya', degree: 'Bachelor of Engineering', field: 'Mechanical', start_year: 2000, end_year: 2004 }]), null, 'a university alone is not JEC')
   eq(findJec([{ school: 'Rani Durgavati Vishwavidyalaya', degree: 'MA', field: 'History', start_year: null, end_year: null }]), null, 'university without engineering')
   eq(findJec([{ school: 'Jabalpur Public School', degree: null, field: null, start_year: null, end_year: null }]), null, 'other Jabalpur school')
   eq(titleCase('L&T'), 'L&T', 'keeps capitals')
