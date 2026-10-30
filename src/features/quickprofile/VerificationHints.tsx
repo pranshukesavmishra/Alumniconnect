@@ -8,7 +8,7 @@ import { Switch } from '../../components/ui/Form'
 import { friendlyError } from '../../lib/errors'
 import { useT } from '../../i18n'
 import { useAdminAccess } from '../admin/access'
-import { useAutoVerifyFlag, useReviewHint, useVerificationHints } from './enrichQueries'
+import { useAppFlag, useReviewHint, useVerificationHints } from './enrichQueries'
 
 export function VerificationHints() {
   const tx = useT()
@@ -16,7 +16,8 @@ export function VerificationHints() {
   const allowed = can('members_verify')
   const hints = useVerificationHints(allowed)
   const review = useReviewHint()
-  const { flag, set } = useAutoVerifyFlag(allowed && isSuper)
+  const auto = useAppFlag('auto_verify_linkedin_jec', allowed && isSuper)
+  const fill = useAppFlag('linkedin_fill', allowed && isSuper)
   if (!allowed || (!hints.data?.length && !isSuper)) return null
   return (
     <Card className="space-y-3 p-4" data-testid="linkedin-hints">
@@ -53,10 +54,16 @@ export function VerificationHints() {
           </div>
         )
       })}
-      {isSuper && flag.data !== undefined && (
-        <div className="border-t border-border pt-3">
-          <Switch checked={flag.data} onChange={(on: boolean) => set.mutate(on, { onError: (e) => toast.error(friendlyError(e)) })} label={tx('qp.hint.auto')} />
-          <p className="mt-1 text-sm text-muted">{tx('qp.hint.autoHint')}</p>
+      {isSuper && auto.flag.data !== undefined && fill.flag.data !== undefined && (
+        <div className="space-y-3 border-t border-border pt-3">
+          <div>
+            <Switch checked={fill.flag.data} onChange={(on: boolean) => fill.set.mutate(on, { onError: (e) => toast.error(friendlyError(e)) })} label={tx('qp.hint.fill')} />
+            <p className="mt-1 text-sm text-muted">{tx('qp.hint.fillHint')}</p>
+          </div>
+          <div>
+            <Switch checked={auto.flag.data} onChange={(on: boolean) => auto.set.mutate(on, { onError: (e) => toast.error(friendlyError(e)) })} label={tx('qp.hint.auto')} />
+            <p className="mt-1 text-sm text-muted">{tx('qp.hint.autoHint')}</p>
+          </div>
         </div>
       )}
     </Card>

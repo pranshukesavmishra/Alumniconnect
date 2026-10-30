@@ -23,6 +23,9 @@ export function useEnrichAvailable(enabled = true) {
     staleTime: 10 * 60_000,
     retry: false,
     queryFn: async () => {
+      // switched on by a super admin once the provider secrets are set; until then the function is never called
+      const flags = await supabase.rpc('quick_profile_flags')
+      if (flags.error || !(flags.data as { linkedin_fill?: boolean } | null)?.linkedin_fill) return false
       const { data, error } = await supabase.functions.invoke('linkedin-enrich', { body: { mode: 'status' } })
       if (error) return false
       return !!(data as { available?: boolean } | null)?.available
@@ -80,23 +83,27 @@ export function useReviewHint() {
   })
 }
 
-export function useAutoVerifyFlag(enabled: boolean) {
+/** A super-admin switch: 'auto_verify_linkedin_jec' (default off) or 'linkedin_fill' (default off). */
+export function useAppFlag(key: 'auto_verify_linkedin_jec' | 'linkedin_fill', enabled: boolean) {
   const qc = useQueryClient()
   const flag = useQuery({
-    queryKey: ['app-flag', 'auto_verify_linkedin_jec'],
+    queryKey: ['app-flag', key],
     enabled,
     queryFn: async () => {
-      const { data, error } = await supabase.from('app_flags').select('enabled').eq('key', 'auto_verify_linkedin_jec').maybeSingle()
+      const { data, error } = await supabase.from('app_flags').select('enabled').eq('key', key).maybeSingle()
       if (error) throw error
       return !!(data as { enabled: boolean } | null)?.enabled
     },
   })
   const set = useMutation({
     mutationFn: async (on: boolean) => {
-      const { error } = await supabase.rpc('admin_set_flag', { p_key: 'auto_verify_linkedin_jec', p_enabled: on })
+      const { error } = await supabase.rpc('admin_set_flag', { p_key: key, p_enabled: on })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['app-flag', 'auto_verify_linkedin_jec'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['app-flag', key] })
+      void qc.invalidateQueries({ queryKey: ['enrich-available'] })
+    },
   })
   return { flag, set }
 }

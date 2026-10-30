@@ -185,3 +185,19 @@ end;
 $$;
 revoke execute on function public.admin_review_hint(uuid, boolean) from anon, public;
 grant execute on function public.admin_review_hint(uuid, boolean) to authenticated;
+
+-- "Fill from LinkedIn" is offered to members only once a super admin switches it on (after setting the provider
+-- secrets), so the app never calls a function that is not deployed.
+insert into public.app_flags (key, enabled) values ('linkedin_fill', false) on conflict (key) do nothing;
+
+create or replace function public.quick_profile_flags()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('linkedin_fill', coalesce((select enabled from public.app_flags where key = 'linkedin_fill'), false));
+$$;
+revoke execute on function public.quick_profile_flags() from anon, public;
+grant execute on function public.quick_profile_flags() to authenticated;
