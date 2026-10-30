@@ -41,10 +41,32 @@ export const GEMINI_SCHEMA = {
   },
 } as const
 
-interface GeminiReply {
-  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
+export interface GeminiReply {
+  candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string; groundingMetadata?: { groundingChunks?: { web?: { uri?: string; title?: string } }[] } }[]
   promptFeedback?: { blockReason?: string }
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
+}
+
+/** Maps a non-OK HTTP answer to an ExtractError (429 busy, bad key / model unavailable). Returns normally for 2xx. */
+export async function throwForStatus(res: Response): Promise<void> {
+  if (res.status === 429) throw new ExtractError('ai_busy', 'The free AI limit is reached for now.')
+  if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
+    await res.body?.cancel().catch(() => undefined)
+    throw new ExtractError('ai_unavailable', `The AI service refused the request (${res.status}); check the key and model.`)
+  }
+  if (!res.ok) {
+    await res.body?.cancel().catch(() => undefined)
+    throw new ExtractError('ai_unavailable', `The AI service answered ${res.status}.`)
+  }
+}
+
+/** Safety blocks and cut-off replies throw; otherwise returns the first candidate. */
+export function checkReply(data: GeminiReply): NonNullable<GeminiReply['candidates']>[number] | undefined {
+  if (data.promptFeedback?.blockReason) throw new ExtractError('refusal', 'The AI declined to read this text.')
+  const cand = data.candidates?.[0]
+  if (cand?.finishReason === 'SAFETY' || cand?.finishReason === 'PROHIBITED_CONTENT' || cand?.finishReason === 'BLOCKLIST') throw new ExtractError('refusal', 'The AI declined to read this text.')
+  if (cand?.finishReason === 'MAX_TOKENS') throw new ExtractError('truncated', 'The reply was cut short.')
+  return cand
 }
 
 /** Missing keys become null / [] so a reply that leaves out an empty field still passes the shared zod schema. */
@@ -73,25 +95,14 @@ export async function extractWithGemini(opts: { apiKey: string; model: string; t
   } catch {
     throw new ExtractError('ai_unavailable', 'The AI service could not be reached.')
   }
-  if (res.status === 429) throw new ExtractError('ai_busy', 'The free AI limit is reached for now.')
-  if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 404) {
-    await res.body?.cancel().catch(() => undefined)
-    throw new ExtractError('ai_unavailable', `The AI service refused the request (${res.status}); check the key and model.`)
-  }
-  if (!res.ok) {
-    await res.body?.cancel().catch(() => undefined)
-    throw new ExtractError('ai_unavailable', `The AI service answered ${res.status}.`)
-  }
+  await throwForStatus(res)
   let data: GeminiReply
   try {
     data = (await res.json()) as GeminiReply
   } catch {
     throw new ExtractError('bad_output', 'The AI reply was not JSON.')
   }
-  if (data.promptFeedback?.blockReason) throw new ExtractError('refusal', 'The AI declined to read this text.')
-  const cand = data.candidates?.[0]
-  if (cand?.finishReason === 'SAFETY' || cand?.finishReason === 'PROHIBITED_CONTENT' || cand?.finishReason === 'BLOCKLIST') throw new ExtractError('refusal', 'The AI declined to read this text.')
-  if (cand?.finishReason === 'MAX_TOKENS') throw new ExtractError('truncated', 'The reply was cut short.')
+  const cand = checkReply(data)
   const text = cand?.content?.parts?.[0]?.text
   if (!text) throw new ExtractError('bad_output', 'The AI reply had no text.')
   let raw: unknown

@@ -302,5 +302,19 @@ do $$ begin
 end $$;
 reset role;
 
+-- suggestion allowance: 3 a day, then refused; nobody but the service can call it
+do $$ begin
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'first';
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'second';
+  assert (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'third';
+  assert not (public.ai_suggest_take('99a00000-0000-0000-0000-00000000000e', 1000)->>'ok')::boolean, 'fourth is refused';
+end $$;
+select pg_temp.login('99a00000-0000-0000-0000-00000000000c');
+set local role authenticated;
+do $$ begin
+  begin perform public.ai_suggest_take('99a00000-0000-0000-0000-00000000000c', 1000); assert false, 'members cannot call it'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
 select 'ALL QUICK PROFILE TESTS PASSED';
 rollback;

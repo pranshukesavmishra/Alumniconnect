@@ -103,7 +103,8 @@ The member describes themselves in their own words: typed, spoken (speech-to-tex
 Extract only what the text states or clearly implies. Never invent or guess: use null (or an empty list) for anything not given.
 - current_title / current_company: the present role only. A past job never becomes the current role.
 - experiences: every job mentioned, newest first, current job included. Years only when stated or directly derivable (e.g. "6 years at Tata Motors until 2012" gives 2006-2012); otherwise null. Use the company name as written (L&T, TCS, Tata Motors).
-- grad_year: the JEC passing-out year (e.g. "Mech 2008" means 2008).
+- The college: Jabalpur Engineering College (JEC) was earlier called Government Engineering College Jabalpur (GEC). "JEC Jabalpur", "J.E.C.", "Govt. Engg. College Jabalpur", "G.E.C. Jabalpur" and spelling slips are all the same college. A university name alone (Rani Durgavati Vishwavidyalaya, RDVV, Jabalpur University) is NOT the college. Old batches (1980s, 1990s) are normal.
+- grad_year: the JEC passing-out year (from the end year of the college's education entry, or the start year plus 4 for a B.E. with only a start year; e.g. "Mech 2008" means 2008).
 - branch: the JEC branch mapped to exactly one value of the allowed list ("Mech" is "B.E. in Mechanical Engineering", "CSE"/"CS" is "B.E. in Computer Science & Engineering", "ETC"/"EC"/"ECE" is "B.E. in Electronics & Telecommunications", "IP" is "B.E. Industrial & Production Engineering"); null if not mentioned.
 - degree: the JEC degree if mentioned (e.g. "B.E.", "M.E.", "MCA").
 - education: other schools or degrees mentioned (IIT, IIM, an MBA...). Include JEC only if the text describes it as a degree entry.

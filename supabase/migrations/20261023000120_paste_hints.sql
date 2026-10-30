@@ -72,3 +72,45 @@ end;
 $$;
 revoke execute on function public.admin_verification_hints() from anon, public;
 grant execute on function public.admin_verification_hints() to authenticated;
+
+-- "Suggest my profile" allowance: 3 a day per member (10 for admins), also counted in the daily total of ai_fill_take
+alter table public.ai_fill_usage add column if not exists suggest_calls int not null default 0;
+
+create or replace function public.ai_suggest_take(p_user uuid, p_global_cap int default 500)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_day date := public._india_today();
+  v_admin boolean;
+  v_limit int;
+  v_used int;
+  v_total bigint;
+begin
+  if p_user is null or not exists (select 1 from public.profiles where id = p_user) then
+    return jsonb_build_object('ok', false, 'reason', 'unknown_user');
+  end if;
+  select coalesce(p.is_admin, false) or coalesce(p.is_super_admin, false) into v_admin from public.profiles p where p.id = p_user;
+  v_limit := case when v_admin then 10 else 3 end;
+  perform pg_advisory_xact_lock(hashtext('ai_fill_take'));
+  select coalesce(sum(calls), 0) into v_total from public.ai_fill_usage where day = v_day;
+  if v_total >= greatest(coalesce(p_global_cap, 500), 0) then
+    return jsonb_build_object('ok', false, 'reason', 'global_limit');
+  end if;
+  select suggest_calls into v_used from public.ai_fill_usage where user_id = p_user and day = v_day;
+  if coalesce(v_used, 0) >= v_limit then
+    return jsonb_build_object('ok', false, 'reason', 'user_limit', 'used', v_used, 'limit', v_limit);
+  end if;
+  insert into public.ai_fill_usage (user_id, day, calls, suggest_calls)
+  values (p_user, v_day, 1, 1)
+  on conflict (user_id, day) do update
+    set calls = public.ai_fill_usage.calls + 1, suggest_calls = public.ai_fill_usage.suggest_calls + 1
+  returning suggest_calls into v_used;
+  return jsonb_build_object('ok', true, 'used', v_used, 'limit', v_limit);
+end;
+$$;
+revoke execute on function public.ai_suggest_take(uuid, int) from anon, authenticated, public;
+grant execute on function public.ai_suggest_take(uuid, int) to service_role;

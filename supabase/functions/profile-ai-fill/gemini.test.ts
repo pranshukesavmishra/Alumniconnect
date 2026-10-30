@@ -80,7 +80,7 @@ Deno.test('status mode: no quota taken; reflects whether the provider has a key'
   let takes = 0
   const take = () => { takes++; return Promise.resolve({ ok: true }) }
   const on = await (await post(deps({ take, alternate: { name: 'gemini', run: () => Promise.reject(new Error('never')) } }), { status: true })).json()
-  eq(on, { available: true, provider: 'gemini' }, 'gemini on')
+  eq(on, { available: true, provider: 'gemini', suggest: false }, 'gemini on')
   const off = await (await post(deps({ take, alternate: { name: 'gemini', run: null } }), { status: true })).json()
   eq(off.available, false, 'gemini without key')
   eq((await (await post(deps({ take }), { status: true })).json()).available, false, 'claude without key')
