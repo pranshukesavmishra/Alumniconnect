@@ -342,6 +342,11 @@ function parseSidebar(lines: PdfLine[], out: ImportedProfile) {
 // ---------------------------------------------------------------- browser entry point
 
 export async function readLinkedInPdf(file: Blob): Promise<ImportedProfile> {
+  return (await readLinkedInPdfWithText(file)).parsed
+}
+
+/** The parsed profile plus the PDF's plain text (sidebar first, then the main column), for Magic fill. */
+export async function readLinkedInPdfWithText(file: Blob): Promise<{ parsed: ImportedProfile; text: string }> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs') // legacy build: works on older phones too
   const workerUrl = (await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')).default
   pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
@@ -365,5 +370,6 @@ export async function readLinkedInPdf(file: Blob): Promise<ImportedProfile> {
   if (!main.some((l) => near(l.size, S.name)) && info.Author !== 'LinkedIn') {
     throw new Error('This doesn’t look like a LinkedIn profile PDF. On LinkedIn (desktop), open your profile and use More → Save to PDF.')
   }
-  return parseLinkedInPdfLines(main, sidebar)
+  const text = [...sidebar, ...main].map((l) => l.text).join('\n')
+  return { parsed: parseLinkedInPdfLines(main, sidebar), text }
 }

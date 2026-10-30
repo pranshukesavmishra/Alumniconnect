@@ -42,6 +42,8 @@ export async function onboard(page: Page, name: string, year: string) {
   await page.getByLabel('City you live in').fill('Pune')
   await page.getByLabel('Mobile number').fill('+91 98765 43210')
   await page.getByRole('button', { name: 'Continue' }).click()
+  // step 2 ("What do you do?") is optional
+  await page.getByRole('button', { name: 'Skip for now' }).click()
 }
 
 /** A fresh, approved circle (with its group chat) holding exactly these members: keeps chat tests isolated from each other. */

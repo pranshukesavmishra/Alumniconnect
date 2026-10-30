@@ -24,6 +24,8 @@ step "database suites" scripts/db-test.sh
 DENO=${DENO:-$(command -v deno || echo /tmp/denobin/node_modules/.bin/deno)}
 if [ -x "$DENO" ]; then
   step "edge functions: unit" "$DENO" test --allow-env --no-check supabase/functions/_shared/webpush.test.ts supabase/functions/import-avatar/index.test.ts
+  step "edge functions: magic fill (Claude mocked)" "$DENO" test --node-modules-dir=none --allow-env --allow-read supabase/functions/profile-ai-fill/index.test.ts
+  step "edge functions: LinkedIn fill (provider mocked)" "$DENO" test --node-modules-dir=none --allow-env --allow-read supabase/functions/linkedin-enrich/index.test.ts
   step "edge functions: push through the real stack" "$DENO" test --allow-all --no-check supabase/functions/push-send/integration.test.ts
 else
   echo "SKIP  edge function tests (install Deno: npm i -g deno)"

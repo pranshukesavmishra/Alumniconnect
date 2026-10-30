@@ -33,6 +33,8 @@ const AdminStories = lazy(() => import('./features/stories/AdminStories').then((
 const GalleryPage = lazy(() => import('./features/photos/GalleryPage').then((m) => ({ default: m.GalleryPage })))
 const ProfilePage = lazy(() => import('./features/profile/ProfilePage').then((m) => ({ default: m.ProfilePage })))
 const EditProfilePage = lazy(() => import('./features/profile/EditProfilePage').then((m) => ({ default: m.EditProfilePage })))
+const MagicFillPage = lazy(() => import('./features/quickprofile/MagicFillPage').then((m) => ({ default: m.MagicFillPage })))
+const AdminPrefillPage = lazy(() => import('./features/quickprofile/AdminPrefillPage').then((m) => ({ default: m.AdminPrefillPage })))
 const LinkedInImportPage = lazy(() => import('./features/profile/LinkedInImportPage').then((m) => ({ default: m.LinkedInImportPage })))
 const DirectoryPage = lazy(() => import('./features/directory/DirectoryPage').then((m) => ({ default: m.DirectoryPage })))
 const AdminHome = lazy(() => import('./features/admin/AdminHome').then((m) => ({ default: m.AdminHome })))
@@ -235,9 +237,11 @@ export function App() {
             <Route path="me" element={m(<ProfilePage self />)} />
             <Route path="me/edit" element={m(<EditProfilePage />)} />
             <Route path="me/import" element={m(<LinkedInImportPage />)} />
+            <Route path="me/magic" element={m(<MagicFillPage />)} />
             <Route path="admin" element={m(<AdminHome />)} />
             <Route path="admin/members" element={m(<AdminMembers />)} />
             <Route path="admin/members/import" element={m(<RequirePerm any={['members_import']} what="Importing members"><AdminImport /></RequirePerm>)} />
+            <Route path="admin/members/reunion-list" element={m(<RequirePerm any={['members_import', 'members_view']} what="The reunion list"><AdminPrefillPage /></RequirePerm>)} />
             <Route path="admin/members/duplicates" element={m(<RequirePerm any={['members_merge']} what="Merging duplicate members"><AdminDuplicates /></RequirePerm>)} />
             <Route path="admin/members/:id" element={m(<RequirePerm any={['members_view']} what="The member history"><AdminMemberTimeline /></RequirePerm>)} />
             <Route path="admin/members/:id/preview" element={m(<RequirePerm any={['members_view']} what="Viewing as a member"><AdminViewAs /></RequirePerm>)} />

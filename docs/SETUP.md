@@ -217,3 +217,69 @@ Uses standard Web Push: no Firebase or other account is needed. Works on Android
 
 Members turn notifications on from **Notifications** (or the prompt on the Chat tab). Signing out removes the
 device. Without these settings the app works exactly the same, with notifications only inside the app.
+
+## Quick profiles: Magic fill, reunion list, Fill from LinkedIn
+
+Busy alumni fill their profile in one or two taps. Everything below is optional: without it the welcome still works
+(two short steps, then Home) and members fill details by hand. Database changes: migrations `20261021000100_quick_profile`
+and `20261021000101_linkedin_enrich` (`npx supabase db push`).
+
+### Magic fill (Claude)
+
+One box on the welcome screen, in Edit profile ("Magic fill" button) and on Home: the member types, pastes their
+LinkedIn profile text or speaks (the phone's own speech recognition, Indian English or Hindi). The `profile-ai-fill`
+function asks Claude to turn it into fields; the member sees a preview with a tick box per field and saves once. The
+LinkedIn PDF import (`/me/import`) also reads the PDF through Magic fill and falls back to the old on-device reader
+when Magic fill is off.
+
+1. Create an API key at https://console.anthropic.com (Settings → API keys). Add a small monthly spend limit there.
+2. Supabase → Edge Functions → Secrets (never put the key in the repo):
+   - `ANTHROPIC_API_KEY` = the key
+   - `AI_MODEL` = optional, default `claude-opus-5-5`. **`claude-haiku-5-5` is about 40× cheaper and is plenty for
+     this extraction** (recommended for a tiny budget).
+   - `AI_DAILY_CAP` = optional, default `500`: Magic fill calls per day for everyone together.
+3. Deploy: `npx supabase functions deploy profile-ai-fill`
+
+Limits built in: 12,000 characters per call; 10 calls per member per day (60 for admins); the daily cap above. The
+member's text is sent to Claude once and never stored; only call and character counts are kept (`ai_fill_usage`).
+
+**Cost per 1,000 profiles** (typical: ~1,500 input and ~1,000 output tokens a call; a pasted LinkedIn profile ~4,000 / 1,500):
+
+| Model | Price per million tokens (input / output) | 1,000 typed profiles | 1,000 pasted LinkedIn profiles | Worst day at the 500 cap |
+|---|---|---|---|---|
+| `claude-haiku-5-5` | $0.10 / $0.50 | about **$0.65** | about **$1.15** | about $0.60 |
+| `claude-opus-5-5` (default) | $4 / $20 | about **$26** | about **$46** | about $23 |
+
+### Reunion list: prefill without creating accounts
+
+Admin → Members → **Reunion list**. Upload the Google Form responses (CSV or Excel). Columns are recognised by name
+(name, e-mail, mobile, batch, branch, city, organisation, designation, ...). No accounts are created and nobody is
+messaged. When a member signs in (any method) with the same e-mail, or enters the same mobile number and has the same
+first letter of the name, the welcome screen asks "Is this you?" and one tap fills their empty profile fields. Each
+row can be claimed once; admins see who claimed it. Nothing else to deploy.
+
+Registration answers (city, mobile, designation, company) also fill empty profile fields automatically; filled ones
+are never overwritten.
+
+### Fill from LinkedIn (People Data Labs)
+
+LinkedIn's sign-in only shares name, e-mail and photo, and copying LinkedIn pages breaks its rules, so a licensed
+data provider looks the member up instead (by their verified sign-in e-mail, or by the profile link they paste). The
+member ticks a consent box every time; the provider's answer is never stored, only what the member saves. If LinkedIn
+shows Jabalpur Engineering College (or GEC Jabalpur), the batch and branch are filled and admins see "LinkedIn shows
+JEC 2004–2008, Mechanical" with a one-tap **Approve** in Admin → Members. Members are never verified automatically
+unless a super admin switches on "Verify automatically when LinkedIn shows JEC" there (off by default).
+
+1. Sign up at https://www.peopledatalabs.com (free plan: about 100 person matches a month; a credit is used only when
+   a profile is found). Paid plans charge per match; check https://www.peopledatalabs.com/pricing for current prices.
+   Copy the API key from the dashboard.
+2. Supabase → Edge Functions → Secrets: `ENRICH_PROVIDER` = `pdl`, `PDL_API_KEY` = the key, optional
+   `ENRICH_DAILY_CAP` (default `50` look-ups a day for everyone; keep it at 3 or less on the free plan's ~100/month).
+3. Deploy: `npx supabase functions deploy linkedin-enrich`
+4. Admin → Members (as a super admin): switch on **Offer "Fill from LinkedIn" to members**. Until then the option is
+   hidden and the function is never called.
+
+Limits: 3 look-ups per member per day. Members who prefer not to can still upload LinkedIn's free data export
+(`/me/import`, "Data export") or use Magic fill.
+
+Tests never call Claude or the provider: `deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/profile-ai-fill/index.test.ts supabase/functions/linkedin-enrich/index.test.ts`.
