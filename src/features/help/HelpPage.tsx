@@ -141,7 +141,7 @@ export function HelpPage() {
               const mine = h.author_id === uid
               return (
                 <li key={h.id}>
-                  <Card className={clsx('space-y-3 p-4', h.is_resolved && 'opacity-70')}>
+                  <Card className={clsx('fx-lift', 'space-y-3 p-4', h.is_resolved && 'opacity-70')}>
                     <div className="flex items-center gap-2">
                       <Badge tone="primary">{h.tag}</Badge>
                       {h.matches_me && !mine && <Badge tone="accent">You can help</Badge>}

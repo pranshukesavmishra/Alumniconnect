@@ -148,9 +148,9 @@ function MentorCard({ m, mine, canRequest, onRequest }: { m: MentorRow; mine: bo
   const open = m.my_status === 'requested' || m.my_status === 'accepted'
   const full = m.open_slots <= 0
   return (
-    <Card className="space-y-3 p-4">
+    <Card variant="gradient-border" className="space-y-3 p-4">
       <div className="flex items-start gap-3">
-        <Avatar src={m.avatar_url} name={m.full_name} size={48} />
+        <Avatar src={m.avatar_url} name={m.full_name} size={56} ring="verified" />
         <div className="min-w-0 flex-1">
           <Link to={`/people/${m.user_id}`} className="font-bold leading-snug hover:underline">
             {m.full_name}

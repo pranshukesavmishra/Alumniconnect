@@ -1,7 +1,6 @@
 import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AdminTranslator } from './i18n/AdminTranslator'
-import { AppShell } from './components/layout/AppShell'
 // lazy() that also drives the shell's top progress bar while a screen's code loads
 import { lazy } from './features/shell/lazyRoute'
 import { PageSkeleton } from './components/ui/Display'
@@ -14,6 +13,7 @@ import { useOnline } from './hooks/useOnline'
 import { AuthCallbackPage, SignInPage } from './features/auth/SignInPage'
 import { MeetPage } from './features/events/MeetPage'
 import { HomePage } from './features/home/HomePage'
+import { RootLayout } from './features/home/RootLayout'
 import { InstallPage, NotFoundPage, AboutPage, PrivacyPage, TermsPage } from './features/home/StaticPages'
 import { WelcomePage } from './features/onboarding/WelcomePage'
 import { isConfigured, supabase } from './lib/supabase'
@@ -79,7 +79,17 @@ const CampaignEditor = lazy(() => import('./features/giving/admin/CampaignEditor
 const SponsorDetail = lazy(() => import('./features/giving/admin/SponsorDetail').then((m) => ({ default: m.SponsorDetail })))
 const SponsorPrint = lazy(() => import('./features/giving/admin/SponsorPrint').then((m) => ({ default: m.SponsorPrint })))
 const StyleguidePage = lazy(() => import('./features/styleguide/StyleguidePage').then((m) => ({ default: m.StyleguidePage })))
+const WorldPage = lazy(() => import('./features/world/WorldPage').then((m) => ({ default: m.WorldPage })))
 const CheckInPage = lazy(() => import('./features/admin/CheckInPage').then((m) => ({ default: m.CheckInPage })))
+const IdCardPage = lazy(() => import('./features/idcard/IdCardPage').then((m) => ({ default: m.IdCardPage })))
+const VerifyPage = lazy(() => import('./features/idcard/VerifyPage').then((m) => ({ default: m.VerifyPage })))
+const ScanCardPage = lazy(() => import('./features/idcard/VerifyPage').then((m) => ({ default: m.ScanCardPage })))
+const BadgesPage = lazy(() => import('./features/badges/BadgesPage').then((m) => ({ default: m.BadgesPage })))
+const YearbookPage = lazy(() => import('./features/yearbook/YearbookPage').then((m) => ({ default: m.YearbookPage })))
+const MyYearbookRedirect = lazy(() => import('./features/yearbook/YearbookPage').then((m) => ({ default: m.MyYearbookRedirect })))
+const FamePage = lazy(() => import('./features/fame/FamePage').then((m) => ({ default: m.FamePage })))
+const AdminYearbooks = lazy(() => import('./features/admin/AdminYearbooks').then((m) => ({ default: m.AdminYearbooks })))
+const AdminFame = lazy(() => import('./features/admin/AdminFame').then((m) => ({ default: m.AdminFame })))
 
 // Once the first screen is up, quietly fetch the code for the main screens so taps feel instant.
 if (typeof window !== 'undefined') {
@@ -179,7 +189,9 @@ export function App() {
           <Route path="/signin" element={<SignInPage />} />
           <Route path="/auth/callback" element={<AuthCallbackPage />} />
           <Route path="/welcome" element={<RequireSession><WelcomePage /></RequireSession>} />
-          <Route element={<AppShell />}>
+          <Route path="/verify" element={<ScanCardPage />} />
+          <Route path="/verify/:token" element={<VerifyPage />} />
+          <Route element={<RootLayout />}>
             <Route index element={<HomePage />} />
             <Route path="meet" element={<MeetPage />} />
             <Route path="meet/register" element={m(<RegisterPage />)} />
@@ -216,6 +228,7 @@ export function App() {
             <Route path="invite" element={m(<InvitePage />)} />
             <Route path="people" element={m(<DirectoryPage />)} />
             <Route path="nearby" element={m(<NearbyPage />)} />
+            <Route path="world" element={<WorldPage />} />
             <Route path="trips" element={m(<TripsPage />)} />
             <Route path="city/:id" element={m(<CityPage />)} />
             <Route path="people/:id" element={m(<ProfilePage />)} />
@@ -247,6 +260,14 @@ export function App() {
             <Route path="admin/events/:slug" element={m(<AdminEventPage />)} />
             <Route path="admin/events/:slug/check-in" element={m(<CheckInPage />)} />
             <Route path="admin/events/:slug/badges" element={m(<AdminBadges />)} />
+            <Route path="id-card" element={m(<IdCardPage />)} />
+            <Route path="me/badges" element={m(<BadgesPage />)} />
+            <Route path="people/:id/badges" element={m(<BadgesPage />)} />
+            <Route path="yearbook" element={m(<MyYearbookRedirect />)} />
+            <Route path="yearbook/:year" element={m(<YearbookPage />)} />
+            <Route path="fame" element={m(<FamePage />)} />
+            <Route path="admin/yearbooks" element={m(<RequirePerm any={['gallery_manage']} what="Yearbooks"><AdminYearbooks /></RequirePerm>)} />
+            <Route path="admin/fame" element={m(<RequirePerm any={['gallery_manage']} what="The Wall of Fame"><AdminFame /></RequirePerm>)} />
             <Route path="about" element={<AboutPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />

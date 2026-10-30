@@ -279,7 +279,7 @@ export function ChatComposer({
           ref={input}
           aria-label={tx('cmp.message')}
           rows={1}
-          className="max-h-40 min-h-12 flex-1 resize-none rounded-3xl border border-border bg-surface px-4 py-3 text-[16px] leading-snug focus:border-primary focus:outline-none"
+          className="max-h-40 min-h-12 flex-1 resize-none rounded-3xl border border-border bg-surface/80 px-4 py-3 text-[16px] leading-snug focus:border-primary focus:outline-none"
           placeholder={picked.length ? tx('cmp.caption') : isGroup ? tx('cmp.messageGroup') : tx('cmp.message')}
           value={text}
           maxLength={4000}
@@ -331,7 +331,7 @@ export function ChatComposer({
         <button
           type="submit"
           disabled={!canSend || saving}
-          className="grid size-12 shrink-0 place-items-center rounded-full bg-primary text-on-primary transition-opacity disabled:opacity-40"
+          className="fx-press grid size-12 shrink-0 place-items-center rounded-full bg-primary bg-(image:--grad-primary) text-on-primary shadow-[0_8px_18px_-8px_var(--primary-glow)] transition-opacity disabled:opacity-40"
           aria-label={editing ? tx('cmp.saveEdit') : tx('cmp.send')}
         >
           {editing ? <Check className="size-5" /> : <Send className="size-5" />}

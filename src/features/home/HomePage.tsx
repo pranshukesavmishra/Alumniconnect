@@ -1,38 +1,38 @@
-import { Cake, Star } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Bell, BriefcaseBusiness, CalendarHeart, Search, Send, Sparkles } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { ArrowRight, Bell, BriefcaseBusiness, Cake, Search, Send, Star } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
-import { ButtonLink } from '../../components/ui/Button'
-import type { JobListItem } from '../jobs/queries'
-import { Avatar, Card, PageSkeleton } from '../../components/ui/Display'
+import { Avatar } from '../../components/ui/Avatar'
+import { SectionHeader } from '../../components/ui/Card'
+import { Card, PageSkeleton } from '../../components/ui/Display'
+import { BentoGrid, Meteors } from '../../components/ui/Fx'
+import { IconTile } from '../../components/ui/IconTile'
 import { LinkedInIcon } from '../../components/ui/Icons'
-import { MEET_SLUG } from '../../lib/constants'
-import { daysUntil, formatDateRange } from '../../lib/format'
-import type { Profile } from '../../lib/types'
-import { useAuth, useMyProfile } from '../auth/AuthProvider'
-import { useEvent, useMyRegistration } from '../events/queries'
-import { FeaturedGiveCard } from '../giving/FeaturedGiveCard'
-import { GalleryStrips } from '../photos/GalleryStrips'
-import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
-import { HighlightsStrip, StoryRow } from '../stories/StoryRow'
-import { PastMeetsStrip } from '../meets/PastMeetsStrip'
-import { StatusBadge } from '../events/StatusBadge'
-import { supabase } from '../../lib/supabase'
+import { Reveal, Stagger } from '../../components/ui/Motion'
+import { ProgressRing } from '../../components/ui/Progress'
 import { useT, type MsgKey } from '../../i18n'
-import { LanguageSwitch } from '../../i18n/LanguageSwitch'
+import { dateLocale } from '../../i18n/core'
+import { cn } from '../../lib/cn'
+import { supabase } from '../../lib/supabase'
+import type { Profile } from '../../lib/types'
+import { useAuth, useMyProfile, useUserId } from '../auth/AuthProvider'
+import { useShownBadges } from '../badges/api'
 import { Composer } from '../community/Composer'
 import { FeedList } from '../community/FeedList'
 import { useGroups, useNotifications } from '../community/queries'
-import { useMySocialLinks } from '../profile/socialQueries'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
+import { useLiveGlimpses } from '../glimpses/api'
+import { useHomeHighlights } from '../highlights/api'
+import type { JobListItem } from '../jobs/queries'
+import { LandingPage } from '../landing/LandingPage'
 import { LocationPromptCard } from '../location/LocationSharing'
-import { useVisibleMenu } from '../../components/layout/useMenuCtx'
-
-function greeting(): MsgKey {
-  const h = Number(new Intl.DateTimeFormat('en-IN', { hour: 'numeric', hour12: false, timeZone: 'Asia/Kolkata' }).format(new Date()))
-  return h < 12 ? 'home.morning' : h < 17 ? 'home.afternoon' : 'home.evening'
-}
+import { PastMeetsStrip } from '../meets/PastMeetsStrip'
+import { GalleryStrips } from '../photos/GalleryStrips'
+import { useMySocialLinks } from '../profile/socialQueries'
+import { HighlightsStrip, StoryRow } from '../stories/StoryRow'
+import { useMyBatchmatesSummary } from '../yearbook/api'
+import { dayPart, istHour, type DayPart } from './homeLogic'
+import { ActivityChips, AnniversaryBanner, BadgesTile, BatchTile, FameTile, GiveTile, NextUpTile, QuickActionsTile, WorldTile } from './HomeTiles'
 
 /** `hasSocial` (an Instagram or Facebook link) is a pure bonus: it is not in the total, so nobody's score goes down, and it is capped at 100. */
 export function profileCompleteness(p: Profile, hasSocial = false): { percent: number; next: { label: MsgKey; to: string } | null } {
@@ -50,63 +50,153 @@ export function profileCompleteness(p: Profile, hasSocial = false): { percent: n
   return { percent: Math.min(100, Math.round(((done + (hasSocial ? 1 : 0)) / total) * 100)), next: first ? { label: first[1], to: first[2] } : null }
 }
 
-function Landing() {
+const GREETING: Record<DayPart, MsgKey> = { morning: 'home.morning', afternoon: 'home.afternoon', evening: 'home.evening', night: 'home.night' }
+
+// The light of the hero follows the clock in India: warm gold mornings, bright emerald afternoons, deep emerald evenings.
+const SKY: Record<DayPart, string> = {
+  morning:
+    'bg-[radial-gradient(70%_80%_at_95%_0%,rgb(240_180_79/0.75),transparent_65%),radial-gradient(60%_70%_at_0%_100%,rgb(31_145_106/0.55),transparent_70%),linear-gradient(160deg,#0f5a43_0%,#0a4433_55%,#062a20_100%)]',
+  afternoon:
+    'bg-[radial-gradient(70%_80%_at_90%_0%,rgb(79_209_161/0.55),transparent_65%),radial-gradient(50%_60%_at_0%_100%,rgb(228_173_69/0.35),transparent_70%),linear-gradient(160deg,#0f7a57_0%,#0a5540_55%,#062a20_100%)]',
+  evening:
+    'bg-[radial-gradient(60%_70%_at_100%_100%,rgb(228_173_69/0.38),transparent_65%),radial-gradient(70%_70%_at_0%_0%,rgb(31_145_106/0.45),transparent_70%),linear-gradient(160deg,#0a4433_0%,#062a20_55%,#03140f_100%)]',
+  night:
+    'bg-[radial-gradient(60%_60%_at_85%_10%,rgb(111_200_165/0.22),transparent_65%),radial-gradient(50%_50%_at_10%_100%,rgb(139_30_45/0.25),transparent_70%),linear-gradient(170deg,#062a20_0%,#04170f_60%,#020b08_100%)]',
+}
+
+export function HomePage() {
   const tx = useT()
+  const uid = useUserId()
+  const { session, loading } = useAuth()
+  const { data: profile, isLoading } = useMyProfile()
+  const { data: groups } = useGroups()
+  const { data: social } = useMySocialLinks()
+  const verified = !!profile && (profile.verification === 'verified' || profile.is_admin)
+  const h = useHomeHighlights()
+  const batch = useMyBatchmatesSummary()
+  const badges = useShownBadges(verified ? uid : null)
+  const { data: glimpses } = useLiveGlimpses()
+
+  if (loading || (session && isLoading)) return <PageSkeleton />
+  if (!session || !profile) return <LandingPage />
+  if (!profile.onboarded) return <Navigate to="/welcome?next=/" replace />
+
+  const comp = profileCompleteness(profile, !!(social?.instagram_url || social?.facebook_url))
+  const year = batch.data?.grad_year ?? profile.grad_year ?? null
+
   return (
-    <div className="min-h-dvh bg-hero text-white">
-      <div className="relative mx-auto max-w-3xl overflow-hidden px-5 pb-16 pt-[calc(env(safe-area-inset-top)+3rem)]">
-        <div aria-hidden className="absolute -right-32 -top-24 size-96 rounded-full bg-hero-2" />
-        <div className="relative">
-          <div className="flex items-center justify-between gap-3">
-            <img src="/jec-logo.png" alt="" className="h-14 w-auto" />
-            <span className="text-text">
-              <LanguageSwitch compact />
-            </span>
+    <Page wide className="space-y-5 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:space-y-6 md:pt-8">
+      <Hero profile={profile} percent={comp.percent} next={comp.next} />
+
+      {verified && (
+        <div className="space-y-3">
+          <StoryRow />
+          <HighlightsStrip />
+        </div>
+      )}
+
+      <ActivityChips h={h.data} />
+      <AnniversaryBanner h={h.data} />
+
+      <BentoGrid>
+        <NextUpTile h={h.data} loading={h.isLoading} />
+        {verified && <BatchTile batch={batch.data} loading={batch.isLoading} fallbackYear={profile.grad_year} />}
+        {verified && <BadgesTile badges={badges.badges} loading={badges.isLoading} />}
+        <QuickActionsTile verified={verified} year={year} />
+        {verified && <WorldTile enabled={verified} />}
+        {verified && <GiveTile />}
+        {verified && <FameTile enabled={verified} />}
+      </BentoGrid>
+
+      {glimpses.length > 0 && (
+        <Reveal as="section">
+          <SectionHeader eyebrow={tx('home.glimpses')} title={tx('home.glimpsesTitle')} />
+          <GlimpseCarousel />
+        </Reveal>
+      )}
+
+      <PastMeetsStrip />
+
+      {verified ? (
+        <>
+          <LocationPromptCard />
+          <div className="grid gap-5 md:grid-cols-2 md:items-start">
+            <Spotlight />
+            <LatestJobs />
           </div>
-          <h1 className="mt-6 text-4xl font-bold leading-[1.1] tracking-tight sm:text-5xl">{tx('home.landingTitle')}</h1>
-          <p className="mt-4 max-w-xl text-lg text-hero-text">
-            {tx('home.landingBody')}
-          </p>
-          <GlimpseCarousel className="mt-6" />
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row [&_a:first-child]:bg-white [&_a:first-child]:bg-none [&_a:first-child]:text-hero">
-            <ButtonLink to="/signin" size="lg">
-              {tx('home.signInOrJoin')}
-            </ButtonLink>
-            <ButtonLink to="/meet" size="lg" variant="ghost" className="text-white hover:bg-white/10">
-              {tx('home.meetLink')} <ArrowRight className="size-4" />
-            </ButtonLink>
-          </div>
+          <Birthdays />
+          <GalleryStrips verified />
+          <section aria-labelledby="home-community" className="space-y-3">
+            <SectionHeader eyebrow={tx('home.community')} title={<span id="home-community">{tx('home.communityTitle')}</span>} />
+            <div className="mx-auto max-w-2xl space-y-4">
+              <Composer groups={groups} />
+              <FeedList scope="home" />
+            </div>
+          </section>
+        </>
+      ) : (
+        <>
+          <Card variant="gradient-border" className="p-5">
+            <p className="font-display text-[20px] font-semibold">{tx('home.unlock')}</p>
+            <p className="mt-1 text-[15px] text-muted">{tx('home.unlockBody')}</p>
+          </Card>
+          <Stagger className="grid gap-3 sm:grid-cols-2">
+            <QuickAction to="/me/import" icon={<LinkedInIcon />} title={tx('home.importLinkedin')} text={tx('home.fill30')} />
+            <QuickAction to="/invite" icon={<Send className="size-5" />} title={tx('home.invite')} text={tx('home.vouch')} />
+          </Stagger>
+        </>
+      )}
+    </Page>
+  )
+}
+
+function Hero({ profile, percent, next }: { profile: Profile; percent: number; next: { label: MsgKey; to: string } | null }) {
+  const tx = useT()
+  const part = dayPart(istHour())
+  const first = profile.full_name.split(' ')[0] || tx('home.there')
+  const today = new Intl.DateTimeFormat(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' }).format(new Date())
+  const sub = [profile.grad_year ? tx('home.batchOf', { year: profile.grad_year }) : null, profile.branch?.replace(/^B\.E\. in /, '')].filter(Boolean).join(' · ')
+  return (
+    <header data-theme="dark" data-daypart={part} className={cn('relative isolate overflow-hidden rounded-[2rem] p-5 text-white shadow-e4 sm:p-7', SKY[part])}>
+      <div aria-hidden className="fx-grid fx-grid-light absolute inset-0 -z-10 opacity-60" />
+      {part === 'night' && <Meteors count={5} className="-z-10" />}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-eyebrow text-accent">{today}</p>
+        <div className="flex items-center gap-1">
+          <Link to="/people" aria-label={tx('home.findJecians')} className="fx-press grid size-11 place-items-center rounded-full text-white/90 hover:bg-white/10">
+            <Search className="size-5" />
+          </Link>
+          <NotificationBell />
         </div>
       </div>
-    </div>
+      <div className="mt-4 flex items-center gap-4 sm:gap-6">
+        <Link to="/me" aria-label={tx('nav.yourProfile')} className="fx-press shrink-0 rounded-full">
+          <ProgressRing value={percent} size={88} stroke={5} tone="brand" label={tx('home.strength', { percent })}>
+            <Avatar src={profile.avatar_url} name={profile.full_name} size={70} />
+          </ProgressRing>
+        </Link>
+        <div className="min-w-0">
+          <p className="text-[15px] text-white/75">{tx(GREETING[part])},</p>
+          <h1 className="text-display truncate leading-[1.05] text-white">{first}</h1>
+          {sub && <p className="mt-1 text-sm text-white/70">{sub}</p>}
+        </div>
+      </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-white/12 bg-white/[0.07] px-4 py-3 backdrop-blur-md">
+        <p className="text-sm font-semibold">{tx('home.complete', { percent })}</p>
+        {next && (
+          <Link to={next.to} className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent">
+            {tx('home.next')} {tx(next.label)} <ArrowRight className="size-4" aria-hidden />
+          </Link>
+        )}
+      </div>
+    </header>
   )
 }
 
-/** A row of shortcuts picked from the menu registry (the entries marked quick). */
-function QuickActions() {
-  const tx = useT()
-  const items = useVisibleMenu().flatMap((s) => s.items).filter((i) => i.quick && i.to)
-  if (!items.length) return null
+function QuickAction({ to, icon, title, text }: { to: string; icon: React.ReactNode; title: string; text: string }) {
   return (
-    <section aria-label={tx('menu.quick')}>
-      <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-        {items.map((i) => (
-          <li key={i.id}>
-            <Link to={i.to!} className="flex min-h-[4.5rem] flex-col items-center justify-center gap-1 rounded-2xl border border-border bg-surface px-1 py-2 text-center text-xs font-semibold hover:border-primary/40">
-              <i.icon className="size-5 text-primary" aria-hidden />
-              <span className="line-clamp-2 leading-tight">{tx(i.label)}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-function QuickAction({ to, icon, title, text }: { to: string; icon: ReactNode; title: string; text: string }) {
-  return (
-    <Link to={to} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-      <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">{icon}</span>
+    <Link to={to} className="fx-press fx-lift flex items-center gap-3 rounded-[1.4rem] border border-border/80 bg-surface p-4 shadow-card">
+      <IconTile icon={icon} tone="emerald" />
       <span className="min-w-0 flex-1">
         <span className="block font-semibold">{title}</span>
         <span className="block text-sm text-muted">{text}</span>
@@ -116,121 +206,22 @@ function QuickAction({ to, icon, title, text }: { to: string; icon: ReactNode; t
   )
 }
 
-export function HomePage() {
-  const tx = useT()
-  const { session, loading } = useAuth()
-  const { data: profile, isLoading } = useMyProfile()
-  const { data: event } = useEvent(MEET_SLUG)
-  const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
-  const { data: groups } = useGroups()
-  const { data: social } = useMySocialLinks()
-
-  if (loading || (session && isLoading)) return <PageSkeleton />
-  if (!session || !profile) return <Landing />
-  if (!profile.onboarded) return <Navigate to="/welcome?next=/" replace />
-
-  const first = profile.full_name.split(' ')[0] || tx('home.there')
-  const comp = profileCompleteness(profile, !!(social?.instagram_url || social?.facebook_url))
-  const days = daysUntil(event?.starts_at ?? null)
-  const reg = mine?.registration && mine.registration.status !== 'cancelled' ? mine.registration : null
-
-  const verified = profile.verification === 'verified' || profile.is_admin
-  return (
-    <Page className="space-y-5 pt-[calc(env(safe-area-inset-top)+1.25rem)]">
-      <header className="flex items-center gap-3">
-        <Avatar src={profile.avatar_url} name={profile.full_name} size={48} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm text-muted">{tx(greeting())},</p>
-          <h1 className="truncate text-2xl font-bold tracking-tight">{first}</h1>
-        </div>
-        <Link to="/people" aria-label={tx('home.findJecians')} className="grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft">
-          <Search className="size-5" />
-        </Link>
-        <NotificationBell />
-      </header>
-
-      {verified && <StoryRow />}
-      {verified && <HighlightsStrip />}
-
-      <GlimpseCarousel />
-
-      {event && (
-        <Link to={reg ? '/meet/my' : '/meet'} className="block overflow-hidden rounded-3xl bg-gradient-to-br from-hero to-hero-2 text-white shadow-pop">
-          <div className="relative p-5">
-            <div aria-hidden className="absolute -right-10 -top-14 size-40 rounded-full bg-hero-2" />
-            <div className="relative">
-              <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-accent">
-                  <CalendarHeart className="size-4" aria-hidden /> {days ? tx('home.inDays', { count: days }) : tx('home.alumniMeet')}
-                </span>
-                {reg && <StatusBadge status={reg.status} />}
-              </div>
-              <p className="mt-2 text-xl font-bold">{event.title}</p>
-              <p className="text-sm text-hero-text">{formatDateRange(event.starts_at, event.ends_at)}</p>
-              <p className="mt-4 inline-flex min-h-6 items-center gap-1 font-semibold">
-                {regPending ? <span className="skeleton inline-block h-5 w-40 rounded-md bg-white/20" aria-busy="true" aria-label={tx('common.loading')} /> : reg ? (reg.status === 'confirmed' ? tx('home.viewPass') : reg.status === 'pending_payment' ? tx('home.completePay') : tx('home.seeReg')) : tx('meet.registerNow')}
-                {!regPending && <ArrowRight className="size-4" aria-hidden />}
-              </p>
-            </div>
-          </div>
-        </Link>
-      )}
-
-      <QuickActions />
-      <PastMeetsStrip />
-
-      {comp.next && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <p className="font-semibold">{tx('home.complete', { percent: comp.percent })}</p>
-            <Sparkles className="size-5 text-accent" aria-hidden />
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={comp.percent} aria-valuemin={0} aria-valuemax={100}>
-            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${comp.percent}%` }} />
-          </div>
-          <Link to={comp.next.to} className="mt-3 inline-flex min-h-11 items-center gap-1 font-semibold text-primary">
-            {tx('home.next')} {tx(comp.next.label)} <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        </Card>
-      )}
-
-      {verified ? (
-        <>
-          <FeaturedGiveCard />
-          <LocationPromptCard />
-          <Spotlight />
-          <GalleryStrips verified />
-          <LatestJobs />
-          <Birthdays />
-          <Composer groups={groups} />
-          <FeedList scope="home" />
-        </>
-      ) : (
-        <>
-          <Card className="p-4">
-            <p className="font-semibold">{tx('home.unlock')}</p>
-            <p className="mt-1 text-[15px] text-muted">
-              {tx('home.unlockBody')}
-            </p>
-          </Card>
-          <section className="grid gap-3 sm:grid-cols-2">
-            <QuickAction to="/me/import" icon={<LinkedInIcon />} title={tx('home.importLinkedin')} text={tx('home.fill30')} />
-            <QuickAction to="/invite" icon={<Send className="size-5" />} title={tx('home.invite')} text={tx('home.vouch')} />
-          </section>
-        </>
-      )}
-    </Page>
-  )
-}
-
 function NotificationBell() {
   const tx = useT()
   const { data } = useNotifications()
   const unread = data?.filter((n) => !n.read_at).length ?? 0
   return (
-    <Link to="/notifications" aria-label={unread ? tx('home.notifUnread', { n: unread }) : tx('notif.title')} className="relative grid size-11 place-items-center rounded-full text-primary hover:bg-primary-soft">
+    <Link
+      to="/notifications"
+      aria-label={unread ? tx('home.notifUnread', { n: unread }) : tx('notif.title')}
+      className="fx-press relative grid size-11 place-items-center rounded-full text-white/90 hover:bg-white/10"
+    >
       <Bell className="size-5" />
-      {unread > 0 && <span className="absolute right-1.5 top-1.5 min-w-4.5 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4.5 text-white">{unread > 9 ? '9+' : unread}</span>}
+      {unread > 0 && (
+        <span className="absolute right-1 top-1 min-w-5 rounded-full bg-accent px-1 text-center text-[11px] font-bold leading-5 text-[#2b1d00] shadow-[0_0_0_2px_#062a20]">
+          {unread > 9 ? '9+' : unread}
+        </span>
+      )}
     </Link>
   )
 }
@@ -248,20 +239,20 @@ function Birthdays() {
   })
   if (!data?.length) return null
   return (
-    <Card className="p-4">
-      <p className="flex items-center gap-2 font-semibold"><Cake className="size-5 text-gold-ink" aria-hidden /> {tx('home.birthdays')}</p>
-      <ul className="mt-3 flex gap-4 overflow-x-auto pb-1">
+    <section aria-label={tx('home.birthdays')}>
+      <SectionHeader eyebrow={tx('home.birthdays')} title={<span className="inline-flex items-center gap-2"><Cake className="size-5 text-gold-ink" aria-hidden />{tx('home.birthdays')}</span>} />
+      <ul className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
         {data.map((b) => (
-          <li key={b.id} className="w-20 shrink-0 text-center">
-            <Link to={`/people/${b.id}`} className="block">
-              <Avatar src={b.avatar_url} name={b.full_name} size={56} className="mx-auto" />
-              <p className="mt-1 truncate text-sm font-semibold">{b.full_name.split(' ')[0]}</p>
+          <li key={b.id} className="w-24 shrink-0">
+            <Link to={`/people/${b.id}`} className="fx-press flex flex-col items-center rounded-[1.4rem] border border-border/70 bg-surface p-3 text-center shadow-card">
+              <Avatar src={b.avatar_url} name={b.full_name} size={56} ring={b.days_away === 0 ? 'verified' : 'none'} />
+              <p className="mt-2 w-full truncate text-sm font-semibold">{b.full_name.split(' ')[0]}</p>
               <p className="text-xs text-muted">{b.days_away === 0 ? tx('home.today') : b.days_away === 1 ? tx('home.tomorrow') : tx('home.inDays', { count: b.days_away })}</p>
             </Link>
           </li>
         ))}
       </ul>
-    </Card>
+    </section>
   )
 }
 
@@ -285,17 +276,20 @@ function Spotlight() {
   })
   if (!data) return null
   return (
-    <Link to={`/people/${data.profile.id}`} className="block rounded-2xl border border-accent/40 bg-accent-soft p-4">
-      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-warning"><Star className="size-3.5 fill-current" aria-hidden /> {tx('home.spotlight')}</p>
-      <div className="mt-2 flex items-center gap-3">
-        <Avatar src={data.profile.avatar_url} name={data.profile.full_name} size={52} />
+    <Link to={`/people/${data.profile.id}`} className="fx-press fx-lift fx-hairline relative block overflow-hidden rounded-[1.6rem] bg-surface p-5 shadow-card">
+      <div aria-hidden className="absolute -right-16 -top-16 size-48 rounded-full bg-accent/20 blur-3xl" />
+      <p className="text-eyebrow relative flex items-center gap-1.5 text-gold-ink">
+        <Star className="size-3.5 fill-current" aria-hidden /> {tx('home.spotlight')}
+      </p>
+      <div className="relative mt-3 flex items-center gap-3">
+        <Avatar src={data.profile.avatar_url} name={data.profile.full_name} size={56} ring="verified" />
         <div className="min-w-0">
-          <p className="font-bold">{data.profile.full_name}</p>
+          <p className="font-display text-[19px] font-semibold leading-tight">{data.profile.full_name}</p>
           <p className="text-sm text-muted">{[data.profile.branch, data.profile.grad_year].filter(Boolean).join(' ')}</p>
         </div>
       </div>
-      <p className="mt-2 text-[15px] font-semibold">{data.headline}</p>
-      {data.story && <p className="mt-1 line-clamp-3 text-sm text-muted">{data.story}</p>}
+      <p className="relative mt-3 text-[16px] font-semibold leading-snug">{data.headline}</p>
+      {data.story && <p className="relative mt-1 line-clamp-3 text-sm text-muted">{data.story}</p>}
     </Link>
   )
 }
@@ -315,30 +309,28 @@ function LatestJobs() {
   if (!data?.length) return null
   return (
     <section aria-label={tx('home.latestJobs')}>
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[13px] font-bold uppercase tracking-[0.08em] text-muted">{tx('home.latestJobs')}</h2>
-        <Link to="/jobs" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">
-          {tx('home.seeAll')}
-        </Link>
-      </div>
-      <ul className="space-y-2">
+      <SectionHeader
+        title={tx('home.latestJobs')}
+        action={
+          <Link to="/jobs" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary">
+            {tx('home.seeAll')}
+          </Link>
+        }
+      />
+      <Stagger className="space-y-2">
         {data.map((j) => (
-          <li key={j.id}>
-            <Link to={`/jobs/${j.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 hover:bg-surface-2">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary" aria-hidden>
-                <BriefcaseBusiness className="size-5" />
+          <Link key={j.id} to={`/jobs/${j.id}`} className="fx-press fx-lift flex items-center gap-3 rounded-[1.4rem] border border-border/80 bg-surface p-3.5 shadow-card">
+            <IconTile icon={BriefcaseBusiness} tone="ink" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{j.title}</span>
+              <span className="block truncate text-sm text-muted">
+                {j.company} · {j.poster_name}
+                {j.can_refer ? ` · ${tx('home.canRefer')}` : ''}
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-semibold">{j.title}</span>
-                <span className="block truncate text-sm text-muted">
-                  {j.company} · {j.poster_name}
-                  {j.can_refer ? ` · ${tx('home.canRefer')}` : ''}
-                </span>
-              </span>
-            </Link>
-          </li>
+            </span>
+          </Link>
         ))}
-      </ul>
+      </Stagger>
     </section>
   )
 }

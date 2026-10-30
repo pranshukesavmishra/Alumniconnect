@@ -120,6 +120,7 @@ export function GlimpseCarousel({ className }: { className?: string }) {
             videoRef={video}
             onEnded={() => count > 1 && go(1)}
             onClick={() => setOpen(cur)}
+            onFailed={() => setBlocked(true)}
             testId="glimpse-video"
           />
         ) : (

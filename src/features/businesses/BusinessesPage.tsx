@@ -6,6 +6,7 @@ import { Page, PageHeader } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Avatar, Badge, Card, EmptyState, Notice, Skeleton } from '../../components/ui/Display'
 import { friendlyError } from '../../lib/errors'
+import { OrgLogo } from '../profile/ProfileParts'
 import { useMyProfile } from '../auth/AuthProvider'
 import { BUSINESS_CATEGORIES, useBusinesses, type BusinessCategory, type BusinessFilters, type BusinessListItem } from './queries'
 
@@ -19,14 +20,12 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 
 export function BusinessCard({ b }: { b: BusinessListItem }) {
   return (
-    <Link to={`/businesses/${b.id}`} className="block">
+    <Link to={`/businesses/${b.id}`} className="fx-press fx-lift block rounded-3xl">
       <Card className="p-4 transition-colors hover:bg-surface-2">
         <div className="flex items-start gap-3">
-          <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-soft text-primary" aria-hidden>
-            <Store className="size-6" />
-          </span>
+          <OrgLogo name={b.name} size={52} />
           <div className="min-w-0 flex-1">
-            <p className="font-bold leading-snug">{b.name}</p>
+            <p className="text-title leading-snug">{b.name}</p>
             <p className="text-[15px] text-muted">
               {b.category} · <MapPin className="-mt-0.5 inline size-3.5" aria-hidden /> {b.city}
             </p>

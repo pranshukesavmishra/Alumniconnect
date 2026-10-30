@@ -56,6 +56,11 @@ export const AUDIT_LABELS: Record<string, string> = {
   restore_story: 'Restored a story',
   meet_save: 'Saved a past meet',
   meet_delete: 'Deleted a past meet',
+  yearbook_save: 'Saved a batch yearbook',
+  yearbook_delete: 'Deleted a batch yearbook',
+  fame_save: 'Saved a Wall of Fame entry',
+  fame_delete: 'Removed a Wall of Fame entry',
+  fame_reorder: 'Reordered the Wall of Fame',
   gallery_update: 'Edited a college gallery photo',
   gallery_remove: 'Removed a photo from the college gallery',
   gallery_chip_save: 'Saved a gallery chip',
@@ -142,6 +147,7 @@ export const AUDIT_GROUPS: { id: string; label: string; actions: string[] }[] = 
   { id: 'messages', label: 'Messages', actions: ['send_event_message', 'schedule_event_message', 'cancel_event_message', 'message_needs_approval', 'approve_event_message', 'reject_event_message', 'post_announcement'] },
   { id: 'money', label: 'Money', actions: ['verify_payment', 'reject_payment', 'record_cash', 'record_bank_transfer', 'record_waiver', 'record_refund', 'refund_payment', 'export_ledger', 'export_event_data', 'transfer_registration', 'cancel_registration', 'reopen_registration', 'update_registration'] },
   { id: 'stories', label: 'Stories', actions: ['story_post', 'story_delete', 'story_notify', 'highlight_save', 'highlight_items', 'highlight_delete', 'highlight_reorder', 'stories_cleanup', 'hide_story', 'restore_story'] },
+  { id: 'showcase', label: 'Yearbooks and Wall of Fame', actions: ['yearbook_save', 'yearbook_delete', 'fame_save', 'fame_delete', 'fame_reorder'] },
   { id: 'members', label: 'Members', actions: ['update_member', 'create_member', 'merge_member', 'export_members', 'import_preview', 'import_job_start', 'import_job_retry', 'export_audit', 'view_member_email', 'view_as_member', 'search_contact'] },
 ]
 
@@ -154,6 +160,9 @@ export function auditSummary(details: Record<string, unknown>): string {
   if ('step_down' in d) parts.push(`${String(d.from ?? 'An owner')} → ${String(d.name ?? '')}${d.step_down ? ' (stepped down)' : ''}`)
   if (('was_admin' in d || 'self' in d) && typeof d.name === 'string' && !('permissions' in d)) parts.push(d.name)
   if (d.code) parts.push(String(d.code))
+  if (typeof d.grad_year === 'number') parts.push(`Class of ${d.grad_year}${d.branch ? `, ${String(d.branch)}` : ''}`)
+  if (typeof d.name === 'string' && typeof d.category === 'string') parts.push(`${d.name} (${d.category.replace(/_/g, ' ')})`)
+  if (typeof d.published === 'boolean') parts.push(d.published ? 'published' : 'draft')
   if (typeof d.what === 'string') parts.push(`${d.what.replace(/_/g, ' ')}${typeof d.count === 'number' ? ` (${d.count})` : ''}`)
   if (typeof d.amount === 'number') parts.push(formatPaise(d.amount))
   if (d.amount?.from !== undefined && d.amount.from !== d.amount.to) parts.push(`${formatPaise(d.amount.from)} → ${formatPaise(d.amount.to)}`)
