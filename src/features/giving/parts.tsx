@@ -1,5 +1,5 @@
 import { Building2, FlaskConical, GraduationCap, HandCoins, Megaphone, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '../../components/ui/Display'
 import { useReducedMotion } from '../../components/ui/Motion'
@@ -77,7 +77,7 @@ export function GoalRing({ raised, goal, size = 132, label, tone = 'brand', chil
     const t = setTimeout(() => setShown(pct), 80)
     return () => clearTimeout(t)
   }, [pct])
-  const id = useRef(`ring-${Math.random().toString(36).slice(2, 8)}`).current
+  const id = useId()
   const stops = tone === 'gold' ? ['#f6d98c', '#d4922a'] : ['#4fd1a1', '#e4ad45']
   return (
     <div role="progressbar" aria-label={label} aria-valuenow={Math.min(100, percentOf(raised, goal))} aria-valuemin={0} aria-valuemax={100} className={cn('relative inline-grid shrink-0 place-items-center', className)} style={{ width: size, height: size }}>
