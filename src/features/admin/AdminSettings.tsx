@@ -90,6 +90,8 @@ interface TicketDraft {
   list: string
   offer: string
   is_primary: boolean
+  /** optional per-person extra: any registrant can add it, whichever main ticket; never the main ticket */
+  is_addon?: boolean
   max: string
   days: number[]
   _delete?: boolean
@@ -123,7 +125,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   })
   const [tickets, setTickets] = useState<TicketDraft[]>(
     existing?.tickets.length
-      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, max: String(t.max_per_registration), days: t.days ?? [] }))
+      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, is_addon: !!t.is_addon, max: String(t.max_per_registration), days: t.days ?? [] }))
       : [
           { label: 'Alumnus / Alumna', description: '', price: '', list: '', offer: '', is_primary: true, max: '1', days: [] },
           { label: 'Spouse', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] },
@@ -138,14 +140,14 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   const move = (i: number, dir: -1 | 1) =>
     setTickets((ts) => {
       let j = i + dir
-      while (j >= 0 && j < ts.length && ts[j]!._delete) j += dir
+      while (j >= 0 && j < ts.length && (ts[j]!._delete || ts[j]!.is_addon)) j += dir
       if (j < 0 || j >= ts.length) return ts
       const c = [...ts]
       ;[c[i], c[j]] = [c[j]!, c[i]!]
       return c
     })
   const nDays = eventDayCount({ starts_at: fromLocalIst(f.starts_at), ends_at: fromLocalIst(f.ends_at) })
-  const visibleIdx = tickets.map((t, i) => (t._delete ? -1 : i)).filter((i) => i >= 0)
+  const visibleIdx = tickets.map((t, i) => (t._delete || t.is_addon ? -1 : i)).filter((i) => i >= 0)
   const live = tickets.filter((t) => !t._delete)
 
   function validate(): string[] {
@@ -163,7 +165,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     if (f.starts_at && f.ends_at && f.ends_at < f.starts_at) errs.push('The end date is before the start date.')
     if (live.filter((t) => t.is_primary).length < 1) errs.push('At least one main (alumnus) ticket is needed.')
     for (const t of live) {
-      if (!t.label.trim()) errs.push('Every ticket needs a name.')
+      if (t.is_addon && t.is_primary) errs.push(`“${t.label || 'extra'}”: an optional extra cannot be the main ticket.`)
+      if (!t.label.trim()) errs.push(t.is_addon ? 'Every optional extra needs a name.' : 'Every ticket needs a name.')
       if (parseRupeesToPaise(t.price) === null) errs.push(`Price for “${t.label || 'ticket'}” is not a valid amount.`)
       if (!(Number(t.max) >= 1 && Number(t.max) <= 20)) errs.push(`“${t.label}”: max per registration must be 1–20.`)
       if (t.list.trim()) {
@@ -216,7 +219,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           price_paise: parseRupeesToPaise(t.price) ?? 0,
           list_price_paise: t.list.trim() ? parseRupeesToPaise(t.list) : null,
           discount_label: t.list.trim() && t.offer.trim() ? t.offer.trim() : null,
-          is_primary: t.is_primary,
+          is_primary: t.is_addon ? false : t.is_primary,
+          is_addon: !!t.is_addon,
           max_per_registration: Number(t.max),
           days: t.days.length === 0 || t.days.length >= nDays ? null : [...t.days].sort((a, b) => a - b),
         })),
@@ -290,7 +294,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           Fees
         </SectionTitle>
         {tickets.map((t, i) =>
-          t._delete ? null : (
+          t._delete || t.is_addon ? null : (
             <Card key={t.id ?? `new-${i}`} className="space-y-3 p-4">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_6rem]">
                 <Field label="Ticket name">{(p) => <Input {...p} value={t.label} onChange={(ev) => setT(i, { label: ev.target.value })} maxLength={80} />}</Field>
@@ -329,6 +333,54 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                     <Trash2 className="size-4" />
                   </button>
                 </div>
+              </div>
+            </Card>
+          ),
+        )}
+      </section>
+
+      <section className="space-y-3" data-testid="addon-editor">
+        <SectionTitle
+          action={
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', list: '', offer: '', is_primary: false, is_addon: true, max: '10', days: [] }])}>
+              Add optional extra
+            </Button>
+          }
+        >
+          Optional extras
+        </SectionTitle>
+        <p className="text-sm text-muted">
+          An extra is priced per person and any registered person can add it, whichever main ticket they chose (for example an outdoor tour on the last day). The main alumnus can join too.
+          Members tick it for themselves and for each family member who joins. Set “Max” to the most people you expect in one registration.
+        </p>
+        {tickets.map((t, i) =>
+          t._delete || !t.is_addon ? null : (
+            <Card key={t.id ?? `new-${i}`} className="space-y-3 p-4" data-testid="addon-card">
+              <div className="grid gap-3 sm:grid-cols-[1fr_8rem_6rem]">
+                <Field label="Name of the extra">{(p) => <Input {...p} value={t.label} onChange={(ev) => setT(i, { label: ev.target.value })} maxLength={80} placeholder="Outdoor tour" />}</Field>
+                <Field label="Extra price per person (₹)" hint={parseRupeesToPaise(t.price) !== null ? formatPaise(parseRupeesToPaise(t.price)!) : undefined}>
+                  {(p) => <Input {...p} inputMode="decimal" value={t.price} onChange={(ev) => setT(i, { price: ev.target.value })} />}
+                </Field>
+                <Field label="Max">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
+              </div>
+              {nDays > 1 && (
+                <fieldset>
+                  <legend className="mb-1 text-sm font-semibold">Valid on <span className="font-normal text-muted">(none ticked = every day)</span></legend>
+                  <div className="flex flex-wrap gap-x-5">
+                    {Array.from({ length: nDays }, (_, d) => d + 1).map((d) => (
+                      <Checkbox key={d} checked={t.days.includes(d)} onChange={(on) => setT(i, { days: on ? [...t.days, d] : t.days.filter((x) => x !== d) })}>
+                        {dayLabel({ starts_at: fromLocalIst(f.starts_at) }, d)}
+                      </Checkbox>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <TicketDiscountEditor t={t} onChange={(patch) => setT(i, patch)} />
+              <Field label="Description" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
+              <div className="flex justify-end">
+                <button type="button" aria-label="Remove optional extra" className="grid size-11 place-items-center rounded-full text-muted hover:bg-danger-soft hover:text-danger" onClick={() => setT(i, { _delete: true })}>
+                  <Trash2 className="size-4" />
+                </button>
               </div>
             </Card>
           ),

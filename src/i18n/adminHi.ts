@@ -1317,4 +1317,12 @@ export const ADMIN_HI: Record<string, string> = {
   "Cleaned up old stories": "पुरानी स्टोरी साफ़ कीं",
   "Hid a story": "स्टोरी छिपाई",
   "Restored a story": "स्टोरी वापस दिखाई",
+  "Name of the extra": "अतिरिक्त का नाम",
+  "Outdoor tour": "आउटडोर भ्रमण",
+  "Extra price per person (₹)": "प्रति व्यक्ति अतिरिक्त शुल्क (₹)",
+  "Max": "अधिकतम",
+  "Add optional extra": "वैकल्पिक अतिरिक्त जोड़ें",
+  "Optional extras": "वैकल्पिक अतिरिक्त",
+  "Remove optional extra": "वैकल्पिक अतिरिक्त हटाएँ",
+  "Every optional extra needs a name.": "हर वैकल्पिक अतिरिक्त का नाम ज़रूरी है।",
 }
