@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Outlet, useLocation, useMatch, useNavigate } from 'react-router'
-import { useMyProfile } from '../../features/auth/AuthProvider'
+import { useAuth, useMyProfile } from '../../features/auth/AuthProvider'
 import { useAutoPhoto } from '../../features/profile/useAutoPhoto'
 import { useInboxLive, useUnreadChats } from '../../features/chat/queries'
 import { BottomTabs } from '../../features/shell/BottomTabs'
@@ -34,6 +34,7 @@ function readCollapsed() {
 export function AppShell() {
   useAutoPhoto()
   const { data: profile } = useMyProfile()
+  const { session, loading: authLoading } = useAuth()
   const unread = useUnreadChats()
   const unreadNotifs = useUnreadNotificationCount()
   const navigate = useNavigate()
@@ -104,7 +105,7 @@ export function AppShell() {
         </Suspense>
       </main>
 
-      {!focused && <BottomTabs unread={unread} createOpen={createOpen} onCreate={() => (profile ? setCreateOpen(true) : navigate('/signin'))} />}
+      {!focused && <BottomTabs unread={unread} createOpen={createOpen} onCreate={() => (session || authLoading ? setCreateOpen(true) : navigate('/signin'))} />}
       <MenuSheet open={menuOpen} onClose={closeMenu} />
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
       <Suspense fallback={null}>
