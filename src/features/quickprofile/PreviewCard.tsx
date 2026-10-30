@@ -96,7 +96,7 @@ export function PreviewCard({
                 <span className="truncate">{v}</span>
                 <button
                   type="button"
-                  className="grid size-9 shrink-0 place-items-center rounded-full hover:bg-border"
+                  className="-my-1 grid size-11 shrink-0 place-items-center rounded-full hover:bg-border"
                   aria-label={tx('qp.remove', { value: v })}
                   onClick={() => onChange({ ...preview, lists: preview.lists.map((x, j) => (j === i ? { ...x, values: x.values.filter((y) => y !== v) } : x)) })}
                 >

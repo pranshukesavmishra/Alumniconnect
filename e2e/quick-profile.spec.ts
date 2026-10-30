@@ -255,3 +255,28 @@ test('Fill from LinkedIn (provider mocked): consent, e-mail miss, profile link, 
   expect(sql(`select linkedin_url || '|' || current_company from profiles where id = '${uid}'`)).toBe('https://www.linkedin.com/in/linked-person|L&T')
   expect(sql(`select count(*) from educations where profile_id = '${uid}' and source = 'ai'`)).toBe('1')
 })
+
+test('360px wide, light and dark: no sideways scrolling on either step or the preview', async ({ browser }) => {
+  for (const scheme of ['light', 'dark'] as const) {
+    const ctx = await browser.newContext({ viewport: { width: 360, height: 740 }, colorScheme: scheme })
+    const page = await ctx.newPage()
+    await mockAi(page, { status: 200, body: { profile: AI_PROFILE } })
+    const noOverflow = async (where: string) =>
+      expect(await page.evaluate(() => document.documentElement.scrollWidth), where).toBeLessThanOrEqual(360)
+    await page.goto('/signin')
+    await signInWithEmail(page, `qp.narrow.${scheme}.${run}@example.com`)
+    await expect(page.getByRole('heading', { name: 'Welcome to JEC Alumni Connect' })).toBeVisible()
+    await noOverflow('step 1')
+    await fillStep1(page, `Narrow ${run}`)
+    await expect(page.getByRole('heading', { name: 'What do you do?' })).toBeVisible()
+    await noOverflow('step 2')
+    await page.getByLabel(/Tell us about yourself/).fill('Senior manager at L&T in Pune')
+    await page.getByRole('button', { name: 'Fill my profile' }).click()
+    await expect(page.getByTestId('qp-preview')).toBeVisible()
+    await noOverflow('preview')
+    // every button in the preview is at least 44px tall
+    const small = await page.getByTestId('qp-preview').locator('button').evaluateAll((els) => els.filter((e) => e.getBoundingClientRect().height < 44).length)
+    expect(small).toBe(0)
+    await ctx.close()
+  }
+})
