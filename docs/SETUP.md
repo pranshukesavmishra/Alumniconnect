@@ -224,7 +224,59 @@ Busy alumni fill their profile in one or two taps. Everything below is optional:
 (two short steps, then Home) and members fill details by hand. Database changes: migrations `20261021000100_quick_profile`
 and `20261021000101_linkedin_enrich` (`npx supabase db push`).
 
-### Magic fill (Claude)
+### Paste your profile (free, no setup)
+
+The first option on the welcome screen (step 2), on `/me/import` and on `/me/magic`. The member opens their own LinkedIn
+profile, selects all, copies, and pastes the text into one box (up to 20,000 characters; a "Paste from clipboard" button
+helps on phones). **"Read my profile"** reads it ON THE DEVICE (`src/features/quickprofile/pasteParser.ts`, no AI, no
+cost, nothing sent anywhere) and shows the usual preview: a tick per field, inline edit, one Save. It understands the
+text of the desktop page, mobile web, the app's share page and LinkedIn's "Save to PDF" (English headings). Save-to-PDF
+and the data export stay under "Other ways to import".
+
+What it cannot read: profiles copied in a language other than English (LinkedIn translates the headings), jobs with no
+dates, a headline that wraps over two lines in the PDF, and a company with several roles whose first role has no
+location line while the next company is a one-word name (the parser then guesses). The preview always lets the member
+untick or edit. The college is recognised under both names (Jabalpur Engineering College / JEC and Government (Govt.)
+Engineering College Jabalpur / GEC, with abbreviations and typos); a university name alone (RDVV, Jabalpur University)
+is NOT treated as the college. When the college entry is saved, admins get a one-tap hint in the verification queue:
+"Education shows Govt. Engg. College, Jabalpur, 1985-1990 / Batch 1990" (migration `20261023000120_paste_hints`; it never
+verifies anyone by itself).
+
+### Free AI boost (optional): Google Gemini free tier
+
+Off unless configured. When on, "Read my profile" sends the pasted text to the `profile-ai-fill` function first (better
+with odd layouts, and it can read other languages) and falls back silently to the on-device reading on ANY failure or
+limit. A new "Suggest my profile" button (no typing or pasting) also appears.
+
+1. Get a free key at https://aistudio.google.com (Get API key). No card needed.
+2. Supabase secrets (never in the repo): `npx supabase@2.120.0 secrets set AI_PROVIDER=gemini GEMINI_API_KEY="..."`
+   Optional: `AI_MODEL` (default `gemini-2.5-flash`), `AI_DAILY_CAP` (default 500 calls a day for everyone).
+3. Deploy: `npx supabase@2.120.0 functions deploy profile-ai-fill`. The app asks the function whether AI is on (a cheap
+   `{"status": true}` call that spends no quota, cached 10 minutes); no rebuild is needed to switch AI on or off.
+   `AI_PROVIDER` unset or `anthropic` keeps the Claude behaviour described below, unchanged.
+
+**Run one real call to confirm.** The Gemini adapter (`supabase/functions/profile-ai-fill/gemini.ts`, `suggest.ts`) was
+written from Google's documented REST shape (`POST .../v1beta/models/{model}:generateContent`, header `x-goog-api-key`,
+`responseMimeType` + `responseSchema`, and `tools: [{google_search: {}}]` for suggestions) and tested only with a mocked
+`fetch`; Google's docs could not be read while building it. After deploying, sign in, open `/me/magic`, paste a profile and
+press "Read my profile" with the browser network tab open: a request to `profile-ai-fill` should answer 200 with a
+`profile`. Then press "Suggest my profile" once. If either answers 503 `ai_unavailable`, check the function log (it
+prints only counts and error codes): usually a wrong key or model name. If the free tier is exhausted the app quietly
+uses the on-device reading (`ai_busy`).
+
+"Suggest my profile" is only for the signed-in member's own name (taken from their profile on the server, never from the
+request). Two Gemini calls: a Google Search grounded one that must answer only from pages it found (or say UNKNOWN), then
+the usual JSON reading. It shows the suggestion with up to 3 source names and never saves by itself ("Yes, this is me"
+opens the normal preview; "Not me" is remembered on that device). Limit: 3 a day per member (`ai_suggest_take`, also
+counted in the daily cap). Privacy: raw text and search answers are never stored or logged; only counts are.
+
+### Invite your batch
+
+Home (a small card) and the batch group page show "Invite your batch": a WhatsApp / Share message "Batch {year} JECians
+- we are joining JEC Alumni Connect for the Grand Reunion 26-27 Dec 2026. Join: {app}/?batch={year}". The link's `batch`
+prefills the batch field on the new member's welcome page. No registration counts are collected or shown.
+
+### Magic fill (Claude, paid key)
 
 One box on the welcome screen, in Edit profile ("Magic fill" button) and on Home: the member types, pastes their
 LinkedIn profile text or speaks (the phone's own speech recognition, Indian English or Hindi). The `profile-ai-fill`
@@ -240,7 +292,7 @@ when Magic fill is off.
    - `AI_DAILY_CAP` = optional, default `500`: Magic fill calls per day for everyone together.
 3. Deploy: `npx supabase functions deploy profile-ai-fill`
 
-Limits built in: 12,000 characters per call; 10 calls per member per day (60 for admins); the daily cap above. The
+Limits built in: 20,000 characters per call; 10 calls per member per day (60 for admins); the daily cap above. The
 member's text is sent to Claude once and never stored; only call and character counts are kept (`ai_fill_usage`).
 
 **Cost per 1,000 profiles** (typical: ~1,500 input and ~1,000 output tokens a call; a pasted LinkedIn profile ~4,000 / 1,500):

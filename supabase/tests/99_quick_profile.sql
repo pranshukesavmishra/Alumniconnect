@@ -289,12 +289,14 @@ set local role authenticated;
 do $$ begin
   perform public.submit_my_education_hint('Govt. Engg. College, Jabalpur', 'B.E.', 'Mechanical', 1989, null, 'paste');
   perform public.submit_my_education_hint('Govt. Engg. College, Jabalpur', 'B.E.', 'Mechanical', 1989, 1993, 'paste');
-  assert (select count(*) from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1, 'one open paste hint';
-  assert (select end_year from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1993, 'latest wins';
-  assert (select verification from public.profiles where id = '99a00000-0000-0000-0000-00000000000c') = 'pending', 'a hint never verifies';
   begin perform public.submit_my_education_hint('X', null, null, null, null, 'linkedin_enrich'); assert false, 'members cannot forge the enrich source'; exception when raise_exception then null; end;
 end $$;
 reset role;
+do $$ begin
+  assert (select count(*) from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1, 'one open paste hint';
+  assert (select end_year from public.verification_hints where user_id = '99a00000-0000-0000-0000-00000000000c' and source = 'paste') = 1993, 'latest wins';
+  assert (select verification from public.profiles where id = '99a00000-0000-0000-0000-00000000000c') = 'pending', 'a hint never verifies';
+end $$;
 select pg_temp.login('99a00000-0000-0000-0000-00000000000d');
 set local role authenticated;
 do $$ begin

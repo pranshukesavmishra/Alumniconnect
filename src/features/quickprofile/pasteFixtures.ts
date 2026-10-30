@@ -647,7 +647,7 @@ export const JUNK: string[] = [
   'Experience\n2020 - 2021\n2019 - 2020\n',
   'Education\n2012 - 2016\n',
   '\u0000\u0001﻿',
-  '😀'.repeat(500),
+  String.fromCodePoint(0x1f600).repeat(500),
   'x'.repeat(100_000),
   `Experience\n${'Jan 2020 - Present\n'.repeat(500)}`,
   `${'a, b, c, d, e\n'.repeat(3000)}`,
