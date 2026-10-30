@@ -5,6 +5,7 @@ import { storiesEn } from './storiesEn'
 import { designEn } from './designEn'
 import { wowEn } from './wowEn'
 import { peopleUiEn } from './peopleUiEn'
+import { landingEn } from './landingEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1321,4 +1322,5 @@ export const en = {
   ...designEn,
   ...wowEn,
   ...peopleUiEn,
+  ...landingEn,
 } as const satisfies Record<string, string>

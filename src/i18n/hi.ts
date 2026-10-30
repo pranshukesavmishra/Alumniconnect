@@ -7,6 +7,7 @@ import { storiesHi } from './storiesHi'
 import { designHi } from './designHi'
 import { wowHi } from './wowHi'
 import { peopleUiHi } from './peopleUiHi'
+import { landingHi } from './landingHi'
 
 export const hi = {
   // registration form
@@ -1340,4 +1341,5 @@ export const hi = {
   ...designHi,
   ...wowHi,
   ...peopleUiHi,
+  ...landingHi,
 } as const satisfies Record<keyof typeof en, string>

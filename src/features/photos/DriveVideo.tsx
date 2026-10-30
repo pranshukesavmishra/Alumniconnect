@@ -44,13 +44,15 @@ export interface DriveVideoProps {
   onEnded?: () => void
   onClick?: () => void
   testId?: string
+  /** called instead of showing the "could not be played" box (e.g. to fall back to the poster) */
+  onFailed?: () => void
 }
 
 /**
  * A plain native <video> (controls, playsInline, preload=metadata) that streams from the drive-media function. The browser asks for byte
  * ranges, so seeking works. If the address stops working (an expired token) it fetches a fresh one once and carries on where it was.
  */
-export function DriveVideo({ kind, id, poster, className, controls = true, autoPlay, muted, loop, preload = 'metadata', label, videoRef, onPlaying, onEnded, onClick, testId }: DriveVideoProps) {
+export function DriveVideo({ kind, id, poster, className, controls = true, autoPlay, muted, loop, preload = 'metadata', label, videoRef, onPlaying, onEnded, onClick, testId, onFailed }: DriveVideoProps) {
   const tx = useT()
   const needsToken = kind !== 'glimpse'
   const { token, ready, refresh } = useMediaToken(needsToken)
@@ -75,7 +77,8 @@ export function DriveVideo({ kind, id, poster, className, controls = true, autoP
       retried.current = true
       if (await refresh()) return
     }
-    setFailed(true)
+    if (onFailed) onFailed()
+    else setFailed(true)
   }
 
   if (failed) {
