@@ -23,6 +23,8 @@ import { profileCompleteness } from '../home/HomePage'
 import { isOurAvatar, useImportProviderPhoto, useMyPrivate, useUpdateProfile } from '../profile/queries'
 import { LinkedInFill } from '../quickprofile/LinkedInFill'
 import { MagicFill } from '../quickprofile/MagicFill'
+import { clearInvitedBatch, invitedBatch } from '../quickprofile/batchInvite'
+import { PasteProfile } from '../quickprofile/PasteProfile'
 import { PrefillClaimCard } from '../quickprofile/PrefillClaimCard'
 import { usePrefillMatch } from '../quickprofile/queries'
 
@@ -92,7 +94,10 @@ export function WelcomePage() {
 
   useEffect(() => {
     if (profile && priv && !loaded) {
-      setForm(fromProfile(profile, priv))
+      const base = fromProfile(profile, priv)
+      // arrived through a batch invite link (?batch=1993): prefill the batch when it is still empty
+      const invited = invitedBatch()
+      setForm(!base.grad_year && invited && !profile.onboarded ? { ...base, grad_year: String(invited) } : base)
       arrivedOnboarded.current = profile.onboarded
       setLoaded(true)
     }
@@ -163,6 +168,7 @@ export function WelcomePage() {
     } catch {
       return // error shown below the form
     }
+    clearInvitedBatch()
     if (editing) return navigate(next, { replace: true })
     setStep(2)
     window.scrollTo({ top: 0 })
@@ -196,6 +202,7 @@ export function WelcomePage() {
           <p className="mt-1 text-muted">{tx('qp.step2Intro')}</p>
         </div>
         {match && <PrefillClaimCard match={match} phone={phoneE164} name={form.full_name} onClaimed={() => setStep('done')} />}
+        <PasteProfile onSaved={() => setStep('done')} autoFocus />
         <LinkedInFill onSaved={() => setStep('done')} />
         <MagicFill onSaved={() => setStep('done')} />
         <Button size="lg" variant="ghost" block onClick={() => setStep('done')}>

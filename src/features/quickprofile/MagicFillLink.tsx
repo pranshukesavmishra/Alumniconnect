@@ -1,15 +1,11 @@
-// The single "Magic fill" entry button used on Home (profile strength) and in Edit profile.
+// The single "Fill my profile" entry button (paste works with no AI, so it always shows) used on Home (profile strength) and in Edit profile.
 import { Sparkles } from 'lucide-react'
 import { Link } from 'react-router'
 import { cn } from '../../lib/cn'
 import { useT } from '../../i18n'
-import { useEnrichAvailable } from './enrichQueries'
-import { MAGIC_FILL_ON } from './queries'
 
 export function MagicFillLink({ next = '/', className }: { next?: string; className?: string }) {
   const tx = useT()
-  const linkedin = useEnrichAvailable().data
-  if (!MAGIC_FILL_ON && !linkedin) return null
   return (
     <Link
       to={`/me/magic?next=${encodeURIComponent(next)}`}

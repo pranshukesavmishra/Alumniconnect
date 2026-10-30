@@ -169,5 +169,60 @@ export function useAdminPrefillDelete() {
   })
 }
 
-/** Magic fill (type or speak one sentence) needs a paid AI key. It stays hidden unless the site is built with VITE_MAGIC_FILL=on. */
+/**
+ * Force-on switch for tests (VITE_MAGIC_FILL=on). In production the AI features show only when the profile-ai-fill function
+ * says it is configured (useAiStatus), so no rebuild is needed to switch them on.
+ */
 export const MAGIC_FILL_ON = import.meta.env.VITE_MAGIC_FILL === 'on'
+
+export interface AiStatus {
+  available: boolean
+  provider: 'anthropic' | 'gemini' | 'none'
+  /** "Suggest my profile" (Gemini with search) */
+  suggest: boolean
+  /** the function answered with an explicit yes/no (not a test double that ignores the question) */
+  explicit: boolean
+}
+
+/** Is an AI provider configured? A cheap check on the function (no quota, nothing sent), cached 10 minutes. Off or failing: unavailable. */
+export function useAiStatus() {
+  const uid = useUserId()
+  return useQuery({
+    queryKey: ['ai-status', uid],
+    enabled: !!uid,
+    staleTime: 10 * 60_000,
+    gcTime: 30 * 60_000,
+    retry: false,
+    queryFn: async (): Promise<AiStatus> => {
+      const { data, error } = await supabase.functions.invoke('profile-ai-fill', { body: { status: true } })
+      if (error) return { available: false, provider: 'none', suggest: false, explicit: false }
+      const d = data as { available?: boolean; provider?: string; suggest?: boolean } | null
+      return { available: !!d?.available, provider: d?.provider === 'gemini' ? 'gemini' : d?.available ? 'anthropic' : 'none', suggest: !!d?.suggest, explicit: typeof d?.available === 'boolean' }
+    },
+  })
+}
+
+/** AI features (type-one-sentence box, AI reading of pasted text): on when configured, or forced on for tests. */
+export function useAiAvailable(): { available: boolean; provider: AiStatus['provider']; suggest: boolean } {
+  const { data } = useAiStatus()
+  // VITE_MAGIC_FILL=on forces the AI features on (tests), unless the function itself says it is off
+  if (MAGIC_FILL_ON && !(data?.explicit && !data.available)) return { available: true, provider: data?.provider ?? 'anthropic', suggest: data?.suggest ?? false }
+  return { available: !!data?.available, provider: data?.provider ?? 'none', suggest: !!data?.suggest }
+}
+
+export interface SuggestReply {
+  found: boolean
+  profile: AiProfile | null
+  sources: { title: string }[]
+}
+
+/** "Suggest my profile": the server searches public pages for the signed-in member's own name. Throws AiFillError. */
+export async function aiSuggest(): Promise<SuggestReply> {
+  const { data, error } = await supabase.functions.invoke('profile-ai-fill', { body: { suggest: true } })
+  if (error) {
+    const body = (await (error as { context?: Response }).context?.json?.().catch(() => null)) as { error?: AiFillErrorCode; message?: string } | null
+    throw new AiFillError(body?.error ?? 'failed', body?.message ?? '')
+  }
+  const d = data as Partial<SuggestReply> | null
+  return { found: !!d?.found && !!d.profile, profile: d?.profile ?? null, sources: (d?.sources ?? []).slice(0, 3) }
+}

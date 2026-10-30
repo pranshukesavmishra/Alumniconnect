@@ -1,3 +1,4 @@
+import { InviteBatch } from '../quickprofile/InviteBatch'
 import { useQuery } from '@tanstack/react-query'
 import { BadgeCheck, Check, ChevronLeft, ChevronRight, Megaphone, MessagesSquare, Plus, ShieldAlert, Users } from 'lucide-react'
 import { useState } from 'react'
@@ -317,6 +318,7 @@ export function GroupPage() {
       </div>
       <Page className="space-y-4 pt-4">
         {g.description && <p className="text-body-lg text-muted">{g.description}</p>}
+        {g.joined && g.grad_year && (g.kind === 'year' || g.kind === 'batch') && <InviteBatch year={g.grad_year} />}
         {canRead && <GroupChatLink groupId={g.id} channel={g.kind === 'channel' || g.post_mode === 'staff_only'} />}
         {canPost && <Composer fixedGroup={g} />}
         {canRead ? (

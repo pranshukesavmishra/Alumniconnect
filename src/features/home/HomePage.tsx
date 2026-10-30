@@ -33,6 +33,7 @@ import { HighlightsStrip, StoryRow } from '../stories/StoryRow'
 import { useMyBatchmatesSummary } from '../yearbook/api'
 import { dayPart, istHour, type DayPart } from './homeLogic'
 import { HomeNudge } from '../quickprofile/HomeNudge'
+import { InviteBatch } from '../quickprofile/InviteBatch'
 import { MagicFillLink } from '../quickprofile/MagicFillLink'
 import { ActivityChips, AnniversaryBanner, BadgesTile, BatchTile, FameTile, GiveTile, NextUpTile, QuickActionsTile, WorldTile } from './HomeTiles'
 
@@ -98,6 +99,7 @@ export function HomePage() {
       )}
 
       <HomeNudge profile={profile} />
+      {profile.grad_year && <InviteBatch year={profile.grad_year} />}
       <ActivityChips h={h.data} />
       <AnniversaryBanner h={h.data} />
 
