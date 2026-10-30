@@ -65,6 +65,10 @@ test('email code sign-in from a protected page, onboarding validation, next redi
   await expect(page.getByText(/Numbers in India have 10 digits/)).toBeVisible()
   await page.getByLabel('Mobile number').fill('+91 99887 76655')
   await page.getByRole('button', { name: 'Continue' }).click()
+  // step 2 ("What do you do?") is optional: the details are already saved
+  await expect(page.getByRole('heading', { name: 'What do you do?' })).toBeVisible()
+  expect(sql(`select onboarded from profiles where id = (select id from auth.users where email = '${mail}')`)).toBe('t')
+  await page.getByRole('button', { name: 'Skip for now' }).click()
 
   // lands on the original destination (pending members see the directory gate)
   await expect(page).toHaveURL(/\/people\?q=abc$/)
