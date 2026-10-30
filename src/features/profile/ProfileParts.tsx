@@ -125,6 +125,35 @@ export function ProfileCover({ year, branch, className, children }: { year?: num
   )
 }
 
+const KIND_BG: Record<string, string> = {
+  official: 'radial-gradient(70% 90% at 15% 0%, rgb(209 106 119 / 0.75), transparent 70%), radial-gradient(50% 70% at 95% 10%, rgb(228 173 69 / 0.45), transparent 70%), linear-gradient(150deg, #8b1e2d 0%, #4d0f19 60%, #2a070d 100%)',
+  department: 'radial-gradient(70% 90% at 10% 0%, rgb(79 209 197 / 0.6), transparent 70%), radial-gradient(50% 70% at 95% 20%, rgb(228 173 69 / 0.35), transparent 70%), linear-gradient(150deg, #12635e 0%, #0b3b38 60%, #062220 100%)',
+  year: 'radial-gradient(70% 90% at 10% 0%, rgb(63 174 133 / 0.8), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(228 173 69 / 0.5), transparent 70%), linear-gradient(150deg, #0b6b4f 0%, #084434 60%, #04261c 100%)',
+  batch: 'radial-gradient(70% 90% at 10% 0%, rgb(63 174 133 / 0.7), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(79 111 181 / 0.5), transparent 70%), linear-gradient(150deg, #0b5a4a 0%, #0a3a3a 60%, #05201f 100%)',
+  channel: 'radial-gradient(70% 90% at 10% 0%, rgb(124 155 224 / 0.7), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(79 209 161 / 0.4), transparent 70%), linear-gradient(150deg, #2e3b72 0%, #1b2450 60%, #0e1430 100%)',
+}
+const CIRCLE_BG = [
+  'radial-gradient(70% 90% at 10% 0%, rgb(177 138 212 / 0.75), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(228 173 69 / 0.45), transparent 70%), linear-gradient(150deg, #5b3479 0%, #34184a 60%, #1c0c29 100%)',
+  'radial-gradient(70% 90% at 10% 0%, rgb(246 207 110 / 0.75), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(209 106 119 / 0.45), transparent 70%), linear-gradient(150deg, #a8661b 0%, #6b3a10 60%, #3a1e06 100%)',
+  'radial-gradient(70% 90% at 10% 0%, rgb(79 209 197 / 0.7), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(177 138 212 / 0.45), transparent 70%), linear-gradient(150deg, #12635e 0%, #0d3f4a 60%, #071f26 100%)',
+  'radial-gradient(70% 90% at 10% 0%, rgb(240 114 127 / 0.65), transparent 70%), radial-gradient(50% 70% at 95% 15%, rgb(246 207 110 / 0.45), transparent 70%), linear-gradient(150deg, #8a3a2a 0%, #5a1f1a 60%, #2d0d0b 100%)',
+]
+const KIND_MOTIF: Record<string, Motif> = { official: 'arches', department: 'gears', year: 'waves', batch: 'circuit', channel: 'waves' }
+const MOTIFS: Motif[] = ['circuit', 'arches', 'waves', 'gears']
+
+/** Cover art for a group: a gradient by kind (maroon for official, teal departments, emerald batches, ink channels; circles seeded). */
+export function GroupCover({ kind, seed, className, children }: { kind: string; seed: string; className?: string; children?: ReactNode }) {
+  const h = nameHash(seed)
+  const bg = KIND_BG[kind] ?? CIRCLE_BG[h % CIRCLE_BG.length]!
+  return (
+    <div className={cn('relative isolate overflow-hidden text-white', className)} style={{ backgroundImage: bg }}>
+      <MotifSvg motif={KIND_MOTIF[kind] ?? MOTIFS[h % 4]!} seed={h} />
+      <div aria-hidden className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgb(0_0_0/0.45))]" />
+      {children && <div className="relative h-full">{children}</div>}
+    </div>
+  )
+}
+
 // ------------------------------------------------------------------ logos
 
 /** A company / school "logo": initials on a rich deterministic gradient with an inner highlight. */
