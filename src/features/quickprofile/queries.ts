@@ -8,8 +8,10 @@ export type AiFillErrorCode =
   | 'ai_not_configured' | 'limit' | 'empty' | 'too_long' | 'ai_busy' | 'ai_unavailable' | 'ai_failed' | 'refusal' | 'truncated' | 'bad_output' | 'unauthorized' | 'failed'
 
 export class AiFillError extends Error {
-  constructor(public code: AiFillErrorCode, message: string) {
+  code: AiFillErrorCode
+  constructor(code: AiFillErrorCode, message: string) {
     super(message)
+    this.code = code
   }
 }
 
