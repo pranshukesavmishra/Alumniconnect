@@ -1,6 +1,6 @@
 // "I'm attending" story card (1080 × 1920), drawn on a canvas in the browser: aurora, crest, the member's name and
 // batch, the dates, and a QR code to the Meet page. Shared as a file where the phone supports it, else downloaded.
-import QRCode from 'qrcode'
+import { qrDataUrl } from '../../components/ui/QrCode'
 
 export const CARD_W = 1080
 export const CARD_H = 1920
@@ -198,7 +198,7 @@ export async function renderShareCard(t: ShareCardText): Promise<Blob> {
   ctx.fillStyle = '#ffffff'
   roundRect(ctx, qx, qy, qrSize + 64, qrSize + 64, 40)
   ctx.fill()
-  const qrUrl = await QRCode.toDataURL(t.url, { margin: 0, width: qrSize, errorCorrectionLevel: 'M', color: { dark: '#062a20', light: '#ffffff' } })
+  const qrUrl = await qrDataUrl(t.url, qrSize)
   const qr = await loadImage(qrUrl)
   if (qr) ctx.drawImage(qr, qx + 32, qy + 32, qrSize, qrSize)
   ctx.fillStyle = 'rgba(207,230,219,0.9)'

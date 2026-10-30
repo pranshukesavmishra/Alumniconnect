@@ -2,6 +2,12 @@ import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 import { Skeleton } from './Display'
 
+/** PNG data URL of a QR code (for canvases, e.g. share cards). Kept here so the QR library ships in one chunk. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function qrDataUrl(value: string, width: number): Promise<string> {
+  return QRCode.toDataURL(value, { margin: 0, width, errorCorrectionLevel: 'M', color: { dark: '#062a20', light: '#ffffff' } })
+}
+
 /** Renders a QR code as inline SVG (crisp at any size, works offline). */
 export function QrCode({ value, size = 220, label }: { value: string; size?: number; label: string }) {
   const [svg, setSvg] = useState<string | null>(null)
