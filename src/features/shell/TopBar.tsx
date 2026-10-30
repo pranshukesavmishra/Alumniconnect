@@ -27,12 +27,12 @@ export function Wordmark({ compact, className }: { compact?: boolean; className?
   return (
     <span className={cn('flex min-w-0 items-center gap-2.5', className)}>
       <span className="relative grid size-8 shrink-0 place-items-center">
-        <span aria-hidden className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgb(228_173_69/0.35),transparent_70%)] blur-[2px]" />
-        <img src="/jec-logo.png" alt="" className="relative h-8 w-auto drop-shadow-[0_2px_4px_rgb(0_0_0/0.18)]" />
+        <span aria-hidden className="absolute -inset-1 rounded-full bg-[radial-gradient(circle,rgb(228_173_69/0.32),transparent_70%)] blur-[3px]" />
+        <img src="/jec-logo.png" alt="" className="relative h-7 w-auto drop-shadow-[0_2px_4px_rgb(0_0_0/0.18)]" />
       </span>
       {!compact && (
-        <span className="min-w-0 truncate font-display text-[18px] font-semibold leading-none tracking-[-0.02em] text-text">
-          JEC Alumni<span className="hidden min-[380px]:inline"> Connect</span>
+        <span className="min-w-0 truncate font-display text-[17px] font-semibold leading-none tracking-[-0.025em] text-text">
+          JEC Alumni<span className="hidden min-[375px]:inline"> Connect</span>
         </span>
       )}
     </span>
@@ -76,11 +76,11 @@ export function TopBar({
       )}
     >
       <div className="fx-liquid shell-bar-top pt-safe">
-        <div className="mx-auto flex h-12 max-w-3xl items-center gap-0.5 px-1.5">
+        <div className="mx-auto flex h-12 max-w-3xl items-center px-1">
           <button ref={menuRef} type="button" onClick={onMenu} aria-haspopup="dialog" aria-expanded={menuOpen} aria-label={tx('menu.title')} className={iconBtn}>
             <Menu className="size-[22px]" strokeWidth={2} aria-hidden />
           </button>
-          <Link to="/" className="flex min-h-11 min-w-0 flex-1 items-center pl-0.5 pr-1" aria-label={tx('shell.homeLink')}>
+          <Link to="/" className="flex min-h-11 min-w-0 flex-1 items-center pr-1" aria-label={tx('shell.homeLink')}>
             <Wordmark />
           </Link>
           {profile && (
@@ -100,7 +100,7 @@ export function TopBar({
                 <CountBubble n={unread} className="right-1 top-1" />
               </button>
               <Link to="/me" aria-label={tx('shell.myProfile')} className="fx-press grid size-11 shrink-0 place-items-center rounded-full">
-                <Avatar src={profile.avatar_url} name={profile.full_name || '?'} size={32} ring={profile.verification === 'verified' ? 'verified' : 'none'} />
+                <Avatar src={profile.avatar_url} name={profile.full_name || '?'} size={30} ring={profile.verification === 'verified' ? 'verified' : 'none'} />
               </Link>
             </>
           )}

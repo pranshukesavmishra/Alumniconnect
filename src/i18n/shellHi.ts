@@ -11,6 +11,7 @@ export const shellHi = {
 
   'shell.viewProfile': 'प्रोफ़ाइल देखें',
   'shell.idCard': 'डिजिटल ID कार्ड',
+  'shell.idCardShort': 'ID कार्ड',
   'shell.strength': 'प्रोफ़ाइल {n}% पूरी',
   'shell.strengthShort': 'प्रोफ़ाइल पूरी',
   'shell.visitor.eyebrow': 'जबलपुर इंजीनियरिंग कॉलेज',
@@ -40,7 +41,7 @@ export const shellHi = {
   'shell.c.chatHint': 'किसी JECian को खोजें और संदेश भेजें',
 
   'shell.search.open': 'खोजें',
-  'shell.search.hint': 'लोग, ग्रुप, नौकरियाँ खोजें',
+  'shell.search.hint': 'JEC में खोजें',
   'shell.search.title': 'खोजें',
   'shell.search.label': 'JEC Alumni Connect में खोजें',
   'shell.search.placeholder': 'लोग, ग्रुप, नौकरियाँ, इवेंट, पेज',

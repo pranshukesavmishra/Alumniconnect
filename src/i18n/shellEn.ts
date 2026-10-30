@@ -11,6 +11,7 @@ export const shellEn = {
   // drawer
   'shell.viewProfile': 'View profile',
   'shell.idCard': 'Digital ID card',
+  'shell.idCardShort': 'ID card',
   'shell.strength': 'Profile strength {n}%',
   'shell.strengthShort': 'profile strength',
   'shell.visitor.eyebrow': 'Jabalpur Engineering College',
@@ -43,7 +44,7 @@ export const shellEn = {
 
   // search
   'shell.search.open': 'Search',
-  'shell.search.hint': 'Search people, groups, jobs',
+  'shell.search.hint': 'Search JEC',
   'shell.search.title': 'Search',
   'shell.search.label': 'Search JEC Alumni Connect',
   'shell.search.placeholder': 'People, groups, jobs, events, pages',

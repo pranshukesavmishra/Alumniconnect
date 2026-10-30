@@ -91,12 +91,11 @@ function MenuList({ big, onDone, hideSignOut, openSection }: { big?: boolean; on
   const [q, setQ] = useState('')
   // one section open at a time (accordion); the one holding the current page starts open
   const [openId, setOpenId] = useState<string | null>(() => openSection ?? all.find((s) => s.id !== 'home' && s.items.some((i) => isActive(i, pathname)))?.id ?? null)
-  // landing on a page opens the section that holds it
+  // landing on a page opens the section that holds it (also once the menu finishes loading)
+  const activeSection = all.find((s) => s.id !== 'home' && s.items.some((i) => isActive(i, pathname)))?.id
   useEffect(() => {
-    const id = all.find((s) => s.id !== 'home' && s.items.some((i) => isActive(i, pathname)))?.id
-    if (id) setOpenId(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname])
+    if (activeSection) setOpenId(activeSection)
+  }, [pathname, activeSection])
   useEffect(() => {
     if (openSection) setOpenId(openSection)
   }, [openSection])
@@ -146,7 +145,7 @@ function MenuList({ big, onDone, hideSignOut, openSection }: { big?: boolean; on
           return (
             <section key={s.id} aria-labelledby={s.id === 'home' ? undefined : headId} aria-label={s.id === 'home' ? tx(s.label) : undefined} data-menu-group={s.id}>
               {s.id !== 'home' && !searching && (
-                <h2 className="font-sans">
+                <h2 className="font-sans tracking-normal">
                   <button
                     type="button"
                     id={headId}
@@ -160,7 +159,7 @@ function MenuList({ big, onDone, hideSignOut, openSection }: { big?: boolean; on
                   >
                     <IconTile icon={style.icon} tone={style.tone} variant={open ? 'solid' : 'soft'} size="sm" className={big ? '' : 'size-8 rounded-[9px]'} />
                     <span className="min-w-0 flex-1">{tx(s.label)}</span>
-                    <span className="text-caption font-semibold text-subtle tabular-nums">{s.items.length}</span>
+                    <span aria-hidden className="text-caption font-semibold text-subtle tabular-nums">{s.items.length}</span>
                     <ChevronDown className={cn('size-[18px] text-muted transition-transform duration-300 ease-[var(--ease-out)]', !open && '-rotate-90')} aria-hidden />
                   </button>
                 </h2>
@@ -215,10 +214,11 @@ function ProfileCard({ profile, onDone }: { profile: Profile; onDone: () => void
         <Link
           to="/id-card"
           onClick={onDone}
+          aria-label={tx('shell.idCard')}
           className="fx-shine fx-press flex min-h-12 items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(140deg,#f8e4b0,#e4ad45_55%,#b5741c)] px-3 text-[14px] font-semibold text-[#2b1a05] shadow-[inset_0_1px_0_rgb(255_255_255/0.6),0_10px_22px_-12px_rgb(228_173_69/0.9)]"
         >
           <IdCard className="size-[18px] shrink-0" aria-hidden />
-          <span className="min-w-0 leading-tight">{tx('shell.idCard')}</span>
+          <span className="min-w-0 leading-tight">{tx('shell.idCardShort')}</span>
         </Link>
       </div>
     </div>

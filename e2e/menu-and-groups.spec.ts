@@ -79,7 +79,7 @@ test('desktop sidebar: grouped sections, jump box, collapse, and Organise only f
   await a.ctx.close()
 })
 
-test('phone: bottom bar of four, top-left Menu, Menu sheet opens, searches, navigates, closes with Esc and Back; no sideways scroll', async ({ browser }) => {
+test('phone: bottom bar of four plus Create, top-left Menu, Menu sheet opens, searches, navigates, closes with Esc and Back; no sideways scroll', async ({ browser }) => {
   const a = await member(browser, `nav2.${run}@example.com`, `Navtwo ${run}`)
   const bar = a.page.getByRole('navigation', { name: 'Main' })
   for (const name of ['Home', 'Groups', 'Meet 2026', 'Chat']) await expect(bar.getByRole('link', { name })).toBeVisible()
@@ -87,7 +87,7 @@ test('phone: bottom bar of four, top-left Menu, Menu sheet opens, searches, navi
   await expect(menuBtn).toBeVisible()
   await expect(bar.getByRole('button', { name: 'Menu' })).toHaveCount(0)
   expect((await menuBtn.boundingBox())!.x).toBeLessThan(60)
-  await expect(bar.getByRole('listitem')).toHaveCount(4)
+  await expect(bar.getByRole('listitem')).toHaveCount(5)
 
   await menuBtn.click()
   const sheet = a.page.getByRole('dialog', { name: 'Menu' })

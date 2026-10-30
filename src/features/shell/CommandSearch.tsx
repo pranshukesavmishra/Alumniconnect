@@ -177,6 +177,7 @@ function Palette({ onClose }: { onClose: () => void }) {
           remember: true,
         })),
       })
+    if (pages.length) out.push({ id: 'pages', label: 'shell.search.pages', items: pages })
     if (grp.length) out.push({ id: 'groups', label: 'shell.search.groups', items: grp })
     if (canMembers)
       out.push({
@@ -191,7 +192,6 @@ function Palette({ onClose }: { onClose: () => void }) {
       loading: on && pending(events),
       items: (events.data ?? []).map((e) => ({ key: `e-${e.id}`, title: e.title, sub: e.when ? String(e.when) : undefined, to: e.to, lead: <IconTile icon={CalendarHeart} tone="gold" size="sm" />, remember: true })),
     })
-    if (pages.length) out.push({ id: 'pages', label: 'shell.search.pages', items: pages })
     return out.filter((g) => g.items.length || g.loading)
   }, [q, recent, menu, tx, groupsQ.data, canMembers, members, jobs, events, on, typing])
 
