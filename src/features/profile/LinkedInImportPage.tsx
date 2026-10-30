@@ -11,6 +11,9 @@ import { LinkedInIcon } from '../../components/ui/Icons'
 import { friendlyError } from '../../lib/errors'
 import { useMyProfile } from '../auth/AuthProvider'
 import { useSaveImport, type ImportedProfile } from './queries'
+import { aiToImported, pickPdfReading } from '../quickprofile/mapping'
+import { aiFill } from '../quickprofile/queries'
+import { useT } from '../../i18n'
 
 type Source = 'pdf' | 'zip'
 
@@ -19,8 +22,12 @@ async function parse(file: File, source: Source): Promise<ImportedProfile> {
     const { readLinkedInZip } = await import('../../lib/linkedin/exportZip')
     return readLinkedInZip(file)
   }
-  const { readLinkedInPdf } = await import('../../lib/linkedin/profilePdf')
-  return readLinkedInPdf(file)
+  const { readLinkedInPdfWithText } = await import('../../lib/linkedin/profilePdf')
+  const { parsed, text } = await readLinkedInPdfWithText(file)
+  // Magic fill reads the PDF text far better than layout rules; without it (not configured, limit, error) the
+  // on-device parser's result is used as before.
+  const ai = await aiFill(text.slice(0, 12_000)).then(aiToImported).catch(() => null)
+  return pickPdfReading(parsed, ai)
 }
 
 function Picker({ source, onPicked, busy }: { source: Source; onPicked: (f: File) => void; busy: boolean }) {
@@ -46,11 +53,12 @@ function Picker({ source, onPicked, busy }: { source: Source; onPicked: (f: File
 
 export function LinkedInImportPage() {
   const { data: profile } = useMyProfile()
+  const tx = useT()
   const save = useSaveImport()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const next = params.get('next') ? safeNext(params.get('next')) : '/me'
-  const [source, setSource] = useState<Source>('pdf')
+  const [source, setSource] = useState<Source>(params.get('source') === 'zip' ? 'zip' : 'pdf')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<ImportedProfile | null>(null)
@@ -234,6 +242,7 @@ export function LinkedInImportPage() {
               <li>Upload that PDF here. On a phone, you can upload it from Downloads, Drive or email.</li>
             </ol>
             <Picker source="pdf" onPicked={onPicked} busy={busy} />
+            <p className="text-sm text-muted">{tx('qp.pdfAiNote')}</p>
           </Card>
         ) : (
           <Card className="space-y-4 p-4">

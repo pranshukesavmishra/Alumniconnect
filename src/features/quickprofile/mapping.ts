@@ -4,6 +4,7 @@ import { BRANCHES, HELP_TAGS } from '../../lib/constants'
 import { normaliseBranch } from '../../lib/memberImport'
 import { isValidPhone, normalizePhone } from '../../lib/phone'
 import type { Profile } from '../../lib/types'
+import type { ImportedProfile } from '../profile/queries'
 
 /** The reply of the profile-ai-fill function (same shape as supabase/functions/profile-ai-fill/extract.ts). */
 export interface AiExperience {
@@ -276,4 +277,32 @@ export function phoneClaimMatches(record: { phone: string | null; full_name: str
   const a = e164OrNull(record.phone)
   const b = e164OrNull(typedPhone)
   return !!a && a === b && nameInitial(typedName) !== '' && nameInitial(record.full_name) === nameInitial(typedName)
+}
+
+// ---------------------------------------------------------------- LinkedIn PDF through Magic fill
+
+/** Magic fill's reading of a LinkedIn PDF, in the shape the LinkedIn import review screen uses. */
+export function aiToImported(ai: AiProfile): ImportedProfile {
+  const day = (y: number | null) => (y ? `${y}-01-01` : null)
+  const headline = ai.headline ?? (ai.current_title && ai.current_company ? `${ai.current_title} at ${ai.current_company}` : null)
+  return {
+    headline: headline ?? undefined,
+    about: ai.about ?? undefined,
+    city: ai.city ?? undefined,
+    skills: ai.skills.length ? ai.skills : undefined,
+    experiences: ai.experiences
+      .filter((e) => e.title.trim() && e.company.trim())
+      .map((e) => ({ title: e.title, company: e.company, location: e.location, start_date: day(e.start_year), end_date: e.is_current ? null : day(e.end_year), is_current: e.is_current, description: null, source: 'linkedin' as const })),
+    educations: ai.education
+      .filter((e) => e.school.trim())
+      .map((e) => ({ school: e.school, degree: e.degree, field: e.field, start_year: e.start_year, end_year: e.end_year, source: 'linkedin' as const })),
+  }
+}
+
+/** Prefer Magic fill's reading unless the on-device parser clearly found more jobs; keep the parser's LinkedIn link. */
+export function pickPdfReading(parsed: ImportedProfile, ai: ImportedProfile | null): ImportedProfile {
+  if (!ai) return parsed
+  if (parsed.experiences.length > ai.experiences.length + 1) return parsed
+  const skills = unionList(ai.skills ?? [], parsed.skills ?? [], 50)
+  return { ...ai, linkedin_url: parsed.linkedin_url, skills: skills.length ? skills : undefined, about: ai.about ?? parsed.about, city: ai.city ?? parsed.city }
 }
