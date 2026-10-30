@@ -26,6 +26,7 @@ const PhotosPage = lazy(() => import('./features/events/PhotosPage').then((m) =>
 const PhotoUploadPage = lazy(() => import('./features/events/PhotosPage').then((m) => ({ default: m.PhotoUploadPage })))
 const PhotoSlideshow = lazy(() => import('./features/photos/PhotoSlideshow').then((m) => ({ default: m.PhotoSlideshow })))
 const PhotoLink = lazy(() => import('./features/photos/PhotoLink').then((m) => ({ default: m.PhotoLink })))
+const GuidePage = lazy(() => import('./features/guide/GuidePage'))
 const MeetsPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetsPage })))
 const MeetDetailPage = lazy(() => import('./features/meets/MeetsPages').then((m) => ({ default: m.MeetDetailPage })))
 const AdminContent = lazy(() => import('./features/meets/admin/AdminContent').then((m) => ({ default: m.AdminContent })))
@@ -279,6 +280,7 @@ export function App() {
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="install" element={<InstallPage />} />
+            <Route path="guide" element={<GuidePage />} />
             <Route path="styleguide" element={<StyleguidePage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

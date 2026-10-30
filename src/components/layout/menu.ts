@@ -3,7 +3,7 @@
 import {
   Activity, Archive, BarChart3, Bell, BriefcaseBusiness, CalendarHeart, CalendarRange, Download, Flag, GraduationCap, Handshake, HeartHandshake, History, Home, Image, Images,
   Clapperboard, Inbox, KeyRound, Landmark, Languages, Link2, LogOut, MapPin, MessagesSquare, Network, PenLine, Search, ShieldCheck, ShieldHalf, ScrollText, Store, UserPlus, UserRound,
-  Sparkles, CirclePlay, Users, UsersRound, Globe2, IdCard, Award, BookOpen, Trophy, type LucideIcon,
+  Sparkles, CirclePlay, CircleHelp, Users, UsersRound, Globe2, IdCard, Award, BookOpen, Trophy, type LucideIcon,
 } from 'lucide-react'
 import { hasAnyPerm, type AdminAccess } from '../../lib/adminAccess'
 import type { MsgKey } from '../../i18n'
@@ -95,6 +95,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'import', group: 'me', label: 'home.importLinkedin', icon: Link2, to: '/me/import', keywords: 'linkedin pdf' },
   { id: 'language', group: 'me', label: 'menu.language', icon: Languages, to: '/me#language', keywords: 'hindi english bhasha' },
   { id: 'my-data', group: 'me', label: 'menu.downloadData', icon: Download, to: '/me#my-data', keywords: 'export privacy' },
+  { id: 'guide', group: 'me', label: 'guide.menu', icon: CircleHelp, to: '/guide', public: true, keywords: 'help tutorial video guide how to use learn start' },
   { id: 'about', group: 'me', label: 'menu.about', icon: Landmark, to: '/about', public: true, keywords: 'college gec government engineering jecaa association history' },
   { id: 'privacy', group: 'me', label: 'menu.privacy', icon: ShieldHalf, to: '/privacy', public: true },
   { id: 'terms', group: 'me', label: 'menu.terms', icon: ScrollText, to: '/terms', public: true },

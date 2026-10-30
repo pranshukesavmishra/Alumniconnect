@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { GuideCard } from '../guide/GuideCard'
 import { ArrowRight, BriefcaseBusiness, Cake, Send, Star } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
@@ -98,6 +99,7 @@ export function HomePage() {
         </div>
       )}
 
+      <GuideCard />
       <HomeNudge profile={profile} />
       {profile.grad_year && <InviteBatch year={profile.grad_year} />}
       <ActivityChips h={h.data} />

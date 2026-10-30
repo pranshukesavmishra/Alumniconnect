@@ -7,6 +7,7 @@ import { storiesHi } from './storiesHi'
 import { designHi } from './designHi'
 import { quickProfileHi } from './quickProfileHi'
 import { shellHi } from './shellHi'
+import { guideHi } from './guideHi'
 import { eventsUiHi } from './eventsUiHi'
 import { wowHi } from './wowHi'
 import { peopleUiHi } from './peopleUiHi'
@@ -1344,6 +1345,7 @@ export const hi = {
   ...designHi,
   ...quickProfileHi,
   ...shellHi,
+  ...guideHi,
   ...eventsUiHi,
   ...wowHi,
   ...peopleUiHi,

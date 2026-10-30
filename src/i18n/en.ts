@@ -9,6 +9,7 @@ import { eventsUiEn } from './eventsUiEn'
 import { wowEn } from './wowEn'
 import { peopleUiEn } from './peopleUiEn'
 import { landingEn } from './landingEn'
+import { guideEn } from './guideEn'
 export const en = {
   'reg.step1': 'Who’s coming',
   'reg.step2': 'Preferences',
@@ -1329,4 +1330,5 @@ export const en = {
   ...wowEn,
   ...peopleUiEn,
   ...landingEn,
+  ...guideEn,
 } as const satisfies Record<string, string>

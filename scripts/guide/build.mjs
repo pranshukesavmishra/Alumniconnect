@@ -33,7 +33,7 @@ const COPY = {
 
 // ------------------------------------------------------------------ timeline
 const GAP = 0.35, X = 0.4, LEAD = 0.5, TAIL = 2.2
-const PAD = { 1: 0.6, 2: 0.3, 3: 0.6, 4: 0.2, 5: 0.3, 6: 0.2, 7: 0.2, 8: 0.1 }
+const PAD = { 1: 0.6, 2: 0.8, 3: 0.6, 4: 0.2, 5: 0.3, 6: 0.2, 7: 0.2, 8: 0.1 }
 const d = Object.fromEntries(lines.map((l) => [l.i, l.dur]))
 const A = { 1: LEAD }
 for (let i = 2; i <= 9; i++) A[i] = A[i - 1] + d[i - 1] + GAP + PAD[i - 1]

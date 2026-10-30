@@ -22,8 +22,15 @@ describe('menu registry', () => {
     for (const g of MENU_GROUPS) expect(g.label in hi).toBe(true)
   })
 
+  it('offers How to use to everyone, signed in or not', () => {
+    const g = MENU.find((i) => i.id === 'guide')!
+    expect(g.to).toBe('/guide')
+    expect(isVisible(g, { ...member, signedIn: false, verified: false })).toBe(true)
+    expect(isVisible(g, member)).toBe(true)
+  })
+
   it('shows a visitor only the public entries', () => {
-    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'past-meets', 'about', 'privacy', 'terms'])
+    expect(ids({ ...member, signedIn: false, verified: false })).toEqual(['home', 'meet', 'programme', 'past-meets', 'guide', 'about', 'privacy', 'terms'])
   })
 
   it('lists Past meets under Events & memories for everyone, signed in or not, and Content only for gallery curators', () => {

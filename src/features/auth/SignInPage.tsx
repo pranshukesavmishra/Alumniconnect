@@ -221,7 +221,10 @@ export function SignInPage() {
           <li key={k} className="flex items-center gap-2"><ShieldCheck className="size-4 shrink-0 text-primary" aria-hidden /> {tx(k)}</li>
         ))}
       </ul>
-      <p className="py-6 text-center text-sm text-muted">
+      <p className="pt-4 text-center">
+        <Link to="/guide" className="inline-flex min-h-11 items-center gap-2 font-semibold text-primary underline" data-testid="signin-guide-link">{tx('guide.signinLink')}</Link>
+      </p>
+      <p className="pb-6 pt-2 text-center text-sm text-muted">
         {tx('auth.agree')} <a className="inline-flex min-h-11 items-center text-primary underline" href="/privacy">{tx('reg.privacyNotice')}</a>.
       </p>
       </div>

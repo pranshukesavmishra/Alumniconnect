@@ -5,7 +5,7 @@
 //          paste LinkedIn text, or speak). "Skip for now" is always there. A finished profile ring, then Home.
 import { toast } from 'sonner'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { Button } from '../../components/ui/Button'
 import { Avatar, Chip, Notice, PageSkeleton } from '../../components/ui/Display'
 import { ChoiceGroup, Field, Input, Select } from '../../components/ui/Form'
@@ -188,6 +188,7 @@ export function WelcomePage() {
           <p className="mt-1 text-muted" aria-live="polite">{tx('qp.doneBody', { percent: pct })}</p>
         </div>
         <Button size="lg" onClick={() => navigate(next, { replace: true })}>{tx('qp.goHome')}</Button>
+        <Link to="/guide" className="inline-flex min-h-11 items-center text-primary underline" data-testid="welcome-guide-link">{tx('guide.doneLink')}</Link>
       </div>
     )
   }
