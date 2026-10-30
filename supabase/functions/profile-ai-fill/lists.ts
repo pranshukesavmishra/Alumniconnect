@@ -24,6 +24,6 @@ export const BRANCHES = [
 
 export const HELP_TAGS = ['Referrals', 'Career guidance', 'Mock interviews', 'Higher studies', 'Startups', 'Government jobs', 'Hiring'] as const
 
-export const MAX_INPUT_CHARS = 12_000
+export const MAX_INPUT_CHARS = 20_000
 export const MAX_SKILLS = 15
 export const MAX_ABOUT = 400

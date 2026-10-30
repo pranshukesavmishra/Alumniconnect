@@ -124,10 +124,10 @@ Deno.test('not signed in: 401 and no Claude call, no quota taken', async () => {
 Deno.test('empty and too long text are refused before any cost', async () => {
   const w = world()
   eq((await call(w, { text: '   ' })).status, 400, 'empty')
-  const long = await call(w, { text: 'x'.repeat(12_001) })
+  const long = await call(w, { text: 'x'.repeat(20_001) })
   eq(long.status, 413, 'too long')
   eq((await long.json()).error, 'too_long', 'code')
-  eq((await call(w, { text: 'x'.repeat(12_000) })).status, 200, 'exactly at the limit is fine')
+  eq((await call(w, { text: 'x'.repeat(20_000) })).status, 200, 'exactly at the limit is fine')
   eq(w.calls.length, 1, 'only the valid one reached Claude')
 })
 
