@@ -1,6 +1,8 @@
-import { lazy, Suspense, useEffect, type ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router'
 import { AdminTranslator } from './i18n/AdminTranslator'
+// lazy() that also drives the shell's top progress bar while a screen's code loads
+import { lazy } from './features/shell/lazyRoute'
 import { PageSkeleton } from './components/ui/Display'
 import { RequirePerm } from './features/admin/access'
 import { useAuth, useMyProfile } from './features/auth/AuthProvider'

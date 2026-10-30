@@ -4,6 +4,8 @@ import { mediaEn } from './mediaEn'
 import { storiesEn } from './storiesEn'
 import { designEn } from './designEn'
 import { quickProfileEn } from './quickProfileEn'
+import { shellEn } from './shellEn'
+import { eventsUiEn } from './eventsUiEn'
 import { wowEn } from './wowEn'
 import { peopleUiEn } from './peopleUiEn'
 import { landingEn } from './landingEn'
@@ -1322,6 +1324,8 @@ export const en = {
   ...storiesEn,
   ...designEn,
   ...quickProfileEn,
+  ...shellEn,
+  ...eventsUiEn,
   ...wowEn,
   ...peopleUiEn,
   ...landingEn,

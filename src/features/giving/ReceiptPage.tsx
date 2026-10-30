@@ -33,7 +33,13 @@ export function ReceiptPage() {
       <Page>
         <PrintArea>
           <div data-testid="receipt">
-            <p className="text-lg font-bold">{r.assoc_name ?? 'JEC Alumni Association'}</p>
+            <div className="-m-6 mb-4 flex items-center gap-3 bg-[linear-gradient(135deg,#0b4a37,#062a20)] p-5 text-white print:bg-white print:text-black">
+              <img src="/jec-logo.png" alt="" className="size-12 rounded-xl bg-white p-1" />
+              <div className="min-w-0">
+                <p className="text-lg font-bold leading-tight">{r.assoc_name ?? 'JEC Alumni Association'}</p>
+                <p className="text-xs text-[#ecc56a] print:text-gray-600">{tx('evx.receiptVerified')}</p>
+              </div>
+            </div>
             {r.assoc_details && <p className="whitespace-pre-line text-sm text-gray-600">{r.assoc_details}</p>}
             <h1 className="mt-4 text-xl font-bold uppercase tracking-wide">{tx('give.rc.title')}</h1>
             {r.status === 'refunded' && <p className="mt-1 font-bold text-red-700">{tx('give.rc.refunded')}</p>}
@@ -45,6 +51,7 @@ export function ReceiptPage() {
             {r.tax_text && <p className="mt-4 whitespace-pre-line text-sm" data-testid="tax-text">{r.tax_text}</p>}
             {r.foreign_notice && <p className="mt-3 whitespace-pre-line text-sm text-gray-700">{r.foreign_notice}</p>}
             {r.footer && <p className="mt-4 whitespace-pre-line border-t border-gray-200 pt-3 text-sm text-gray-600">{r.footer}</p>}
+            <p className="mt-4 text-center font-serif text-base italic text-[#0b6b4f]">{tx('evx.receiptThanks')}</p>
           </div>
         </PrintArea>
       </Page>

@@ -55,6 +55,13 @@ export default defineConfig({
   build: {
     target: 'es2022',
     chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        // the QR library must be pre-cached (the entry pass shows its QR offline at the gate); a shared chunk of it
+        // would otherwise be named "browser-*.js", which the service worker skips
+        manualChunks: (id: string) => (/node_modules[\\/](qrcode|dijkstrajs|pngjs)[\\/]/.test(id) ? 'qrcode-lib' : undefined),
+      },
+    },
   },
   test: {
     environment: 'node',

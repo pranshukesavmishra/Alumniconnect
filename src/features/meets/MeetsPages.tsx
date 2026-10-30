@@ -149,7 +149,7 @@ function MeetMedia({ m }: { m: PastMeet }) {
       ) : (
         <div className="grid grid-cols-3 gap-1 sm:grid-cols-4" data-testid="meet-media-grid">
           {photos.map((p, i) => (
-            <button key={p.id} type="button" onClick={() => setOpen(i)} className="relative aspect-square overflow-hidden rounded-lg bg-surface-2" aria-label={p.caption ?? tx('photos.photoN', { n: p.id.slice(0, 4) })}>
+            <button key={p.id} type="button" onClick={() => setOpen(i)} className="relative aspect-square overflow-hidden rounded-2xl bg-surface-2 shadow-e1" aria-label={p.caption ?? tx('photos.photoN', { n: p.id.slice(0, 4) })}>
               <img src={thumbUrl(p)} alt="" loading="lazy" className="size-full object-cover" />
               {isVideo(p) && <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-0.5 text-xs font-semibold text-white"><Play className="size-3 fill-current" aria-hidden />{formatDuration(p.duration_ms)}</span>}
             </button>

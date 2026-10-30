@@ -1,21 +1,25 @@
-import { CalendarDays, Clock, History, Images, MapPin, Phone, Pin, Ticket } from 'lucide-react'
+import { CalendarDays, Clock, Pin, Phone, Ticket } from 'lucide-react'
 import { Link } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
-import { ButtonLink } from '../../components/ui/Button'
-import { SponsorStrip } from '../giving/SponsorWall'
-import { Badge, Card, EmptyState, Notice, PageSkeleton, SectionTitle } from '../../components/ui/Display'
+import { Card, SectionHeader } from '../../components/ui/Card'
+import { EmptyState, Notice, PageSkeleton } from '../../components/ui/Display'
+import { NoEventsArt } from '../../components/ui/Illustrations'
+import { Reveal } from '../../components/ui/Motion'
 import { MEET_SLUG, yearRange } from '../../lib/constants'
 import { useT } from '../../i18n'
 import { friendlyError } from '../../lib/errors'
-import { daysUntil, formatDateRange, formatDateTime, relativeTime } from '../../lib/format'
+import { formatDateTime, relativeTime } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
+import { formatPhone, telHref } from '../../lib/phone'
 import { useAuth } from '../auth/AuthProvider'
-import { clock, groupByDay, useAnnouncements, useProgramme } from './programme'
+import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
+import { SponsorStrip } from '../giving/SponsorWall'
+import { Faq, MeetHero, MemoriesTeaser, PrimaryCta, ProgrammeTimeline, StickyCta, TierCards, VenueCard, WhyCome, type FaqItem } from './MeetParts'
+import { useAnnouncements, useProgramme } from './programme'
 import { registrationOpen, useEvent, useMyRegistration, useTicketTypes } from './queries'
+import { eventDayCount } from './reunion'
 import { StatusBadge } from './StatusBadge'
 import { WaitlistCard } from './WaitlistCard'
-import { formatPhone, telHref } from '../../lib/phone'
-import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 export function MeetPage() {
   const tx = useT()
@@ -28,131 +32,84 @@ export function MeetPage() {
 
   if (isLoading) return <PageSkeleton />
   if (error) return <Page><Notice tone="danger" title={tx('meet.loadError')}>{friendlyError(error)}</Notice></Page>
-  if (!event) return <EmptyState title={tx('meet.notPublished')} icon={<CalendarDays />}>{tx('meet.checkBack')}</EmptyState>
+  if (!event) return <Page><EmptyState illustration={<NoEventsArt />} title={tx('meet.notPublished')}>{tx('meet.checkBack')}</EmptyState></Page>
 
   const open = registrationOpen(event)
-  const days = daysUntil(event.starts_at)
   const reg = mine?.registration
   const active = reg && reg.status !== 'cancelled'
   const years = event.eligible_from_year && event.eligible_to_year ? yearRange(event.eligible_from_year, event.eligible_to_year).reverse() : []
+  const primaryPrices = (tickets ?? []).filter((t) => t.is_primary).map((t) => t.price_paise)
+  const from = primaryPrices.length ? formatPaise(Math.min(...primaryPrices)) : null
+  const registerTo = session ? '/meet/register' : '/signin?next=/meet/register'
+  const hrefFor = (id: string) => (active ? '/meet/register' : session ? `/meet/register?ticket=${id}` : `/signin?next=${encodeURIComponent(`/meet/register?ticket=${id}`)}`)
+  const hasFamily = (tickets ?? []).some((t) => !t.is_primary)
+  const nDays = eventDayCount(event, tickets ?? [])
 
   // while a signed-in member's registration is still loading, show a placeholder, never the wrong button
   const waiting = !!session && regPending
   const cta = waiting ? (
     <div className="skeleton h-14 w-full rounded-full" aria-busy="true" aria-label={tx('meet.loadingReg')} />
   ) : active ? (
-    <ButtonLink to="/meet/my" size="lg" block icon={<Ticket className="size-5" />}>
+    <PrimaryCta to="/meet/my" icon={<Ticket className="size-5" />} gold={reg.status === 'confirmed'}>
       {reg.status === 'confirmed' ? tx('meet.viewTicket') : reg.status === 'pending_payment' ? tx('meet.completePayment') : tx('meet.viewReg')}
-    </ButtonLink>
+    </PrimaryCta>
   ) : open ? (
-    <ButtonLink to={session ? '/meet/register' : '/signin?next=/meet/register'} size="lg" block>
+    <PrimaryCta to={registerTo} gold>
       {tx('meet.registerNow')}
-    </ButtonLink>
+    </PrimaryCta>
   ) : null
 
-  return (
-    <div>
-      {/* hero */}
-      <section className="relative overflow-hidden bg-hero px-5 pb-8 pt-[calc(env(safe-area-inset-top)+2rem)] text-white">
-        <div aria-hidden className="absolute -right-24 -top-24 size-72 rounded-full bg-hero-2" />
-        <div aria-hidden className="absolute -bottom-20 right-10 size-40 rounded-full bg-accent/15" />
-        <div className="relative mx-auto max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-accent">{tx('brand.college')}</p>
-          <h1 className="mt-2 text-[32px] font-bold leading-[1.1] tracking-tight sm:text-4xl">{event.title}</h1>
-          {event.tagline && <p className="mt-2 text-lg text-hero-text">{event.tagline}</p>}
-          <ul className="mt-6 space-y-2.5 text-[15px] text-hero-text">
-            <li className="flex items-start gap-3">
-              <CalendarDays className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-              <span>
-                {formatDateRange(event.starts_at, event.ends_at)}
-                {days !== null && days > 0 && <span className="text-hero-text"> · {tx('meet.inDays', { count: days })}</span>}
-              </span>
-            </li>
-            {event.venue && (
-              <li className="flex items-start gap-3">
-                <MapPin className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden />
-                {event.venue_map_url ? (
-                  <a href={event.venue_map_url} target="_blank" rel="noreferrer" className="underline decoration-white/40 underline-offset-4">
-                    {event.venue}
-                  </a>
-                ) : (
-                  <span>{event.venue}</span>
-                )}
-              </li>
-            )}
-          </ul>
-          <div className="mt-7 hidden max-w-xs sm:block [&_a]:bg-white [&_a]:bg-none [&_a]:text-hero [&_a:hover]:bg-primary-soft">{cta}</div>
-        </div>
-      </section>
+  const faq: FaqItem[] = [
+    { q: tx('evx.faqPayQ'), a: tx('evx.faqPayA') },
+    ...(hasFamily ? [{ q: tx('evx.faqFamilyQ'), a: tx('evx.faqFamilyA') }] : []),
+    ...(event.ask_reunion_questions ? [{ q: tx('evx.faqStayQ'), a: tx('evx.faqStayA') }] : []),
+    { q: tx('evx.faqEditQ'), a: tx('evx.faqEditA') },
+    { q: tx('evx.faqGateQ'), a: tx('evx.faqGateA') },
+    ...(event.eligible_from_year && event.eligible_to_year ? [{ q: tx('evx.faqWhoQ'), a: tx('evx.faqWhoA', { from: event.eligible_from_year, to: event.eligible_to_year }) }] : []),
+  ]
 
-      <Page className="space-y-6">
-        <GlimpseCarousel className="-mt-2" />
-        <Link to="/meets" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40" data-testid="meet-past-link">
-          <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><History className="size-5" aria-hidden /></span>
-          <span className="min-w-0">
-            <span className="block font-semibold">{tx('meets.relive')}</span>
-            <span className="block truncate text-sm text-muted">{tx('meets.reliveHint')}</span>
-          </span>
-        </Link>
+  return (
+    <div className="bg-bg">
+      <MeetHero event={event} cta={cta} />
+
+      <Page className="space-y-10 pt-5">
         {active && (
-          <Card className="flex items-center justify-between gap-3 p-4">
-            <div className="min-w-0">
-              <p className="text-sm text-muted">{tx('meet.yourReg')}</p>
-              <p className="font-mono text-lg font-semibold tracking-wide">{reg.code}</p>
+          <Link to="/meet/my" className="fx-press fx-hairline -mt-12 relative z-10 flex items-center justify-between gap-3 rounded-[1.6rem] bg-surface p-4 shadow-pop" data-testid="meet-my-reg">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[image:var(--grad-gold)] text-[#2b1a05]" aria-hidden>
+                <Ticket className="size-6" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-caption text-muted">{tx('meet.yourReg')}</p>
+                <p className="font-mono text-lg font-semibold tracking-wider">{reg.code}</p>
+              </div>
             </div>
             <StatusBadge status={reg.status} />
-          </Card>
+          </Link>
         )}
+
+        <GlimpseCarousel />
 
         {!active && open && !waiting && !!session && <WaitlistCard eventId={event.id} />}
 
-        <Link to="/meet/photos" className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 hover:border-primary/40">
-          <span className="grid size-11 place-items-center rounded-full bg-primary-soft text-primary"><Images className="size-5" aria-hidden /></span>
-          <span className="min-w-0">
-            <span className="block font-semibold">{tx('meet.photosButton')}</span>
-            <span className="block truncate text-sm text-muted">{tx('meet.photosHint')}</span>
-          </span>
-        </Link>
-
-        <SponsorStrip event={event.id} />
-
         {!!announcements.data?.length && (
-          <section aria-label="Announcements" className="space-y-2">
-            <SectionTitle>Announcements</SectionTitle>
+          <section aria-label="Announcements" className="space-y-3">
+            <SectionHeader eyebrow={tx('evx.annEyebrow')} title="Announcements" />
             {announcements.data.slice(0, 3).map((a) => (
-              <Card key={a.id} className={a.pinned ? 'border-accent/50 bg-accent-soft p-4' : 'p-4'}>
-                <p className="font-semibold">{a.pinned && <Pin className="mr-1 inline size-4 text-warning" aria-label="Pinned" />}{a.title}</p>
-                <p className="mt-1 whitespace-pre-line text-[15px] text-muted">{a.body}</p>
-                <p className="mt-2 text-xs text-muted">{relativeTime(a.created_at)}</p>
+              <Card key={a.id} variant={a.pinned ? 'gradient-border' : 'default'} className="p-4">
+                <p className="text-title">{a.pinned && <Pin className="mr-1.5 inline size-4 text-gold-ink" aria-label="Pinned" />}{a.title}</p>
+                <p className="text-body mt-1 whitespace-pre-line text-muted">{a.body}</p>
+                <p className="text-caption mt-2 text-subtle">{relativeTime(a.created_at)}</p>
               </Card>
             ))}
           </section>
         )}
 
-        {!!programme.data?.length && (
-          <section id="programme" aria-label="Programme" className="scroll-mt-20 space-y-4">
-            <SectionTitle>Programme</SectionTitle>
-            {groupByDay(programme.data).map((d) => (
-              <div key={d.day}>
-                <h3 className="mb-1.5 text-sm font-bold">{d.heading}</h3>
-                <Card className="divide-y divide-border">
-                  {d.items.map((it) => (
-                    <div key={it.id} className="flex gap-3 p-3.5">
-                      <p className="w-20 shrink-0 text-sm font-semibold tabular-nums">{clock(it.starts_at)}</p>
-                      <div className="min-w-0">
-                        <p className="font-semibold">{it.title}</p>
-                        {(it.venue || it.ends_at) && (
-                          <p className="text-sm text-muted">{[it.venue, it.ends_at ? `until ${clock(it.ends_at)}` : null].filter(Boolean).join(' · ')}</p>
-                        )}
-                        {it.details && <p className="mt-1 whitespace-pre-line text-sm text-muted">{it.details}</p>}
-                      </div>
-                    </div>
-                  ))}
-                </Card>
-              </div>
-            ))}
-          </section>
-        )}
+        <Reveal>
+          <WhyCome hasFamily={hasFamily} days={nDays} />
+        </Reveal>
+
+        {!!programme.data?.length && <ProgrammeTimeline items={programme.data} event={event} />}
 
         {!open && !active && (
           <Notice tone="warning" title={tx('meet.closed')}>
@@ -160,80 +117,74 @@ export function MeetPage() {
           </Notice>
         )}
 
+        {tickets && tickets.length > 0 && (
+          <Reveal>
+            <TierCards tickets={tickets} hrefFor={hrefFor} />
+          </Reveal>
+        )}
+
         {years.length > 0 && (
-          <section>
-            <SectionTitle>{tx('meet.batches')}</SectionTitle>
+          <section aria-labelledby="batches-title">
+            <SectionHeader title={<span id="batches-title">{tx('meet.batches')}</span>} />
             <div className="grid grid-cols-5 gap-2">
               {years.map((y) => (
-                <div key={y} className="rounded-xl border border-border bg-surface px-1 py-2.5 text-center">
-                  <p className="text-[15px] font-bold tabular-nums">{y}</p>
+                <div key={y} className="fx-hairline rounded-2xl bg-surface px-1 py-3 text-center shadow-e1">
+                  <p className="text-stat text-[17px]">{y}</p>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {tickets && tickets.length > 0 && (
-          <section>
-            <SectionTitle>{tx('meet.fees')}</SectionTitle>
-            <Card className="divide-y divide-border">
-              {tickets.map((t) => (
-                <div key={t.id} className="flex items-start justify-between gap-4 p-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold">{t.label}</p>
-                    {t.description && <p className="text-sm text-muted">{t.description}</p>}
-                  </div>
-                  <p className="shrink-0 text-lg font-bold tabular-nums">{formatPaise(t.price_paise)}</p>
-                </div>
-              ))}
-            </Card>
-            <p className="mt-2 text-sm text-muted">{tx('meet.payNote')}</p>
-          </section>
-        )}
+        <Reveal>
+          <VenueCard event={event} />
+        </Reveal>
 
         {event.description && (
-          <section>
-            <SectionTitle>{tx('meet.about')}</SectionTitle>
-            <Card className="whitespace-pre-line p-4 text-[15px] leading-relaxed">{event.description}</Card>
+          <section aria-labelledby="about-title">
+            <SectionHeader title={<span id="about-title">{tx('meet.about')}</span>} />
+            <p className="text-body-lg whitespace-pre-line text-text/90">{event.description}</p>
           </section>
         )}
 
-        <section>
-          <SectionTitle>{tx('meet.goodToKnow')}</SectionTitle>
-          <Card className="divide-y divide-border">
-            {event.registration_closes_at && (
-              <div className="flex items-center gap-3 p-4">
-                <Clock className="size-5 text-primary" aria-hidden />
-                <p className="text-[15px]">
-                  {tx('meet.closes')} <strong>{formatDateTime(event.registration_closes_at)}</strong>
-                </p>
-              </div>
-            )}
-            {(event.contact_phone || event.contact_email) && (
-              <div className="flex items-start gap-3 p-4">
-                <Phone className="mt-0.5 size-5 text-primary" aria-hidden />
-                <p className="text-[15px]">
-                  {tx('meet.questions')} {event.contact_phone && <a className="font-semibold text-primary" href={telHref(event.contact_phone)}>{formatPhone(event.contact_phone)}</a>}
-                  {event.contact_phone && event.contact_email && ' · '}
-                  {event.contact_email && <a className="font-semibold text-primary" href={`mailto:${event.contact_email}`}>{event.contact_email}</a>}
-                </p>
-              </div>
-            )}
-            <div className="flex items-center gap-3 p-4">
-              <Badge tone="primary">{tx('meet.tip')}</Badge>
-              <p className="text-[15px] text-muted">
-                {tx('meet.addHome')} <Link to="/install" className="font-semibold text-primary">{tx('meet.how')}</Link>
+        <SponsorStrip event={event.id} />
+
+        <Reveal>
+          <MemoriesTeaser />
+        </Reveal>
+
+        <Faq items={faq} />
+
+        <section aria-label={tx('meet.goodToKnow')} className="grid gap-3 sm:grid-cols-2">
+          {event.registration_closes_at && (
+            <Card variant="sunken" className="flex items-center gap-3 p-4">
+              <Clock className="size-5 shrink-0 text-primary" aria-hidden />
+              <p className="text-body">
+                {tx('meet.closes')} <strong>{formatDateTime(event.registration_closes_at)}</strong>
               </p>
-            </div>
+            </Card>
+          )}
+          {(event.contact_phone || event.contact_email) && (
+            <Card variant="sunken" className="flex items-start gap-3 p-4">
+              <Phone className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
+              <p className="text-body min-w-0 [overflow-wrap:anywhere]">
+                {tx('meet.questions')} {event.contact_phone && <a className="font-semibold text-primary" href={telHref(event.contact_phone)}>{formatPhone(event.contact_phone)}</a>}
+                {event.contact_phone && event.contact_email && ' · '}
+                {event.contact_email && <a className="font-semibold text-primary" href={`mailto:${event.contact_email}`}>{event.contact_email}</a>}
+              </p>
+            </Card>
+          )}
+          <Card variant="sunken" className="flex items-center gap-3 p-4 sm:col-span-2">
+            <CalendarDays className="size-5 shrink-0 text-primary" aria-hidden />
+            <p className="text-body text-muted">
+              {tx('meet.addHome')} <Link to="/install" className="font-semibold text-primary">{tx('meet.how')}</Link>
+            </p>
           </Card>
         </section>
+        {cta && <div className="h-16 sm:hidden" aria-hidden />}
       </Page>
 
-      {cta && (
-        <div className="sticky bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-10 border-t border-border bg-bg/95 px-4 py-3 backdrop-blur sm:hidden">
-          {cta}
-        </div>
-      )}
+      {cta && <StickyCta from={active ? null : from}>{cta}</StickyCta>}
     </div>
   )
 }
