@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Bell, BriefcaseBusiness, Cake, Search, Send, Star } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, Cake, Send, Star } from 'lucide-react'
 import { Link, Navigate } from 'react-router'
 import { Page } from '../../components/layout/AppShell'
 import { Avatar } from '../../components/ui/Avatar'
@@ -19,7 +19,7 @@ import { useAuth, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useShownBadges } from '../badges/api'
 import { Composer } from '../community/Composer'
 import { FeedList } from '../community/FeedList'
-import { useGroups, useNotifications } from '../community/queries'
+import { useGroups } from '../community/queries'
 import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 import { useLiveGlimpses } from '../glimpses/api'
 import { useHomeHighlights } from '../highlights/api'
@@ -162,12 +162,6 @@ function Hero({ profile, percent, next }: { profile: Profile; percent: number; n
       {part === 'night' && <Meteors count={5} className="-z-10" />}
       <div className="flex items-center justify-between gap-3">
         <p className="text-eyebrow text-accent">{today}</p>
-        <div className="flex items-center gap-1">
-          <Link to="/people" aria-label={tx('home.findJecians')} className="fx-press grid size-11 place-items-center rounded-full text-white/90 hover:bg-white/10">
-            <Search className="size-5" />
-          </Link>
-          <NotificationBell />
-        </div>
       </div>
       <div className="mt-4 flex items-center gap-4 sm:gap-6">
         <Link to="/me" aria-label={tx('nav.yourProfile')} className="fx-press shrink-0 rounded-full">
@@ -202,26 +196,6 @@ function QuickAction({ to, icon, title, text }: { to: string; icon: React.ReactN
         <span className="block text-sm text-muted">{text}</span>
       </span>
       <ArrowRight className="size-4 text-muted" aria-hidden />
-    </Link>
-  )
-}
-
-function NotificationBell() {
-  const tx = useT()
-  const { data } = useNotifications()
-  const unread = data?.filter((n) => !n.read_at).length ?? 0
-  return (
-    <Link
-      to="/notifications"
-      aria-label={unread ? tx('home.notifUnread', { n: unread }) : tx('notif.title')}
-      className="fx-press relative grid size-11 place-items-center rounded-full text-white/90 hover:bg-white/10"
-    >
-      <Bell className="size-5" />
-      {unread > 0 && (
-        <span className="absolute right-1 top-1 min-w-5 rounded-full bg-accent px-1 text-center text-[11px] font-bold leading-5 text-[#2b1d00] shadow-[0_0_0_2px_#062a20]">
-          {unread > 9 ? '9+' : unread}
-        </span>
-      )}
     </Link>
   )
 }
