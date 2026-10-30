@@ -161,7 +161,8 @@ export function cleanLines(input: string): string[] {
     .replace(/[​-‍⁠﻿­]/g, '')
     .replace(/[   ]/g, ' ')
     .replace(/\r\n?/g, '\n')
-    .replace(/\u0000/g, '')
+    .split('\0')
+    .join('')
     // a long address wrapped by the PDF: "linkedin.com/in/asha-verma-\n123abc"
     .replace(/(linkedin\.com\/in\/[^\s]*-)\s*\n\s*(\S+)/gi, '$1$2')
   const out: string[] = []

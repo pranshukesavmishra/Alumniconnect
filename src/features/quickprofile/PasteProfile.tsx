@@ -10,28 +10,13 @@ import { Notice } from '../../components/ui/Display'
 import { Textarea } from '../../components/ui/Form'
 import { isJec } from '../../lib/linkedin/common'
 import { useT } from '../../i18n'
-import type { AiProfile } from './mapping'
-import { parsedHasContent, parsePastedProfile, PASTE_MAX_CHARS } from './pasteParser'
+import { parsedHasContent, PASTE_MAX_CHARS } from './pasteParser'
+import { readPasted } from './pasteRead'
 import { PreviewCard } from './PreviewCard'
 import { submitEducationHint } from './enrichQueries'
-import { aiFill, useAiAvailable } from './queries'
+import { useAiAvailable } from './queries'
 import { SuggestProfile } from './SuggestProfile'
 import { useFoundProfile } from './useFoundProfile'
-
-/** On-device reading, or the AI's when it is on; any AI problem falls back to the on-device reading without a word. */
-export async function readPasted(text: string, aiOn: boolean, ai: (t: string) => Promise<AiProfile> = aiFill): Promise<{ profile: AiProfile; by: 'ai' | 'device' }> {
-  const device = parsePastedProfile(text)
-  if (aiOn) {
-    try {
-      const got = await ai(text)
-      // keep the device reading when it clearly found more jobs than the AI did
-      if (got.experiences.length + 1 >= device.experiences.length) return { profile: { ...got, linkedin_url: got.linkedin_url ?? device.linkedin_url }, by: 'ai' }
-    } catch {
-      /* fall back */
-    }
-  }
-  return { profile: device, by: 'device' }
-}
 
 export function PasteProfile({ onSaved, autoFocus, suggest = true }: { onSaved?: () => void; autoFocus?: boolean; suggest?: boolean }) {
   const tx = useT()

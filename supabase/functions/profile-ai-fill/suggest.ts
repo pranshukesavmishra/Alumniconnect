@@ -30,7 +30,7 @@ Search the public web for the person described below. Answer ONLY from pages you
 Write a short factual summary: current job title and company, city, earlier jobs and companies with years if the pages give them, degrees, and the JEC batch year and branch if shown.
 If you cannot find a page that clearly matches, or you are not sure it is the same person, answer with exactly the single word UNKNOWN.`
 
-const clean = (s: string | null | undefined, n: number) => (s ?? '').replace(/[\r\n\u0000]+/g, ' ').trim().slice(0, n)
+const clean = (s: string | null | undefined, n: number) => (s ?? '').replace(/\p{Cc}+/gu, ' ').trim().slice(0, n)
 
 function describe(i: SuggestInput): string {
   const lines = [`Name: ${clean(i.full_name, 120)}`, 'College: Jabalpur Engineering College (JEC) / Government Engineering College Jabalpur (GEC)']
