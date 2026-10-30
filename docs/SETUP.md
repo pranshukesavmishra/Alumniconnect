@@ -171,6 +171,15 @@ of admin who can make other admins, choose exactly what each admin may do, and h
 4. Use **Organise → event → Team** to add treasurers and gate volunteers (check-in), and **Organise → Roles → Admins and owners → Make admin** to give committee members only the access they need. Each person must sign in once first.
 5. Complete the **go-live checklist** in the Phase 1 build plan (Section 10): two people check fees and the UPI ID with a real ₹1 payment, plus a dry run with 5 committee members. Then tick **Published**.
 
+### Optional extras (for example a 27 Dec outdoor tour at a price per person)
+
+Use this when one day is optional and priced per person, for anyone registered (the alumnus himself, a spouse, children), whichever main ticket they chose.
+
+1. **Organise → event → Settings → Fees**, scroll below the ticket cards to **Optional extras**, and tap **Add optional extra**.
+2. Name it (for example "Outdoor tour"), enter the **extra price per person** (for example 650), tick **27 Dec** under "Valid on", and leave **Max** at 10 (the most people in one registration). Optionally add a description or a discount. Tap **Save changes**.
+3. Members see **Optional extras** on the days step of registration, with a tickbox for themselves and for each family member, and an "Add for all N people" shortcut. The Meet page shows it under "Optional · 27 Dec".
+4. The extra adds money and heads to its own day only: people are counted once for capacity (the main and family tickets), while the day-by-day counts (Responses, Day of) include everyone who ticked the extra.
+
 ---
 
 ## Local development
