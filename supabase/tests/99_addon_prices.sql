@@ -78,27 +78,16 @@ begin
     jsonb_build_object('ticket_type_id', v_dinner, 'for_ticket_type_id', v_spouse, 'quantity', 1)));
   assert (p ->> 'total')::int = 400000 + 50000 + 100000, 'default fallback for an extra without an override';
 
-  -- count per person type must not exceed the people of that type (2 children tours with 1 child)
-  begin
-    perform public._price_items(v_event, jsonb_build_array(
-      jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1), jsonb_build_object('ticket_type_id', v_child, 'quantity', 1),
-      jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_child, 'quantity', 2)));
-    assert false, 'more child tours than children must be rejected';
-  exception when raise_exception then
-    get stacked diagnostics msg = message_text;
-    assert msg like '%one per person%', 'per type message: ' || msg;
-  end;
-  -- ... but a tour for a person type that is not in the registration at all is refused too
-  begin
-    perform public._price_items(v_event, jsonb_build_array(
-      jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1),
-      jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_child, 'quantity', 1)));
-    assert false, 'a tour for an absent person type must be rejected';
-  exception when raise_exception then
-    get stacked diagnostics msg = message_text;
-    assert msg like '%one per person%', 'absent type message: ' || msg;
-  end;
-  -- the main alumnus counts as one person of the main ticket type
+  -- counts are independent of the family on the ticket: 2 child tours with 1 child, or a type that is not on the ticket, are fine
+  p := public._price_items(v_event, jsonb_build_array(
+    jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1), jsonb_build_object('ticket_type_id', v_child, 'quantity', 1),
+    jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_child, 'quantity', 2)));
+  assert (p ->> 'total')::int = 400000 + 30000 + 70000, 'independent child count: ' || (p ->> 'total');
+  p := public._price_items(v_event, jsonb_build_array(
+    jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1),
+    jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_child, 'quantity', 1)));
+  assert (p ->> 'total')::int = 400000 + 35000, 'extra for a type not on the ticket';
+  -- the main alumnus ("Me") takes an extra at most once
   begin
     perform public._price_items(v_event, jsonb_build_array(
       jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1),
@@ -106,18 +95,8 @@ begin
     assert false, 'two tours for one alumnus must be rejected';
   exception when raise_exception then
     get stacked diagnostics msg = message_text;
-    assert msg like '%one per person%', 'alumnus message: ' || msg;
+    assert msg like '%main person%', 'alumnus message: ' || msg;
   end;
-
-  -- total extras of one kind never exceed the people (alumnus + 1 child = 2, three lines of 1 each is impossible anyway)
-  begin
-    perform public._price_items(v_event, jsonb_build_array(
-      jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1),
-      jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_alumnus, 'quantity', 1),
-      jsonb_build_object('ticket_type_id', v_tour, 'quantity', 1),
-      jsonb_build_object('ticket_type_id', v_tour, 'for_ticket_type_id', v_child, 'quantity', 1)));
-    assert false, 'more extras than people must be rejected';
-  exception when raise_exception then null; end;
 
   -- same extra twice for the same person type is a malformed selection
   begin
@@ -174,15 +153,6 @@ begin
     jsonb_build_object('ticket_type_id', v_tour, 'quantity', 2)));
   assert (p ->> 'total')::int = 400000 + 30000 + 2 * 65000, 'legacy untyped extras use the default price: ' || (p ->> 'total');
   assert exists (select 1 from jsonb_array_elements(p -> 'lines') l where (l ->> 'addon')::boolean and l ->> 'for' is null and l ->> 'label' = 'Outdoor tour'), 'legacy label unchanged';
-  begin
-    perform public._price_items(v_event, jsonb_build_array(
-      jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1), jsonb_build_object('ticket_type_id', v_tour, 'quantity', 2)));
-    assert false, 'legacy: more than the people must be rejected';
-  exception when raise_exception then
-    get stacked diagnostics msg = message_text;
-    assert msg like '%one per person%', 'legacy message: ' || msg;
-  end;
-
   -- an override never changes a normal ticket price and the unavailable flag only matters for typed lines
   p := public._price_items(v_event, jsonb_build_array(
     jsonb_build_object('ticket_type_id', v_alumnus, 'quantity', 1), jsonb_build_object('ticket_type_id', v_spouse, 'quantity', 1),

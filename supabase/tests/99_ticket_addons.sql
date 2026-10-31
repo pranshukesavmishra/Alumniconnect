@@ -53,15 +53,10 @@ begin
     jsonb_build_object('ticket_type_id', v_both, 'quantity', 1), jsonb_build_object('ticket_type_id', v_tour, 'quantity', 1)));
   assert p -> 'day_heads' = '{"1":1,"2":2}'::jsonb, 'both-days main plus add-on';
 
-  -- one per person
-  begin
-    perform public._price_items(v_event, jsonb_build_array(
-      jsonb_build_object('ticket_type_id', v_d1, 'quantity', 1), jsonb_build_object('ticket_type_id', v_tour, 'quantity', 2)));
-    assert false, 'more add-ons than people must be rejected';
-  exception when raise_exception then
-    get stacked diagnostics msg = message_text;
-    assert msg like '%one per person%', 'message: ' || msg;
-  end;
+  -- add-on people are independent of the ticket: 2 add-on people with 1 main person are allowed and count as attendees
+  p := public._price_items(v_event, jsonb_build_array(
+    jsonb_build_object('ticket_type_id', v_d1, 'quantity', 1), jsonb_build_object('ticket_type_id', v_tour, 'quantity', 2)));
+  assert (p ->> 'heads')::int = 2 and p -> 'day_heads' = '{"1":1,"2":2}'::jsonb, 'extra-only people counted: ' || (p ->> 'heads');
 
   -- max_per_registration still applies
   update public.event_ticket_types set max_per_registration = 2 where id = v_tour;

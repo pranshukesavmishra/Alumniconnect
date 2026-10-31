@@ -106,10 +106,9 @@ begin
     perform public.admin_update_registration(r.id, null, pg_temp.i(1, 1, 1, 1) || '[]'::jsonb, 'Check the limits');
     assert true;
   end;
-  begin
-    perform public.admin_update_registration(r.id, null, pg_temp.i(0, 2, 1, 1), 'Too many child tours');
-    assert false, 'two child tours with one child';
-  exception when raise_exception then assert sqlerrm like '%one per person%', sqlerrm; end;
+  -- two child tours with one child are fine now (counts are independent of the family)
+  r := public.admin_update_registration(r.id, null, pg_temp.i(0, 2, 1, 1), 'Two child tours');
+  assert r.amount_paise = 400000 + 50000 + 30000 + 70000, 'independent child tours: ' || r.amount_paise;
 end $$;
 reset role;
 do $$ begin raise notice 'ALL ADDON PRICE FLOW TESTS PASSED'; end $$;
