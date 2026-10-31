@@ -13,6 +13,7 @@ import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import type { AddonPrice, EventRow, TicketType } from '../../lib/types'
 import { isValidUpiId } from '../../lib/upi'
 import { dayLabel, eventDayCount } from '../events/reunion'
+import { buildDayExtras, includedDays, optionalFromData, validateDayExtras } from './dayExtras'
 import { discountInfo, percentFromPrice, priceFromPercent } from '../events/ticketPricing'
 import { DriveArchive } from './DriveArchive'
 import { QuestionsEditor } from './AdminQuestions'
@@ -106,34 +107,58 @@ interface TicketDraft {
   key?: string
   /** on a normal ticket: the price of each optional extra for this person type, by the extra's key. Empty price = the extra's own price; off = not available */
   prices?: Record<string, { price: string; off: boolean }>
+  /** optional extra days: day number -> extra price in rupees ('' = the extra's default price) */
+  optional?: Record<number, string>
 }
 
 let newKeyCounter = 0
 const newKey = () => `new-${++newKeyCounter}`
 const keyOf = (t: { id?: string; key?: string }) => t.id ?? t.key ?? ''
 
-/** The overrides of one optional extra for one person type: empty price = the extra's own price, 0 = free, off = this ticket cannot take it. */
-function ExtraPriceFields({ ticket, extras, onChange }: { ticket: TicketDraft; extras: TicketDraft[]; onChange: (patch: Partial<TicketDraft>) => void }) {
-  if (extras.length === 0) return null
-  const set = (k: string, v: { price: string; off: boolean }) => onChange({ prices: { ...ticket.prices, [k]: v } })
+/** Days of one ticket: which are covered by the price, and which are an optional extra with its own price. */
+function TicketDays({ ticket, nDays, dayName, onChange }: { ticket: TicketDraft; nDays: number; dayName: (d: number) => string; onChange: (patch: Partial<TicketDraft>) => void }) {
+  const optional = ticket.optional ?? {}
   return (
-    <fieldset className="space-y-3 rounded-2xl border border-border p-3" data-testid="extra-prices">
-      <legend className="px-1 text-sm font-semibold">Optional extras for this ticket</legend>
-      {extras.map((a) => {
-        const k = keyOf(a)
-        const v = ticket.prices?.[k] ?? { price: '', off: false }
-        const dflt = parseRupeesToPaise(a.price)
-        return (
-          <div key={k} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" data-testid="extra-price-row">
-            <Field label={`Price of ${a.label.trim() || 'the extra'} for this ticket (₹)`} hint={v.off ? undefined : dflt !== null ? `Empty = the extra’s own price, ${formatPaise(dflt)}. 0 = free.` : 'Empty = the extra’s own price. 0 = free.'}>
-              {(p) => <Input {...p} inputMode="decimal" value={v.price} disabled={v.off} onChange={(ev) => set(k, { ...v, price: ev.target.value })} />}
-            </Field>
-            <Checkbox checked={v.off} onChange={(on) => set(k, { price: on ? '' : v.price, off: on })}>
-              Not available for this ticket
-            </Checkbox>
-          </div>
-        )
-      })}
+    <fieldset data-testid="ticket-days">
+      <legend className="mb-1 text-sm font-semibold">Days</legend>
+      <p className="mb-1 text-sm text-muted">Included = covered by the ticket price. Optional extra = members tick it and pay this extra per person. Nothing ticked = every day.</p>
+      <div className="divide-y divide-border">
+        {Array.from({ length: nDays }, (_, i) => i + 1).map((d) => {
+          const inc = ticket.days.includes(d)
+          const opt = optional[d] !== undefined
+          const rest = { ...optional }
+          delete rest[d]
+          return (
+            <div key={d} className="flex flex-wrap items-center gap-x-5" data-testid="ticket-day-row">
+              <Checkbox checked={inc} onChange={(on) => onChange(on ? { days: [...ticket.days, d], optional: rest } : { days: ticket.days.filter((x) => x !== d) })}>
+                {`Included: ${dayName(d)}`}
+              </Checkbox>
+              {!inc && (
+                <>
+                  <Checkbox checked={opt} onChange={(on) => onChange({ optional: on ? { ...optional, [d]: '' } : rest })}>
+                    {`Optional extra day: ${dayName(d)}`}
+                  </Checkbox>
+                  {opt && (
+                    <label className="flex items-center gap-1 pb-2 text-sm">
+                      <span className="sr-only">{`Extra price for ${dayName(d)} (₹)`}</span>
+                      <span aria-hidden>₹</span>
+                      <input
+                        aria-label={`Extra price for ${dayName(d)} (₹)`}
+                        inputMode="numeric"
+                        className="h-11 w-24 rounded-xl border border-border bg-surface px-3 text-base"
+                        placeholder="default"
+                        value={optional[d]}
+                        onChange={(ev) => onChange({ optional: { ...optional, [d]: ev.target.value } })}
+                      />
+                      <span>extra</span>
+                    </label>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </fieldset>
   )
 }
@@ -166,7 +191,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   })
   const [tickets, setTickets] = useState<TicketDraft[]>(
     existing?.tickets.length
-      ? existing.tickets.map((t) => ({ id: t.id, key: t.id, prices: pricesFor(t.id, existing.addonPrices ?? []), label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, is_addon: !!t.is_addon, max: String(t.max_per_registration), days: t.days ?? [] }))
+      ? existing.tickets.map((t) => ({ id: t.id, key: t.id, optional: t.is_addon ? undefined : optionalFromData(t.id, t.days ?? [], existing.tickets.filter((x) => x.is_addon).sort((x, y) => x.sort - y.sort), existing.addonPrices ?? []), prices: pricesFor(t.id, existing.addonPrices ?? []), label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, is_addon: !!t.is_addon, max: String(t.max_per_registration), days: t.days ?? [] }))
       : [
           { key: newKey(), label: 'Alumnus / Alumna', description: '', price: '', list: '', offer: '', is_primary: true, max: '1', days: [] },
           { key: newKey(), label: 'Spouse', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] },
@@ -188,6 +213,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       return c
     })
   const nDays = eventDayCount({ starts_at: fromLocalIst(f.starts_at), ends_at: fromLocalIst(f.ends_at) })
+  const dayName = (d: number) => dayLabel({ starts_at: fromLocalIst(f.starts_at) }, d)
   const visibleIdx = tickets.map((t, i) => (t._delete || t.is_addon ? -1 : i)).filter((i) => i >= 0)
   const live = tickets.filter((t) => !t._delete)
 
@@ -217,12 +243,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         else if (np !== null && lp <= np) errs.push(`“${t.label || 'ticket'}”: the original price must be higher than the price now, or leave it empty for no discount.`)
       }
     }
-    for (const t of live.filter((x) => !x.is_addon)) {
-      for (const a of live.filter((x) => x.is_addon)) {
-        const v = t.prices?.[keyOf(a)]
-        if (v && !v.off && v.price.trim() && parseRupeesToPaise(v.price) === null) errs.push(`Price of “${a.label || 'extra'}” for “${t.label || 'ticket'}” is not a valid amount.`)
-      }
-    }
+    errs.push(...validateDayExtras(live, dayName))
     if (f.is_published && !f.upi_id && live.some((t) => (parseRupeesToPaise(t.price) ?? 0) > 0)) errs.push('Add the UPI ID before publishing an event with paid tickets.')
     return errs
   }
@@ -234,6 +255,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     if (errs.length) return window.scrollTo({ top: 0, behavior: 'smooth' })
     if (f.is_published && !e?.is_published && !window.confirm('Publish now? Members will be able to see the event and register.')) return
     const n = (v: string) => (v.trim() ? v.trim() : null)
+    const built = buildDayExtras(tickets, dayName, (e): TicketDraft => ({ ...e, description: '', list: '', offer: '', is_primary: false, is_addon: true, max: '10' }))
     try {
       const id = await save.mutateAsync({
         event: {
@@ -258,18 +280,8 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           is_published: f.is_published,
           ask_reunion_questions: f.ask_reunion_questions,
         },
-        addonPrices: tickets
-          .filter((t) => !t._delete && !t.is_addon)
-          .flatMap((t) =>
-            tickets
-              .filter((a) => !a._delete && a.is_addon)
-              .flatMap((a) => {
-                const v = t.prices?.[keyOf(a)]
-                if (!v || (!v.off && !v.price.trim())) return []
-                return [{ addonKey: keyOf(a), ticketKey: keyOf(t), price_paise: v.off ? null : (parseRupeesToPaise(v.price) ?? 0), available: !v.off }]
-              }),
-          ),
-        tickets: tickets.map((t) => ({
+        addonPrices: built.addonPrices,
+        tickets: built.drafts.map((t) => ({
           id: t.id,
           _key: keyOf(t),
           _delete: t._delete,
@@ -281,7 +293,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           is_primary: t.is_addon ? false : t.is_primary,
           is_addon: !!t.is_addon,
           max_per_registration: Number(t.max),
-          days: t.days.length === 0 || t.days.length >= nDays ? null : [...t.days].sort((a, b) => a - b),
+          days: t.is_addon ? (t.days.length === 0 || t.days.length >= nDays ? null : [...t.days].sort((a, b) => a - b)) : includedDays(t, nDays),
         })),
       })
       toast.success('Event saved')
@@ -363,21 +375,9 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                 <Field label="Max each">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
               </div>
               <TicketDiscountEditor t={t} onChange={(patch) => setT(i, patch)} />
-              <ExtraPriceFields ticket={t} extras={tickets.filter((a) => a.is_addon && !a._delete)} onChange={(patch) => setT(i, patch)} />
               <Field label="What it includes" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
-              {nDays > 1 && (
-                <fieldset>
-                  <legend className="mb-1 text-sm font-semibold">Valid on <span className="font-normal text-muted">(none ticked = every day)</span></legend>
-                  <div className="flex flex-wrap gap-x-5">
-                    {Array.from({ length: nDays }, (_, d) => d + 1).map((d) => (
-                      <Checkbox key={d} checked={t.days.includes(d)} onChange={(on) => setT(i, { days: on ? [...t.days, d] : t.days.filter((x) => x !== d) })}>
-                        {dayLabel({ starts_at: fromLocalIst(f.starts_at) }, d)}
-                      </Checkbox>
-                    ))}
-                  </div>
-                  {!t.is_primary && <p className="text-sm text-muted">A family ticket can only be bought with a main ticket that covers all of its days.</p>}
-                </fieldset>
-              )}
+              {nDays > 1 && <TicketDays ticket={t} nDays={nDays} dayName={dayName} onChange={(patch) => setT(i, patch)} />}
+              {nDays > 1 && !t.is_primary && <p className="text-sm text-muted">A family ticket can only be bought with a main ticket that covers all of its days.</p>}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Checkbox checked={t.is_primary} onChange={(v) => setT(i, { is_primary: v })}>
                   Main ticket (the alumnus; exactly one per registration)
@@ -410,9 +410,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           Optional extras
         </SectionTitle>
         <p className="text-sm text-muted">
-          An extra is priced per person and any registered person can add it, whichever main ticket they chose (for example an outdoor tour on the last day). The main alumnus can join too.
-          Members tick it for themselves and for each family member who joins. Set “Max” to the most people you expect in one registration.
-          The price here is the default. To charge a different amount per person type (for example a lower price for a child), set it in that ticket’s card under Fees; leave it empty there to use this price.
+          Advanced. Optional extra days are set inside each ticket card above and appear here by themselves once saved. You can rename an extra, change its default price (used when a ticket’s price box is left empty), add a discount, or set the most people in one registration. Per-ticket prices are set inside each ticket card.
         </p>
         {tickets.map((t, i) =>
           t._delete || !t.is_addon ? null : (
