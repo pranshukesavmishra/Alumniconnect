@@ -1,12 +1,12 @@
-// Optional extras priced per person type: the admin sets the child's price for the tour in the child's own ticket card (and
-// switches the tour off for the spouse); a member registers alumnus + spouse + child, ticks the tour for the alumnus and the
+// Optional extras priced per person type: the admin ticks 27 Dec as an optional extra day in the alumnus card (650) and the
+// child card (350) and leaves it unticked on the spouse card; a member registers alumnus + spouse + child, ticks the tour for the alumnus and the
 // child, sees each person's own price, and the server charges exactly what the screen showed.
 import { expect, test } from '@playwright/test'
 import { createMember, newUtr, signInContext, stamp, sql } from './verify/meet-lib'
 
 const S = stamp()
 const tag = S.slice(-4)
-const tour = `Tour ${tag}`
+const tour = '27 Dec (optional)' // named from the day by the admin screen
 const spouse = `Spouse price ${tag}`
 const child = `Child price ${tag}`
 const rupees = (p: number) => `₹${(p / 100).toLocaleString('en-IN')}`
@@ -18,7 +18,7 @@ const eventId = () => sql(`select id from events where slug = 'alumni-meet-2026'
 test.afterAll(() => {
   const ev = eventId()
   sql(`delete from event_registrations where event_id = '${ev}' and email like 'addonp-${S}%'`)
-  sql(`delete from event_ticket_types where event_id = '${ev}' and label in ('${tour}', '${spouse}', '${child}')`)
+  sql(`delete from event_ticket_types where event_id = '${ev}' and (label in ('${spouse}', '${child}') or (is_addon and label = '${tour}'))`)
 })
 
 test('extras by person type: admin sets the child price in the child card, member pays each person their own price', async ({ browser }) => {
@@ -27,9 +27,8 @@ test('extras by person type: admin sets the child price in the child card, membe
   const main = Number(mainRow[1])
   sql(`insert into event_ticket_types (event_id, label, price_paise, is_primary, max_per_registration, sort, days) values
          ('${ev}', '${spouse}', 50000, false, 1, 90, '{1}'), ('${ev}', '${child}', 30000, false, 4, 91, '{1}')`)
-  sql(`insert into event_ticket_types (event_id, label, price_paise, is_primary, is_addon, max_per_registration, sort, days) values ('${ev}', '${tour}', 65000, false, true, 10, 92, '{2}')`)
 
-  // ---- admin: the child pays 350 for the tour, the spouse cannot take it
+  // ---- admin: 27 Dec is an optional extra day: 650 on the alumnus card, 350 on the child card, not offered to the spouse
   const adminEmail = `addonp-admin-${S}@test.local`
   const adminId = createMember({ email: adminEmail, name: `Addonp Admin ${tag}`, admin: true, verified: true })
   const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
@@ -37,24 +36,26 @@ test('extras by person type: admin sets the child price in the child card, membe
   const admin = await actx.newPage()
   await admin.goto('/admin/events/alumni-meet-2026?tab=settings')
   const cardOf = (label: string) => admin.getByTestId('ticket-card').filter({ has: admin.locator(`input[value="${label}"]`) })
-  const childCard = cardOf(child)
-  const priceField = (c: ReturnType<typeof cardOf>) => c.getByLabel(`Price of ${tour} for this ticket (₹)`)
-  await expect(priceField(childCard)).toHaveValue('') // empty = the extra's own price
-  await expect(childCard.getByText(/Empty = the extra’s own price, ₹650/)).toBeVisible()
-  await priceField(childCard).fill('350')
-  const spouseCard = cardOf(spouse)
-  await spouseCard.getByRole('checkbox', { name: 'Not available for this ticket' }).check()
-  await expect(priceField(spouseCard)).toBeDisabled()
+  const priceField = (c: ReturnType<typeof cardOf>) => c.getByLabel('Extra price for 27 Dec (₹)')
+  const optBox = (c: ReturnType<typeof cardOf>) => c.getByRole('checkbox', { name: 'Optional extra day: 27 Dec' })
+  const main2 = mainLabel(ev)
+  await optBox(cardOf(main2)).check()
+  await priceField(cardOf(main2)).fill('650')
+  await optBox(cardOf(child)).check()
+  await priceField(cardOf(child)).fill('350')
+  await expect(optBox(cardOf(spouse))).not.toBeChecked() // unticked = this person type cannot take it
   await admin.getByRole('button', { name: 'Save changes' }).click()
   await expect(admin.getByText('Event saved')).toBeVisible()
   expect(
-    sql(`select string_agg(t.label || '=' || coalesce(p.price_paise::text, 'default') || '/' || p.available, ',' order by t.label) from event_addon_prices p join event_ticket_types t on t.id = p.ticket_type_id where p.event_id = '${ev}' and p.addon_id = (select id from event_ticket_types where label = '${tour}' and event_id = '${ev}')`),
-  ).toBe(`${child}=35000/true,${spouse}=default/false`)
+    sql(`select string_agg(t.label || '=' || coalesce(p.price_paise::text, 'default') || '/' || p.available, ',' order by t.label) from event_addon_prices p join event_ticket_types t on t.id = p.ticket_type_id where p.event_id = '${ev}' and t.label in ('${main2}', '${spouse}', '${child}') and p.addon_id = (select id from event_ticket_types where label = '${tour}' and is_addon and event_id = '${ev}')`),
+  ).toBe([`${main2}=65000/true`, `${child}=35000/true`, `${spouse}=default/false`].sort().join(','))
+  expect(sql(`select price_paise from event_ticket_types where label = '${tour}' and is_addon and event_id = '${ev}'`)).toBe('65000') // default = the first entered price
 
-  // empty again = back to the default; the saved values come back after a reload
+  // the saved values come back after a reload
   await admin.reload()
   await expect(priceField(cardOf(child))).toHaveValue('350')
-  await expect(cardOf(spouse).getByRole('checkbox', { name: 'Not available for this ticket' })).toBeChecked()
+  await expect(priceField(cardOf(main2))).toHaveValue('650')
+  await expect(optBox(cardOf(spouse))).not.toBeChecked()
 
   // the Meet page tells people the different prices
   const pubCtx = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -83,8 +84,8 @@ test('extras by person type: admin sets the child price in the child card, membe
   await page.getByRole('group', { name: 'Do you need help with local travel or pickup?' }).getByText('No', { exact: true }).click()
 
   const extras = page.getByTestId('optional-extras')
-  const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${tour}`) })
-  const kiran = extras.getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour}`) })
+  const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })
+  const kiran = extras.getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })
   await expect(me).toHaveAccessibleName(/\+₹650/)
   await expect(kiran).toHaveAccessibleName(/\+₹350/)
   await expect(extras.getByRole('checkbox', { name: new RegExp(`Meera`) })).toHaveCount(0)
@@ -133,8 +134,8 @@ test('extras by person type: admin sets the child price in the child card, membe
   // re-open the form before paying: the ticks are restored per person
   await page.goto('/meet/register')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join ${tour}`) })).toBeChecked()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour}`) })).toBeChecked()
+  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeChecked()
+  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeChecked()
 
   // admin People shows the lines
   await admin.goto(`/admin/events/alumni-meet-2026?tab=people&q=${encodeURIComponent(`Addonp Alum ${tag}`)}`)
@@ -148,7 +149,7 @@ test('extras by person type: admin sets the child price in the child card, membe
   await expect(page.getByText('Payment received. The treasurer is verifying it.')).toBeVisible()
   await page.goto('/meet/register')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour}`) })).toBeDisabled()
+  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeDisabled()
 
   await actx.close()
   await mctx.close()

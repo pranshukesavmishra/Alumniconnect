@@ -1,10 +1,10 @@
-// Optional extras (add-on tickets): the admin adds "Outdoor tour" for 27 Dec, a member with a day-1 main ticket ticks it for
+// Optional extras (add-on tickets): the admin ticks 27 Dec as an optional extra day in the ticket cards, a member with a day-1 main ticket ticks it for
 // themselves and their spouse, pays, and the day counts show 2 people on day 2 and 2 (not 4) on day 1.
 import { expect, test } from '@playwright/test'
 import { createMember, newUtr, signInContext, stamp, sql } from './verify/meet-lib'
 
 const S = stamp()
-const extraName = `Outdoor tour ${S.slice(-4)}`
+const extraName = '27 Dec (optional)' // named from the day by the admin screen
 const spouseLabel = `Spouse test ${S.slice(-4)}`
 const rupees = (p: number) => `₹${(p / 100).toLocaleString('en-IN')}`
 
@@ -15,7 +15,7 @@ const eventId = () => sql(`select id from events where slug = 'alumni-meet-2026'
 test.afterAll(() => {
   const ev = eventId()
   sql(`delete from event_registrations where event_id = '${ev}' and email like 'addon-${S}%'`)
-  sql(`delete from event_ticket_types where event_id = '${ev}' and label in ('${extraName}', '${spouseLabel}')`)
+  sql(`delete from event_ticket_types where event_id = '${ev}' and (label = '${spouseLabel}' or (is_addon and label = '${extraName}'))`)
 })
 
 test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for self and spouse, totals and day counts are right', async ({ browser }) => {
@@ -24,22 +24,32 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   const main = Number(mainRow[1])
   sql(`insert into event_ticket_types (event_id, label, price_paise, is_primary, max_per_registration, sort, days) values ('${ev}', '${spouseLabel}', 50000, false, 1, 90, '{1}')`)
 
-  // ---- admin adds the extra in Settings → Fees → Optional extras
+  // ---- admin: Settings → Fees, on the 26 Dec alumnus card and the spouse card, 27 Dec is an optional extra day at 650
   const adminEmail = `addon-admin-${S}@test.local`
   const adminId = createMember({ email: adminEmail, name: `Addon Admin ${S.slice(-4)}`, admin: true, verified: true })
   const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } })
   await signInContext(actx, adminId, adminEmail)
   const admin = await actx.newPage()
   await admin.goto('/admin/events/alumni-meet-2026?tab=settings')
-  await admin.getByRole('button', { name: 'Add optional extra' }).click()
-  const card = admin.getByTestId('addon-card')
-  await expect(card.getByLabel('Max')).toHaveValue('10')
-  await card.getByLabel('Name of the extra').fill(extraName)
-  await card.getByLabel('Extra price per person (₹)').fill('650')
-  await card.getByRole('checkbox', { name: '27 Dec' }).check()
+  const mainLabel = sql(`select label from event_ticket_types where id = '${mainRow[0]}'`)
+  const cardOf = (label: string) => admin.getByTestId('ticket-card').filter({ has: admin.locator(`input[value="${label}"]`) })
+  for (const label of [mainLabel, spouseLabel]) {
+    const c = cardOf(label)
+    await expect(c.getByRole('checkbox', { name: 'Included: 26 Dec' })).toBeChecked()
+    await c.getByRole('checkbox', { name: 'Optional extra day: 27 Dec' }).check()
+    await c.getByLabel('Extra price for 27 Dec (₹)').fill('650')
+  }
+  // included wins: the included day offers no optional box
+  await expect(cardOf(mainLabel).getByRole('checkbox', { name: 'Optional extra day: 26 Dec' })).toHaveCount(0)
   await admin.getByRole('button', { name: 'Save changes' }).click()
   await expect(admin.getByText('Event saved')).toBeVisible()
-  expect(sql(`select is_addon || '|' || is_primary || '|' || price_paise || '|' || max_per_registration || '|' || days::text from event_ticket_types where event_id = '${ev}' and label = '${extraName}'`)).toBe('true|false|65000|10|{2}')
+  expect(sql(`select is_addon || '|' || is_primary || '|' || price_paise || '|' || max_per_registration || '|' || days::text from event_ticket_types where event_id = '${ev}' and is_addon and label = '${extraName}'`)).toBe('true|false|65000|10|{2}')
+  expect(sql(`select days::text from event_ticket_types where id = '${mainRow[0]}'`)).toBe('{1}') // the main ticket stays a normal 26 Dec ticket
+  // the same values come back after a reload; the extra shows in the advanced section
+  await admin.reload()
+  await expect(cardOf(mainLabel).getByLabel('Extra price for 27 Dec (₹)')).toHaveValue('650')
+  await expect(cardOf(spouseLabel).getByLabel('Extra price for 27 Dec (₹)')).toHaveValue('650')
+  await expect(admin.getByTestId('addon-card').locator(`input[value="${extraName}"]`)).toBeVisible()
 
   // it is not a normal ticket card and the Meet page shows it under its own heading
   const mctxPublic = await browser.newContext({ viewport: { width: 390, height: 844 } })
@@ -71,8 +81,8 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
 
   // starts at zero; tick myself, then use the everyone shortcut and untick, then tick both
   const extras = page.getByTestId('optional-extras')
-  const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${extraName}`) })
-  const meera = extras.getByRole('checkbox', { name: new RegExp(`Meera: also join ${extraName}`) })
+  const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${extraName.replace(/[()]/g, "\\$&")}`) })
+  const meera = extras.getByRole('checkbox', { name: new RegExp(`Meera: also join ${extraName.replace(/[()]/g, "\\$&")}`) })
   await expect(me).not.toBeChecked()
   await extras.getByRole('button', { name: new RegExp(`for all 2 people`) }).click()
   await expect(me).toBeChecked()
@@ -82,11 +92,12 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   await me.check()
   await meera.check()
 
-  // changing the main ticket keeps the extras ticked
+  // a ticket that already includes 27 Dec offers no extra for it
   await page.getByText('Both days', { exact: false }).first().click()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join`) })).toBeChecked()
+  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join`) })).toHaveCount(0)
   await page.getByText('26 Dec only', { exact: false }).first().click()
-  await expect(me).toBeChecked()
+  await me.check()
+  await meera.check()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // involved: all "No"
