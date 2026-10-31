@@ -222,6 +222,8 @@ export interface RegistrationItem {
   ticket_type_id: string
   /** for an optional extra: the person type (normal ticket) it was taken for; null on older registrations */
   for_ticket_type_id?: string | null
+  /** for an optional extra: optional names of the people who take it, for the name badge */
+  names?: string[]
   label: string
   unit_price_paise: number
   quantity: number

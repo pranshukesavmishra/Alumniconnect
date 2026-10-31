@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { EventQuestion, TicketType } from '../../lib/types'
-import { addonCount, groupPersons, isAddon, checkCustomAnswers, cleanCustomAnswers, dayHeads, dayLabel, eventDayCount, fundOk, missingProfileFields, pastJobs, ticketFits } from './reunion'
+import { isAddon, checkCustomAnswers, cleanCustomAnswers, dayHeads, dayLabel, eventDayCount, fundOk, missingProfileFields, pastJobs, ticketFits } from './reunion'
 
 const event = { starts_at: '2026-12-26T04:30:00Z', ends_at: '2026-12-27T12:30:00Z' }
 const t = (id: string, days: number[] | null) => ({ id, days }) as Pick<TicketType, 'id' | 'days'>
@@ -83,15 +83,6 @@ describe('optional extras (add-ons)', () => {
   const tour = { id: 'tour', days: [2] }
   const d1 = { id: 'm1', days: [1] }
   const spouse = { id: 'sp', days: [1] }
-  it('are per person, counted only for people still in the registration', () => {
-    const persons = groupPersons([spouse], { sp: 1 })
-    expect(persons).toEqual(['me', 'sp:0'])
-    expect(addonCount(['me', 'sp:0'], persons)).toBe(2)
-    expect(addonCount(['me'], persons)).toBe(1)
-    expect(addonCount(undefined, persons)).toBe(0)
-    expect(addonCount(['me', 'sp:0'], groupPersons([spouse], { sp: 0 }))).toBe(1)
-    expect(addonCount(['me', 'me'], persons)).toBe(1)
-  })
   it('add day-2 heads to a day-1 main ticket', () => {
     expect(dayHeads([d1, spouse, tour], { m1: 1, sp: 1, tour: 2 }, 2)).toEqual({ 1: 2, 2: 2 })
     expect(dayHeads([d1, spouse, tour], { m1: 1, sp: 1, tour: 0 }, 2)).toEqual({ 1: 2, 2: 0 })

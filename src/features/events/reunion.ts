@@ -47,19 +47,6 @@ export function isAddon(t: { is_addon?: boolean | null }): boolean {
   return !!t.is_addon
 }
 
-/** Keys of the people in a registration, in order: the main person ('me'), then each guest row `${ticketId}:${index}`. */
-export function groupPersons(guestTickets: { id: string }[], qty: Record<string, number>): string[] {
-  const out = ['me']
-  for (const t of guestTickets) for (let i = 0; i < (qty[t.id] ?? 0); i++) out.push(`${t.id}:${i}`)
-  return out
-}
-
-/** How many people tick an extra: only people still in the registration count (a removed guest drops their tick). */
-export function addonCount(ticked: string[] | undefined, persons: string[]): number {
-  const set = new Set(persons)
-  return new Set((ticked ?? []).filter((k) => set.has(k))).size
-}
-
 /** The person type (normal ticket id) a person key belongs to: the main person is the chosen main ticket. */
 export function personTypeOf(key: string, primaryId: string): string {
   return key === 'me' ? primaryId : key.split(':')[0]!
@@ -82,68 +69,83 @@ export interface AddonLine {
   forId: string
   qty: number
   unitPaise: number
+  /** optional names of the people (for the name badge), at most one per counted person */
+  names?: string[]
+}
+
+/** Counts of an extra per person type: the main ticket's type id is the "Me" tickbox (0/1), every other type a stepper. */
+export type AddonCounts = Record<string, Record<string, number>>
+export type AddonNames = Record<string, Record<string, string[]>>
+
+/** How many more people may still take the extra (its maximum minus everyone already counted, optionally leaving one type out). */
+export function addonRoom(max: number, counts: Record<string, number> | undefined, exceptType?: string): number {
+  const others = Object.entries(counts ?? {}).reduce((n, [k, v]) => (k === exceptType ? n : n + Math.max(0, v)), 0)
+  return Math.max(0, max - others)
 }
 
 /**
- * One line per (extra, person type) from the ticked people. A tick of a person who is no longer in the registration, or of
- * a person type that cannot take the extra, is left out (the server would refuse it).
+ * One line per (extra, person type), independent of the family on the main ticket. "Me" (the main ticket's type) is at most 1,
+ * every other type and the total at most the extra's maximum. Types that cannot take the extra are left out
+ * (the server would refuse them).
  */
-export function addonLines(
-  addons: Pick<TicketType, 'id' | 'price_paise'>[],
-  ticked: Record<string, string[] | undefined>,
-  persons: string[],
+export function addonLinesFromCounts(
+  addons: Pick<TicketType, 'id' | 'price_paise' | 'max_per_registration'>[],
+  counts: AddonCounts,
+  names: AddonNames,
   primaryId: string | undefined,
   prices: Pick<AddonPrice, 'addon_id' | 'ticket_type_id' | 'price_paise' | 'available'>[] = [],
 ): AddonLine[] {
   if (!primaryId) return []
-  const inRegistration = new Set(persons)
   const out: AddonLine[] = []
   for (const a of addons) {
-    const counts = new Map<string, number>()
-    for (const k of new Set(ticked[a.id] ?? [])) {
-      if (!inRegistration.has(k)) continue
-      const t = personTypeOf(k, primaryId)
-      if (!addonPriceFor(a, t, prices).available) continue
-      counts.set(t, (counts.get(t) ?? 0) + 1)
+    let left = Math.max(0, a.max_per_registration)
+    for (const [typeId, raw] of Object.entries(counts[a.id] ?? {})) {
+      const pr = addonPriceFor(a, typeId, prices)
+      const qty = Math.min(Math.floor(raw) || 0, typeId === primaryId ? 1 : left, left)
+      if (qty <= 0 || !pr.available) continue
+      left -= qty
+      const nm = (names[a.id]?.[typeId] ?? []).slice(0, qty).map((x) => x.trim())
+      out.push({ addonId: a.id, forId: typeId, qty, unitPaise: pr.pricePaise, ...(nm.some(Boolean) ? { names: nm.filter(Boolean) } : {}) })
     }
-    for (const [forId, qty] of counts) out.push({ addonId: a.id, forId, qty, unitPaise: addonPriceFor(a, forId, prices).pricePaise })
   }
   return out
 }
 
-/** Money for the extras: each person's own price. */
+/** Money for the extras: each person type's own price times its count. */
 export function addonLinesTotal(lines: AddonLine[]): number {
   return lines.reduce((s, l) => s + l.unitPaise * l.qty, 0)
 }
 
-/** Who has an extra, rebuilt from saved item rows: typed rows fill the first people of that type, untyped (older) rows the first people overall. */
-export function ticksFromItems(
+/**
+ * Counts (and names) of one extra rebuilt from saved item rows. Typed rows map straight to their person type; an older untyped
+ * row is given to "Me" first, then to the first person type that can take it.
+ */
+export function countsFromItems(
   addonId: string,
-  items: { ticket_type_id: string; for_ticket_type_id?: string | null; quantity: number }[],
-  persons: string[],
+  items: { ticket_type_id: string; for_ticket_type_id?: string | null; quantity: number; names?: string[] | null }[],
   primaryId: string | undefined,
-): string[] {
+  typeIds: string[],
+): { counts: Record<string, number>; names: Record<string, string[]> } {
+  const counts: Record<string, number> = {}
+  const names: Record<string, string[]> = {}
   const rows = items.filter((i) => i.ticket_type_id === addonId)
-  const out = new Set<string>()
   for (const r of rows.filter((x) => x.for_ticket_type_id)) {
-    let left = r.quantity
-    for (const k of persons) {
-      if (left <= 0) break
-      if (primaryId && personTypeOf(k, primaryId) === r.for_ticket_type_id && !out.has(k)) {
-        out.add(k)
-        left--
-      }
-    }
+    counts[r.for_ticket_type_id!] = (counts[r.for_ticket_type_id!] ?? 0) + r.quantity
+    if (r.names?.length) names[r.for_ticket_type_id!] = [...r.names]
   }
-  let legacy = rows.filter((x) => !x.for_ticket_type_id).reduce((s, x) => s + x.quantity, 0)
-  for (const k of persons) {
-    if (legacy <= 0) break
-    if (!out.has(k)) {
-      out.add(k)
-      legacy--
-    }
+  let legacy = rows.filter((x) => !x.for_ticket_type_id).reduce((n, x) => n + x.quantity, 0)
+  if (primaryId && legacy > 0 && !counts[primaryId]) {
+    counts[primaryId] = 1
+    legacy--
   }
-  return [...out]
+  const first = typeIds[0]
+  if (first && legacy > 0) counts[first] = (counts[first] ?? 0) + legacy
+  return { counts, names }
+}
+
+/** Named people who join only through an extra, from saved item rows: "Name (27 Dec event, Child)". */
+export function extraPeople(items: { label: string; names?: string[] | null }[]): { name: string; label: string }[] {
+  return items.flatMap((i) => (i.names ?? []).filter((n) => n.trim()).map((name) => ({ name, label: i.label })))
 }
 
 /** People per day for a ticket selection: { 1: 1, 2: 4 }. */

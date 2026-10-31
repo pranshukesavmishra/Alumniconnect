@@ -16,6 +16,7 @@ import { exportAttendees, exportPayments, exportRegistrations } from './export'
 import { loggedExport } from './exportLog'
 import { useRecordOfflinePayment, type AdminData } from './queries'
 import { RegistrationAdjustments } from './RegistrationAdjustments'
+import { extraPeople } from '../events/reunion'
 import { AdminReunionDetail } from './AdminReunionDetail'
 import { RegistrationEditor } from './RegistrationEditor'
 import { usePaged } from '../../lib/paging'
@@ -166,6 +167,7 @@ function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registratio
               </KeyValue>
             ))}
             <KeyValue label="People">{reg.headcount}</KeyValue>
+            {extraPeople(items).length > 0 && <KeyValue label="Joining via extras">{extraPeople(items).map((p) => `${p.name} (${p.label})`).join(', ')}</KeyValue>}
             {reg.guests.length > 0 && <KeyValue label="With them">{reg.guests.map((g) => `${g.name || '—'} (${g.relation})`).join(', ')}</KeyValue>}
             <KeyValue label="Food">{FOOD_PREFS.find((f) => f.value === reg.food_pref)?.label ?? '—'}</KeyValue>
             <KeyValue label="T-shirt">{reg.tshirt_size ?? '—'}</KeyValue>

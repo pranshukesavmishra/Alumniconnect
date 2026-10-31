@@ -11,6 +11,9 @@ export const eventsUiEn = {
   'addon.none': 'Remove for everyone',
   'addon.notFor': '{name}: {what} is not available for this ticket',
   'addon.heading': 'Optional · {when}',
+  'addon.independent': "Joining on {when}? Add how many adults and children — they don't need to be on a 26 Dec ticket.",
+  'addon.namesHint': 'Names of those joining on {when}, for the name badge (optional)',
+  'addon.nameLabel': '{type} {n} name (optional)',
   // Meet page
   'evx.heroEyebrow': 'Jabalpur Engineering College · Since 1947',
   'evx.countdownTitle': 'The gates open in',

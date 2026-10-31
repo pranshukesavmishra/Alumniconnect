@@ -60,7 +60,10 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
       p_items: [
         ...plain.map((t) => ({ ticket_type_id: t.id, quantity: qty[t.id] ?? 0 })),
         ...addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => ({ ticket_type_id: a.id, quantity: qty[a.id]! })),
-        ...rows.filter((r) => r.forId && (ax[r.key] ?? 0) > 0).map((r) => ({ ticket_type_id: r.a.id, for_ticket_type_id: r.forId, quantity: ax[r.key]! })),
+        ...rows.filter((r) => r.forId && (ax[r.key] ?? 0) > 0).map((r) => {
+          const names = items.find((i) => i.ticket_type_id === r.a.id && i.for_ticket_type_id === r.forId)?.names?.slice(0, ax[r.key]!)
+          return { ticket_type_id: r.a.id, for_ticket_type_id: r.forId, quantity: ax[r.key]!, ...(names?.length ? { names } : {}) }
+        }),
       ],
       p_reason: reason.trim(),
       p_expected: reg.updated_at,

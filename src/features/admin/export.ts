@@ -2,6 +2,7 @@ import Papa from 'papaparse'
 import { downloadFile } from '../../lib/ics'
 import { FOOD_PREFS } from '../../lib/constants'
 import type { EventRow } from '../../lib/types'
+import { extraPeople } from '../events/reunion'
 import type { AdminData } from './queries'
 
 export const food = (v: string | null) => FOOD_PREFS.find((f) => f.value === v)?.label ?? ''
@@ -39,7 +40,7 @@ export const stamp = () => new Date().toISOString().slice(0, 10)
 
 export function exportRegistrations(event: EventRow, d: AdminData) {
   const itemsBy = new Map<string, string>()
-  for (const i of d.items) itemsBy.set(i.registration_id, [itemsBy.get(i.registration_id), `${i.label} x${i.quantity}`].filter(Boolean).join('; '))
+  for (const i of d.items) itemsBy.set(i.registration_id, [itemsBy.get(i.registration_id), `${i.label} x${i.quantity}${i.names?.length ? ` (${i.names.join(', ')})` : ''}`].filter(Boolean).join('; '))
   const paidBy = new Map<string, number>()
   for (const p of d.payments) if (p.status === 'verified' && p.method !== 'waiver') paidBy.set(p.registration_id, (paidBy.get(p.registration_id) ?? 0) + p.amount_paise)
   saveCsv(
@@ -79,6 +80,7 @@ export function exportAttendees(event: EventRow, d: AdminData) {
   for (const r of d.registrations.filter((x) => x.status === 'confirmed' || x.status === 'under_review')) {
     const batch = [r.branch, r.grad_year].filter(Boolean).join(' ')
     rows.push({ Code: r.code, Status: r.status, Name: safe(r.full_name), 'Badge name': safe(r.nickname), Type: 'Alumnus', Batch: batch, Food: food(r.food_pref), 'T-shirt': r.tshirt_size ?? '', 'Registered by': safe(r.full_name) })
+    for (const p of extraPeople(d.items.filter((i) => i.registration_id === r.id))) rows.push({ Code: r.code, Status: r.status, Name: safe(p.name), 'Badge name': '', Type: safe(p.label), Batch: '', Food: food(r.food_pref), 'T-shirt': '', 'Registered by': safe(r.full_name) })
     for (const g of r.guests) rows.push({ Code: r.code, Status: r.status, Name: safe(g.name), 'Badge name': '', Type: safe(g.relation ?? 'Guest'), Batch: '', Food: food(g.food ?? r.food_pref), 'T-shirt': '', 'Registered by': safe(r.full_name) })
   }
   saveCsv(`${event.slug}-attendees-${stamp()}.csv`, rows)

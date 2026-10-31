@@ -24,7 +24,7 @@ import { registrationOpen, useAddonPrices, useEvent, useEventQuestions, useMyExp
 import { PriceTag } from './PriceTag'
 import { discountInfo, totalSavings } from './ticketPricing'
 import { FundPicker, MultiChoice, ProfileCard, QuestionField, YesNo, boolToYn, ynToBool, type YN } from './RegisterParts'
-import { addonLines, addonLinesTotal, addonPriceFor, answerText, groupPersons, personTypeOf, ticksFromItems, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
+import { addonLinesFromCounts, addonLinesTotal, addonPriceFor, addonRoom, answerText, countsFromItems, checkCustomAnswers, cleanCustomAnswers, dayLabel, eventDayCount, fundOk, missingProfileFields, ticketFits, type AnswerProblem } from './reunion'
 import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 
 interface GuestDraft {
@@ -36,8 +36,10 @@ interface FormState {
   qty: Record<string, number>
   guestNames: Record<string, string[]>
   guestFood: Record<string, string[]>
-  /** optional extras: which people tick each extra ('me' or `${guestTicketId}:${row}`) */
-  addonOn?: Record<string, string[]>
+  /** optional extras: how many people take each extra per person type (the main ticket's type = "Me", 0/1), independent of the family on the ticket */
+  addonQty?: Record<string, Record<string, number>>
+  /** optional names of those people, for the name badge */
+  addonNames?: Record<string, Record<string, string[]>>
   tshirt_size: string
   food_pref: string
   needs_accommodation: YN
@@ -83,7 +85,8 @@ const blank = (): FormState => ({
   qty: {},
   guestNames: {},
   guestFood: {},
-  addonOn: {},
+  addonQty: {},
+  addonNames: {},
   tshirt_size: '',
   food_pref: '',
   needs_accommodation: '',
@@ -161,7 +164,7 @@ export function RegisterPage() {
     const reg = mine?.registration
     if (reg && reg.status !== 'cancelled') {
       const qty: Record<string, number> = {}
-      for (const it of mine.items) qty[it.ticket_type_id] = (qty[it.ticket_type_id] ?? 0) + it.quantity
+      for (const it of mine.items) if (!it.for_ticket_type_id && !tickets.find((t) => t.id === it.ticket_type_id)?.is_addon) qty[it.ticket_type_id] = (qty[it.ticket_type_id] ?? 0) + it.quantity
       // Match saved guests to tickets by id (older entries by label); anything unmatched fills remaining slots,
       // so a renamed ticket never drops a guest's name.
       const guestNames: Record<string, string[]> = {}
@@ -190,10 +193,14 @@ export function RegisterPage() {
         guestNames[t.id] = list.map((g) => g.name)
         guestFood[t.id] = list.map((g) => g.food)
       }
-      const personKeys = groupPersons(extras, qty)
-      const addonOn: Record<string, string[]> = {}
+      const addonQty: Record<string, Record<string, number>> = {}
+      const addonNames: Record<string, Record<string, string[]>> = {}
       const savedPrimary = tickets.find((t) => t.is_primary && (qty[t.id] ?? 0) > 0)
-      for (const a of tickets.filter((t) => t.is_addon)) addonOn[a.id] = ticksFromItems(a.id, mine.items, personKeys, savedPrimary?.id)
+      for (const a of tickets.filter((t) => t.is_addon)) {
+        const c = countsFromItems(a.id, mine.items, savedPrimary?.id, extras.map((t) => t.id))
+        addonQty[a.id] = c.counts
+        addonNames[a.id] = c.names
+      }
       const fund = reg.fund_paise > 0
       const preset = (FUND_PRESETS as readonly number[]).includes(reg.fund_paise)
       setForm((f) => ({
@@ -201,7 +208,8 @@ export function RegisterPage() {
         qty,
         guestNames,
         guestFood,
-        addonOn,
+        addonQty,
+        addonNames,
         tshirt_size: reg.tshirt_size ?? '',
         food_pref: reg.food_pref ?? '',
         needs_accommodation: boolToYn(reg.needs_accommodation),
@@ -265,12 +273,10 @@ export function RegisterPage() {
   const extraTickets = useMemo(() => tickets?.filter((t) => !t.is_primary && !t.is_addon) ?? [], [tickets])
   const addonTickets = useMemo(() => tickets?.filter((t) => t.is_addon) ?? [], [tickets])
   const activeQuestions = useMemo(() => (questions ?? []).filter((q) => q.is_active), [questions])
-  // people in the registration: the main person and the guests. Optional extras are per person on top of those.
-  const guestTicketsAll = extraTickets.filter((t) => ticketFits(primaryTickets.find((p) => (form.qty[p.id] ?? 0) > 0), t))
-  const persons = groupPersons(guestTicketsAll, form.qty)
+  // optional extras have their own counts per person type: they do not depend on the family added for the main ticket
   const selectedPrimary0 = primaryTickets.find((p) => (form.qty[p.id] ?? 0) > 0)
-  // an extra is priced per person type: one line per (extra, person type) from the ticked people, each at that type's own price
-  const aLines = addonLines(addonTickets, form.addonOn ?? {}, persons, selectedPrimary0?.id, addonPrices)
+  // an extra is priced per person type: one line per (extra, person type), each at that type's own price
+  const aLines = addonLinesFromCounts(addonTickets, form.addonQty ?? {}, form.addonNames ?? {}, selectedPrimary0?.id, addonPrices)
   const qtyAll: Record<string, number> = { ...form.qty }
   for (const a of addonTickets) qtyAll[a.id] = aLines.filter((l) => l.addonId === a.id).reduce((n, l) => n + l.qty, 0)
   const ticketsTotal = (tickets ?? []).filter((t) => !t.is_addon).reduce((sum, t) => sum + t.price_paise * (qtyAll[t.id] ?? 0), 0) + addonLinesTotal(aLines)
@@ -334,15 +340,14 @@ export function RegisterPage() {
       for (const t of extraTickets) if (!ticketFits(chosen, t)) qty[t.id] = 0
       return { ...f, qty }
     })
-  const toggleAddon = (a: TicketType, key: string, on: boolean) =>
+  const setAddonQty = (a: TicketType, typeId: string, v: number) =>
+    setForm((f) => ({ ...f, addonQty: { ...f.addonQty, [a.id]: { ...f.addonQty?.[a.id], [typeId]: Math.max(0, v) } } }))
+  const setAddonName = (a: TicketType, typeId: string, i: number, v: string) =>
     setForm((f) => {
-      const cur = new Set(f.addonOn?.[a.id] ?? [])
-      if (on) cur.add(key)
-      else cur.delete(key)
-      return { ...f, addonOn: { ...f.addonOn, [a.id]: [...cur] } }
+      const list = [...(f.addonNames?.[a.id]?.[typeId] ?? [])]
+      list[i] = v
+      return { ...f, addonNames: { ...f.addonNames, [a.id]: { ...f.addonNames?.[a.id], [typeId]: list } } }
     })
-  const canTake = (a: TicketType, k: string) => !!selectedPrimary && addonPriceFor(a, personTypeOf(k, selectedPrimary.id), addonPrices).available
-  const setAddonAll = (a: TicketType, on: boolean) => setForm((f) => ({ ...f, addonOn: { ...f.addonOn, [a.id]: on ? persons.filter((k) => canTake(a, k)) : [] } }))
   const setGuest = (t: TicketType, i: number, key: 'guestNames' | 'guestFood', v: string) =>
     setForm((f) => {
       const list = [...(f[key][t.id] ?? [])]
@@ -476,10 +481,10 @@ export function RegisterPage() {
         // after payment the ticket mix is fixed: send the saved rows exactly (older registrations have extras without a person type)
         items:
           locked && mine
-            ? mine.items.map((i) => ({ ticket_type_id: i.ticket_type_id, ...(i.for_ticket_type_id ? { for_ticket_type_id: i.for_ticket_type_id } : {}), quantity: i.quantity }))
+            ? mine.items.map((i) => ({ ticket_type_id: i.ticket_type_id, ...(i.for_ticket_type_id ? { for_ticket_type_id: i.for_ticket_type_id } : {}), quantity: i.quantity, ...(i.names?.length ? { names: i.names } : {}) }))
             : [
                 ...(tickets ?? []).filter((t) => !t.is_addon).map((t) => ({ ticket_type_id: t.id, quantity: qtyAll[t.id] ?? 0 })),
-                ...aLines.map((l) => ({ ticket_type_id: l.addonId, for_ticket_type_id: l.forId, quantity: l.qty })),
+                ...aLines.map((l) => ({ ticket_type_id: l.addonId, for_ticket_type_id: l.forId, quantity: l.qty, ...(l.names?.length ? { names: l.names } : {}) })),
               ],
       })
       clearDraft()
@@ -674,33 +679,25 @@ export function RegisterPage() {
                 <Card className="divide-y divide-border">
                   {addonTickets.map((a) => {
                     const when = (a.days ?? []).map((x) => dayLabel(event, x)).join(' & ')
-                    const n = qtyAll[a.id] ?? 0
-                    const eligible = persons.filter((k) => canTake(a, k))
-                    const ticked = new Set(form.addonOn?.[a.id] ?? [])
-                    const personName = (k: string): string => {
-                      if (k === 'me') return tx('addon.me')
-                      const [tid, idx] = k.split(':')
-                      const g = extraTickets.find((t) => t.id === tid)
-                      const nm = (form.guestNames[tid!]?.[Number(idx)] ?? '').trim()
-                      return nm || `${g?.label ?? ''} ${Number(idx) + 1}`.trim()
-                    }
+                    const cnt = form.addonQty?.[a.id] ?? {}
                     return (
                       <div key={a.id} className="space-y-3 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="font-semibold">{[when, a.label].filter(Boolean).join(' · ')}</p>
                             <p className="text-sm text-muted">{[tx('addon.perPerson'), a.description].filter(Boolean).join(' · ')}</p>
+                            <p className="text-sm text-muted">{tx('addon.independent', { when: when || a.label })}</p>
                           </div>
                         </div>
                         <div className="space-y-3">
                           {/* me: one tickbox */}
-                          {persons.includes('me') && (() => {
-                            const pr = addonPriceFor(a, personTypeOf('me', selectedPrimary.id), addonPrices)
-                            if (!pr.available) return <p className="text-sm text-muted" data-testid="addon-unavailable">{tx('addon.notFor', { name: personName('me'), what: a.label })}</p>
+                          {(() => {
+                            const pr = addonPriceFor(a, selectedPrimary.id, addonPrices)
+                            if (!pr.available) return <p className="text-sm text-muted" data-testid="addon-unavailable">{tx('addon.notFor', { name: tx('addon.me'), what: a.label })}</p>
                             const d = pr.overridden ? null : discountInfo(a)
                             return (
-                              <Checkbox checked={ticked.has('me')} disabled={locked} onChange={(on) => toggleAddon(a, 'me', on)}>
-                                {tx('addon.join', { name: personName('me'), what: a.label })}
+                              <Checkbox checked={(cnt[selectedPrimary.id] ?? 0) > 0} disabled={locked} onChange={(on) => setAddonQty(a, selectedPrimary.id, on ? 1 : 0)}>
+                                {tx('addon.join', { name: tx('addon.me'), what: a.label })}
                                 <span className="ml-1 text-muted">
                                   {`(+${formatPaise(pr.pricePaise)}`}
                                   {d && <>{' '}<s>{formatPaise(d.listPaise)}</s>{` · ${tx('addon.save', { percent: d.percent })}`}</>}
@@ -709,46 +706,51 @@ export function RegisterPage() {
                               </Checkbox>
                             )
                           })()}
-                          {/* family: one +/- row per kind of person (adults, children), price x number */}
-                          {extraTickets
-                            .filter((t) => (form.qty[t.id] ?? 0) > 0)
-                            .map((t) => {
-                              const keys = persons.filter((k) => k.startsWith(`${t.id}:`))
-                              if (keys.length === 0) return null
-                              const pr = addonPriceFor(a, t.id, addonPrices)
-                              if (!pr.available) {
-                                return (
-                                  <p key={t.id} className="text-sm text-muted" data-testid="addon-unavailable">
-                                    {tx('addon.notFor', { name: t.label, what: a.label })}
-                                  </p>
-                                )
-                              }
-                              const on = keys.filter((k) => ticked.has(k))
-                              const setCount = (v: number) =>
-                                setForm((f) => {
-                                  const cur = new Set(f.addonOn?.[a.id] ?? [])
-                                  keys.forEach((k, i) => (i < v ? cur.add(k) : cur.delete(k)))
-                                  return { ...f, addonOn: { ...f.addonOn, [a.id]: [...cur] } }
-                                })
+                          {/* one +/- row per kind of person (adults, children), price x number, not limited by the 26 Dec family tickets */}
+                          {extraTickets.map((t) => {
+                            const pr = addonPriceFor(a, t.id, addonPrices)
+                            if (!pr.available) {
                               return (
-                                <div key={t.id} className="flex items-center justify-between gap-3" data-testid="addon-group">
+                                <p key={t.id} className="text-sm text-muted" data-testid="addon-unavailable">
+                                  {tx('addon.notFor', { name: t.label, what: a.label })}
+                                </p>
+                              )
+                            }
+                            const on = Math.min(cnt[t.id] ?? 0, a.max_per_registration)
+                            const room = addonRoom(a.max_per_registration, { ...cnt, [selectedPrimary.id]: 0 }, t.id)
+                            const d = pr.overridden ? null : discountInfo(a)
+                            return (
+                              <div key={t.id} className="space-y-2" data-testid="addon-group">
+                                <div className="flex items-center justify-between gap-3">
                                   <div className="min-w-0">
                                     <p className="font-medium">{t.label}</p>
                                     <p className="text-sm text-muted">
                                       {`${formatPaise(pr.pricePaise)} ${tx('reg.each')}`}
-                                      {on.length > 0 && ` · ${formatPaise(pr.pricePaise * on.length)}`}
+                                      {d && <>{' '}<s>{formatPaise(d.listPaise)}</s></>}
+                                      {on > 0 && ` · ${formatPaise(pr.pricePaise * on)}`}
                                     </p>
                                   </div>
-                                  {locked ? <span className="font-semibold tabular-nums">{on.length}</span> : <Stepper value={on.length} max={keys.length} onChange={setCount} label={`${a.label}: ${t.label}`} />}
+                                  {locked ? <span className="font-semibold tabular-nums">{on}</span> : <Stepper value={on} max={Math.min(a.max_per_registration, room)} onChange={(v) => setAddonQty(a, t.id, v)} label={`${a.label}: ${t.label}`} />}
                                 </div>
-                              )
-                            })}
+                                {on > 0 && (
+                                  <div className="space-y-2" data-testid="addon-names">
+                                    <p className="text-sm text-muted">{tx('addon.namesHint', { when: when || a.label })}</p>
+                                    {Array.from({ length: on }, (_, i) => (
+                                      <Input
+                                        key={i}
+                                        aria-label={tx('addon.nameLabel', { type: t.label, n: i + 1 })}
+                                        placeholder={tx('addon.nameLabel', { type: t.label, n: i + 1 })}
+                                        maxLength={80}
+                                        value={form.addonNames?.[a.id]?.[t.id]?.[i] ?? ''}
+                                        onChange={(e) => setAddonName(a, t.id, i, e.target.value)}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
-                        {!locked && eligible.length > 1 && (
-                          <Button type="button" variant="secondary" size="sm" onClick={() => setAddonAll(a, n < eligible.length)}>
-                            {n < eligible.length ? tx('addon.all', { count: eligible.length, what: a.label }) : tx('addon.none')}
-                          </Button>
-                        )}
                       </div>
                     )
                   })}

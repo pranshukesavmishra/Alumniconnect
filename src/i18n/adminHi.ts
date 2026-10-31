@@ -254,6 +254,7 @@ export const ADMIN_HI: Record<string, string> = {
   "Note to member": "सदस्य के लिए नोट",
   "People": "लोग",
   "With them": "उनके साथ",
+  "Joining via extras": "वैकल्पिक कार्यक्रम में शामिल",
   "Food": "भोजन",
   "T-shirt": "टी-शर्ट",
   "Accommodation": "ठहरना",
