@@ -1,0 +1,20 @@
+p = "scripts/guide/scenes.mjs"
+s = open(p).read()
+a = s.index("    await page.getByText(/Both days/).first().waitFor()")
+b = s.index("    r.pause()\n    await page.locator('label').filter({ hasText: /^Vegetarian$/ })")
+new = """    await page.getByText(/Alumnus/).first().waitFor()
+    await tap(page, page.getByText(/Alumnus/).first(), { label: 'Your ticket: now 25% off', look: 900, pause: 700 })
+    await shot(r, 's3_ticket')
+    const more = page.getByRole('button', { name: 'More: Spouse · 26 Dec' })
+    await tap(page, more, { label: 'Add family', look: 600, pause: 400 })
+    await page.getByLabel('Spouse · 26 Dec 1 name').fill('Sunita Mehta')
+    await sleep(400)
+    const extras = page.getByTestId('optional-extras')
+    await extras.scrollIntoViewIfNeeded()
+    await smoothScroll(page, 80, 400)
+    await tap(page, extras.locator('label').nth(0), { label: 'Optional 27 Dec tour', look: 900, pause: 500, scroll: false })
+    await tap(page, extras.locator('label').nth(1), { look: 600, pause: 900, scroll: false })
+    await shot(r, 's3_tour')
+"""
+s = s[:a] + new + s[b:]
+open(p, "w").write(s)

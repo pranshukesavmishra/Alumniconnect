@@ -102,10 +102,5 @@ for (let i = 0; i < 8; i++) {
   sql(`insert into event_photos (id, event_id, uploaded_by, storage_path, thumb_path, width, height, caption, kind, source, status, sort_order, media_kind, content_hash, created_at)
        values ('${id}', '${ev}', '${up}', '${path}', '${thumb}', 1600, 1067, ${q(caps[i])}, 'event', 'member', 'approved', ${i}, 'photo', '${createHash('sha256').update('guide-' + i).digest('hex')}', now() - interval '${i * 40 + 10} minutes')`)
 }
-console.log('ORIG_UPI=' + sql(`select coalesce(upi_id, '') from events where id = '${ev}'`))
-sql(`update events set upi_id = 'jecalumni@okicici', upi_payee_name = 'JEC Alumni Association' where id = '${ev}'`)
-sql(`delete from event_ticket_types where event_id = '${ev}' and label = 'Outdoor tour (Bhedaghat)'`)
-sql(`insert into event_ticket_types (event_id, label, description, price_paise, is_primary, is_addon, max_per_registration, sort, days) values ('${ev}', 'Outdoor tour', 'Bhedaghat boat ride and lunch', 65000, false, true, 10, 90, '{2}')`)
-sql(`update event_ticket_types set label = 'Outdoor tour (Bhedaghat)' where event_id = '${ev}' and label = 'Outdoor tour'`)
 await sleep(100)
 console.log('seed ok')

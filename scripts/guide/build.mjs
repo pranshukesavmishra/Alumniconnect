@@ -32,8 +32,8 @@ const COPY = {
 }[LANG]
 
 // ------------------------------------------------------------------ timeline
-const GAP = 0.35, X = 0.4, LEAD = 0.5, TAIL = 2.2
-const PAD = { 1: 0.6, 2: 0.8, 3: 0.6, 4: 0.2, 5: 0.3, 6: 0.2, 7: 0.2, 8: 0.1 }
+const GAP = 0.3, X = 0.4, LEAD = 0.5, TAIL = 1.9
+const PAD = { 1: 0.5, 2: 0.6, 3: 0.2, 4: 0.1, 5: 0.2, 6: 0.1, 7: 0.1, 8: 0.1 }
 const d = Object.fromEntries(lines.map((l) => [l.i, l.dur]))
 const A = { 1: LEAD }
 for (let i = 2; i <= 9; i++) A[i] = A[i - 1] + d[i - 1] + GAP + PAD[i - 1]
@@ -83,7 +83,7 @@ async function renderLayers() {
     <div style="position:absolute;left:${PH.x - 14}px;top:${PH.y - 14}px;width:${PH.w + 28}px;height:${PH.h + 28}px;border-radius:58px;background:#0b1210;box-shadow:0 40px 90px rgba(0,0,0,.55),0 0 0 2px rgba(255,255,255,.18)"></div>`)
   const e = COPY.end
   out.end = await shot('end', `<div class="bg"></div><div class="dots"></div>
-    <div style="position:absolute;left:0;right:0;top:300px;display:flex;justify-content:center"><div style="width:340px;height:340px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 24px 70px rgba(0,0,0,.45),0 0 0 14px rgba(232,163,61,.35)"><img src="${pathToFileURL(ROOT + 'public/jecaa-logo.png').href}" style="width:300px;height:300px;border-radius:50%"></div></div>
+    <div style="position:absolute;left:0;right:0;top:300px;display:flex;justify-content:center"><div style="width:340px;height:340px;border-radius:50%;background:#fff;display:grid;place-items:center;box-shadow:0 24px 70px rgba(0,0,0,.45),0 0 0 14px rgba(232,163,61,.35)"><img src="${pathToFileURL(ROOT + 'public/jec-logo.png').href}" style="height:270px;width:auto"></div></div>
     <div style="position:absolute;left:40px;right:40px;top:740px;text-align:center;font-size:96px;font-weight:800;letter-spacing:-.02em;line-height:1.05">${esc(e[0])}</div>
     <div style="position:absolute;left:60px;right:60px;top:900px;text-align:center;font-size:${hi ? 56 : 58}px;font-weight:600;color:#cfe6db;line-height:1.25">${esc(e[1])}</div>
     <div style="position:absolute;left:0;right:0;top:1090px;display:flex;justify-content:center"><div style="font-size:46px;font-weight:700;background:#e8a33d;color:#2a1a02;border-radius:60px;padding:22px 48px">${esc(e[2])}</div></div>`)
