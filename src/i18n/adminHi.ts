@@ -1325,4 +1325,11 @@ export const ADMIN_HI: Record<string, string> = {
   "Optional extras": "वैकल्पिक अतिरिक्त",
   "Remove optional extra": "वैकल्पिक अतिरिक्त हटाएँ",
   "Every optional extra needs a name.": "हर वैकल्पिक अतिरिक्त का नाम ज़रूरी है।",
+  "Optional extras for this ticket": "इस टिकट के लिए वैकल्पिक अतिरिक्त",
+  "Price of {} for this ticket (₹)": "इस टिकट के लिए {1} की कीमत (₹)",
+  "Empty = the extra’s own price, {}. 0 = free.": "खाली = अतिरिक्त की अपनी कीमत, {1}। 0 = निःशुल्क।",
+  "Empty = the extra’s own price. 0 = free.": "खाली = अतिरिक्त की अपनी कीमत। 0 = निःशुल्क।",
+  "Not available for this ticket": "इस टिकट के लिए उपलब्ध नहीं",
+  "Price of “{}” for “{}” is not a valid amount.": "“{2}” टिकट पर “{1}” की कीमत सही राशि नहीं है।",
+  "the extra": "अतिरिक्त",
 }

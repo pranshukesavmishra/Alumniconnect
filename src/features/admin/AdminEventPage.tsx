@@ -121,7 +121,7 @@ export function AdminEventPage() {
         {tab === 'finance' && <AdminFinance event={data.event} />}
         {tab === 'waitlist' && <AdminWaitlist event={data.event} />}
         {tab === 'dayof' && <AdminDayOf event={data.event} manager={manager} />}
-        {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}`} existing={data} />}
+        {tab === 'settings' && <AdminSettings key={`${data.event.updated_at}:${data.tickets.map((t) => t.id).join()}:${data.addonPrices.map((p) => `${p.addon_id}${p.ticket_type_id}${p.price_paise}${p.available}`).join()}`} existing={data} />}
         {tab === 'photos' && <PhotoAdminTab event={data.event} />}
         {tab === 'team' && <AdminTeam eventId={data.event.id} eventTitle={data.event.title} />}
       </Page>
