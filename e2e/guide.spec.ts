@@ -3,7 +3,9 @@
 //   PW_CHROMIUM=/opt/pw-browsers/chromium npx playwright test e2e/guide.spec.ts
 import { expect, test, type Page } from '@playwright/test'
 import { onboard, signInWithEmail, sql } from './helpers'
-import { CHAPTERS } from '../src/features/guide/chapters'
+import { readFileSync } from 'node:fs'
+
+const CHAPTERS = JSON.parse(readFileSync(new URL('../src/features/guide/chapters.json', import.meta.url), 'utf8')) as Record<'en' | 'hi', { step: number; start: number }[]>
 
 const run = Date.now().toString(36).slice(-5)
 const noHScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -94,7 +96,7 @@ test('a member finds How to use in the menu and a dismissible card on Home', asy
   await expect(card).toBeVisible()
   // menu entry
   await page.getByRole('button', { name: /menu/i }).first().click()
-  await page.getByRole('button', { name: /^Me/ }).first().click()
+  await page.getByRole('button', { name: 'Me', exact: true }).first().click()
   await page.getByRole('link', { name: 'How to use' }).filter({ visible: true }).first().click()
   await expect(page).toHaveURL(/\/guide$/)
   await expect(page.getByTestId('guide-help').getByRole('link', { name: 'Ask JEC' })).toBeVisible()
