@@ -11,15 +11,19 @@ import { normalizePhone } from '../../lib/phone'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
 import { supabase } from '../../lib/supabase'
 import type { Registration, RegistrationItem } from '../../lib/types'
-import { useTicketTypes } from '../events/queries'
+import { useAddonPrices, useTicketTypes } from '../events/queries'
+import { addonPriceFor } from '../events/reunion'
 import { adminDataKey } from './queries'
 
 /** Managers: change tickets/details on a member's behalf, or cancel / reopen. Re-priced on the server and audited. */
 export function RegistrationEditor({ reg, items }: { reg: Registration; items: RegistrationItem[] }) {
   const qc = useQueryClient()
   const { data: tickets } = useTicketTypes(reg.event_id)
+  const { data: addonPrices = [] } = useAddonPrices(reg.event_id)
   const [open, setOpen] = useState(false)
-  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(items.map((i) => [i.ticket_type_id, i.quantity])))
+  const [qty, setQty] = useState<Record<string, number>>(() => Object.fromEntries(items.filter((i) => !i.for_ticket_type_id).map((i) => [i.ticket_type_id, i.quantity])))
+  // optional extras are per person type: key `${extra}:${person type}` (person type empty = an older registration without one)
+  const [ax, setAx] = useState<Record<string, number>>(() => Object.fromEntries(items.filter((i) => i.for_ticket_type_id).map((i) => [`${i.ticket_type_id}:${i.for_ticket_type_id}`, i.quantity])))
   const [food, setFood] = useState(reg.food_pref ?? '')
   const [tshirt, setTshirt] = useState(reg.tshirt_size ?? '')
   const [phone, setPhone] = useState(reg.phone)
@@ -30,7 +34,17 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
   const [busy, setBusy] = useState(false)
 
   const fundPaise = parseRupeesToPaise(fund || '0')
-  const ticketsTotal = (tickets ?? []).reduce((s, t) => s + t.price_paise * (qty[t.id] ?? 0), 0)
+  const plain = (tickets ?? []).filter((t) => !t.is_addon)
+  const addons = (tickets ?? []).filter((t) => t.is_addon)
+  // the legacy (no person type) count of an extra comes from `qty`; typed counts from `ax`
+  const rows = addons.flatMap((a) => [
+    ...(qty[a.id] ? [{ key: a.id, a, forId: '', label: a.label, price: a.price_paise, max: a.max_per_registration }] : []),
+    ...plain.flatMap((t) => {
+      const pr = addonPriceFor(a, t.id, addonPrices)
+      return pr.available || (ax[`${a.id}:${t.id}`] ?? 0) > 0 ? [{ key: `${a.id}:${t.id}`, a, forId: t.id, label: `${a.label} (${t.label})`, price: pr.pricePaise, max: a.max_per_registration }] : []
+    }),
+  ])
+  const ticketsTotal = plain.reduce((s, t) => s + t.price_paise * (qty[t.id] ?? 0), 0) + rows.reduce((s, r) => s + r.price * (r.forId ? (ax[r.key] ?? 0) : (qty[r.a.id] ?? 0)), 0)
   const total = ticketsTotal + (fundPaise ?? 0)
   const done = () => qc.invalidateQueries({ queryKey: adminDataKey(reg.event_id) })
 
@@ -43,7 +57,11 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
     const { error } = await supabase.rpc('admin_update_registration', {
       p_registration: reg.id,
       p_details: { food_pref: food, tshirt_size: tshirt, phone: normalizePhone(phone), feedback, ...(fundPaise !== reg.fund_paise ? { fund_paise: fundPaise } : {}) },
-      p_items: (tickets ?? []).map((t) => ({ ticket_type_id: t.id, quantity: qty[t.id] ?? 0 })),
+      p_items: [
+        ...plain.map((t) => ({ ticket_type_id: t.id, quantity: qty[t.id] ?? 0 })),
+        ...addons.filter((a) => (qty[a.id] ?? 0) > 0).map((a) => ({ ticket_type_id: a.id, quantity: qty[a.id]! })),
+        ...rows.filter((r) => r.forId && (ax[r.key] ?? 0) > 0).map((r) => ({ ticket_type_id: r.a.id, for_ticket_type_id: r.forId, quantity: ax[r.key]! })),
+      ],
       p_reason: reason.trim(),
       p_expected: reg.updated_at,
     })
@@ -88,13 +106,27 @@ export function RegistrationEditor({ reg, items }: { reg: Registration; items: R
       ) : (
         <Card className="space-y-4 p-4">
           <p className="font-semibold">Edit on the member’s behalf</p>
-          {(tickets ?? []).map((t) => (
+          {plain.map((t) => (
             <div key={t.id} className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-medium">{t.label}</p>
                 <p className="text-sm text-muted">{formatPaise(t.price_paise)}</p>
               </div>
               <Stepper value={qty[t.id] ?? 0} max={t.max_per_registration} onChange={(v) => setQty((q) => ({ ...q, [t.id]: v }))} label={t.label} />
+            </div>
+          ))}
+          {rows.map((r) => (
+            <div key={r.key} className="flex items-center justify-between gap-3" data-testid="edit-addon-row">
+              <div>
+                <p className="font-medium">{r.label}</p>
+                <p className="text-sm text-muted">{formatPaise(r.price)}</p>
+              </div>
+              <Stepper
+                value={r.forId ? (ax[r.key] ?? 0) : (qty[r.a.id] ?? 0)}
+                max={r.max}
+                onChange={(v) => (r.forId ? setAx((q) => ({ ...q, [r.key]: v })) : setQty((q) => ({ ...q, [r.a.id]: v })))}
+                label={r.label}
+              />
             </div>
           ))}
           <p className="text-sm">

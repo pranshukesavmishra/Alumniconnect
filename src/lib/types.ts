@@ -115,6 +115,15 @@ export interface TicketType {
   days: number[] | null
 }
 
+/** Price of an optional extra for one person type. price_paise null = the extra's own price; available false = that person type cannot take it. */
+export interface AddonPrice {
+  addon_id: string
+  ticket_type_id: string
+  event_id: string
+  price_paise: number | null
+  available: boolean
+}
+
 export type QuestionKind = 'yes_no' | 'single' | 'multi' | 'short_text' | 'long_text'
 
 /** A question the organisers added to an event's registration. */
@@ -211,6 +220,8 @@ export interface Registration {
 export interface RegistrationItem {
   registration_id: string
   ticket_type_id: string
+  /** for an optional extra: the person type (normal ticket) it was taken for; null on older registrations */
+  for_ticket_type_id?: string | null
   label: string
   unit_price_paise: number
   quantity: number

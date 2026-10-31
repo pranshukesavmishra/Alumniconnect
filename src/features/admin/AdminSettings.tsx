@@ -10,7 +10,7 @@ import { normalizePhone } from '../../lib/phone'
 import { MEET_SLUG } from '../../lib/constants'
 import { friendlyError } from '../../lib/errors'
 import { formatPaise, parseRupeesToPaise } from '../../lib/money'
-import type { EventRow, TicketType } from '../../lib/types'
+import type { AddonPrice, EventRow, TicketType } from '../../lib/types'
 import { isValidUpiId } from '../../lib/upi'
 import { dayLabel, eventDayCount } from '../events/reunion'
 import { discountInfo, percentFromPrice, priceFromPercent } from '../events/ticketPricing'
@@ -81,6 +81,13 @@ function TicketDiscountEditor({ t, onChange }: { t: TicketDraft; onChange: (patc
   )
 }
 
+/** Saved overrides of the extras as the draft's text fields (keyed by the extra's id). */
+function pricesFor(ticketId: string, rows: AddonPrice[]): Record<string, { price: string; off: boolean }> {
+  const out: Record<string, { price: string; off: boolean }> = {}
+  for (const r of rows) if (r.ticket_type_id === ticketId) out[r.addon_id] = { price: r.available && r.price_paise != null ? String(r.price_paise / 100) : '', off: !r.available }
+  return out
+}
+
 interface TicketDraft {
   id?: string
   label: string
@@ -95,9 +102,43 @@ interface TicketDraft {
   max: string
   days: number[]
   _delete?: boolean
+  /** stable key for new tickets that have no id yet */
+  key?: string
+  /** on a normal ticket: the price of each optional extra for this person type, by the extra's key. Empty price = the extra's own price; off = not available */
+  prices?: Record<string, { price: string; off: boolean }>
 }
 
-export function AdminSettings({ existing }: { existing?: { event: EventRow; tickets: TicketType[] } }) {
+let newKeyCounter = 0
+const newKey = () => `new-${++newKeyCounter}`
+const keyOf = (t: { id?: string; key?: string }) => t.id ?? t.key ?? ''
+
+/** The overrides of one optional extra for one person type: empty price = the extra's own price, 0 = free, off = this ticket cannot take it. */
+function ExtraPriceFields({ ticket, extras, onChange }: { ticket: TicketDraft; extras: TicketDraft[]; onChange: (patch: Partial<TicketDraft>) => void }) {
+  if (extras.length === 0) return null
+  const set = (k: string, v: { price: string; off: boolean }) => onChange({ prices: { ...ticket.prices, [k]: v } })
+  return (
+    <fieldset className="space-y-3 rounded-2xl border border-border p-3" data-testid="extra-prices">
+      <legend className="px-1 text-sm font-semibold">Optional extras for this ticket</legend>
+      {extras.map((a) => {
+        const k = keyOf(a)
+        const v = ticket.prices?.[k] ?? { price: '', off: false }
+        const dflt = parseRupeesToPaise(a.price)
+        return (
+          <div key={k} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end" data-testid="extra-price-row">
+            <Field label={`Price of ${a.label.trim() || 'the extra'} for this ticket (₹)`} hint={v.off ? undefined : dflt !== null ? `Empty = the extra’s own price, ${formatPaise(dflt)}. 0 = free.` : 'Empty = the extra’s own price. 0 = free.'}>
+              {(p) => <Input {...p} inputMode="decimal" value={v.price} disabled={v.off} onChange={(ev) => set(k, { ...v, price: ev.target.value })} />}
+            </Field>
+            <Checkbox checked={v.off} onChange={(on) => set(k, { price: on ? '' : v.price, off: on })}>
+              Not available for this ticket
+            </Checkbox>
+          </div>
+        )
+      })}
+    </fieldset>
+  )
+}
+
+export function AdminSettings({ existing }: { existing?: { event: EventRow; tickets: TicketType[]; addonPrices?: AddonPrice[] } }) {
   const phoneError = usePhoneError()
   const navigate = useNavigate()
   const save = useSaveEvent()
@@ -125,12 +166,12 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
   })
   const [tickets, setTickets] = useState<TicketDraft[]>(
     existing?.tickets.length
-      ? existing.tickets.map((t) => ({ id: t.id, label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, is_addon: !!t.is_addon, max: String(t.max_per_registration), days: t.days ?? [] }))
+      ? existing.tickets.map((t) => ({ id: t.id, key: t.id, prices: pricesFor(t.id, existing.addonPrices ?? []), label: t.label, description: t.description ?? '', price: String(t.price_paise / 100), list: t.list_price_paise ? String(t.list_price_paise / 100) : '', offer: t.discount_label ?? '', is_primary: t.is_primary, is_addon: !!t.is_addon, max: String(t.max_per_registration), days: t.days ?? [] }))
       : [
-          { label: 'Alumnus / Alumna', description: '', price: '', list: '', offer: '', is_primary: true, max: '1', days: [] },
-          { label: 'Spouse', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] },
-          { label: 'Child (5–12 years)', description: '', price: '', list: '', offer: '', is_primary: false, max: '4', days: [] },
-          { label: 'Child (under 5)', description: 'Free', price: '0', list: '', offer: '', is_primary: false, max: '4', days: [] },
+          { key: newKey(), label: 'Alumnus / Alumna', description: '', price: '', list: '', offer: '', is_primary: true, max: '1', days: [] },
+          { key: newKey(), label: 'Spouse', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] },
+          { key: newKey(), label: 'Child (5–12 years)', description: '', price: '', list: '', offer: '', is_primary: false, max: '4', days: [] },
+          { key: newKey(), label: 'Child (under 5)', description: 'Free', price: '0', list: '', offer: '', is_primary: false, max: '4', days: [] },
         ],
   )
   const [errors, setErrors] = useState<string[]>([])
@@ -176,6 +217,12 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         else if (np !== null && lp <= np) errs.push(`“${t.label || 'ticket'}”: the original price must be higher than the price now, or leave it empty for no discount.`)
       }
     }
+    for (const t of live.filter((x) => !x.is_addon)) {
+      for (const a of live.filter((x) => x.is_addon)) {
+        const v = t.prices?.[keyOf(a)]
+        if (v && !v.off && v.price.trim() && parseRupeesToPaise(v.price) === null) errs.push(`Price of “${a.label || 'extra'}” for “${t.label || 'ticket'}” is not a valid amount.`)
+      }
+    }
     if (f.is_published && !f.upi_id && live.some((t) => (parseRupeesToPaise(t.price) ?? 0) > 0)) errs.push('Add the UPI ID before publishing an event with paid tickets.')
     return errs
   }
@@ -211,8 +258,20 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
           is_published: f.is_published,
           ask_reunion_questions: f.ask_reunion_questions,
         },
+        addonPrices: tickets
+          .filter((t) => !t._delete && !t.is_addon)
+          .flatMap((t) =>
+            tickets
+              .filter((a) => !a._delete && a.is_addon)
+              .flatMap((a) => {
+                const v = t.prices?.[keyOf(a)]
+                if (!v || (!v.off && !v.price.trim())) return []
+                return [{ addonKey: keyOf(a), ticketKey: keyOf(t), price_paise: v.off ? null : (parseRupeesToPaise(v.price) ?? 0), available: !v.off }]
+              }),
+          ),
         tickets: tickets.map((t) => ({
           id: t.id,
+          _key: keyOf(t),
           _delete: t._delete,
           label: t.label.trim(),
           description: n(t.description),
@@ -286,7 +345,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-3">
         <SectionTitle
           action={
-            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] }])}>
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { key: newKey(), label: '', description: '', price: '', list: '', offer: '', is_primary: false, max: '1', days: [] }])}>
               Add ticket
             </Button>
           }
@@ -295,7 +354,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         </SectionTitle>
         {tickets.map((t, i) =>
           t._delete || t.is_addon ? null : (
-            <Card key={t.id ?? `new-${i}`} className="space-y-3 p-4">
+            <Card key={keyOf(t) || `new-${i}`} className="space-y-3 p-4" data-testid="ticket-card">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_6rem]">
                 <Field label="Ticket name">{(p) => <Input {...p} value={t.label} onChange={(ev) => setT(i, { label: ev.target.value })} maxLength={80} />}</Field>
                 <Field label="Price (₹)" hint={parseRupeesToPaise(t.price) !== null ? formatPaise(parseRupeesToPaise(t.price)!) : undefined}>
@@ -304,6 +363,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                 <Field label="Max each">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
               </div>
               <TicketDiscountEditor t={t} onChange={(patch) => setT(i, patch)} />
+              <ExtraPriceFields ticket={t} extras={tickets.filter((a) => a.is_addon && !a._delete)} onChange={(patch) => setT(i, patch)} />
               <Field label="What it includes" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
               {nDays > 1 && (
                 <fieldset>
@@ -342,7 +402,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
       <section className="space-y-3" data-testid="addon-editor">
         <SectionTitle
           action={
-            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { label: '', description: '', price: '', list: '', offer: '', is_primary: false, is_addon: true, max: '10', days: [] }])}>
+            <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setTickets((t) => [...t, { key: newKey(), label: '', description: '', price: '', list: '', offer: '', is_primary: false, is_addon: true, max: '10', days: [] }])}>
               Add optional extra
             </Button>
           }
@@ -352,10 +412,11 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         <p className="text-sm text-muted">
           An extra is priced per person and any registered person can add it, whichever main ticket they chose (for example an outdoor tour on the last day). The main alumnus can join too.
           Members tick it for themselves and for each family member who joins. Set “Max” to the most people you expect in one registration.
+          The price here is the default. To charge a different amount per person type (for example a lower price for a child), set it in that ticket’s card under Fees; leave it empty there to use this price.
         </p>
         {tickets.map((t, i) =>
           t._delete || !t.is_addon ? null : (
-            <Card key={t.id ?? `new-${i}`} className="space-y-3 p-4" data-testid="addon-card">
+            <Card key={keyOf(t) || `new-${i}`} className="space-y-3 p-4" data-testid="addon-card">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_6rem]">
                 <Field label="Name of the extra">{(p) => <Input {...p} value={t.label} onChange={(ev) => setT(i, { label: ev.target.value })} maxLength={80} placeholder="Outdoor tour" />}</Field>
                 <Field label="Extra price per person (₹)" hint={parseRupeesToPaise(t.price) !== null ? formatPaise(parseRupeesToPaise(t.price)!) : undefined}>

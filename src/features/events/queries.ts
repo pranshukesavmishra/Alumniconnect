@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useUserId } from '../auth/AuthProvider'
 import { supabase } from '../../lib/supabase'
-import type { CustomAnswer, EventQuestion, EventRow, Experience, Guest, Payment, Registration, RegistrationItem, StaffRole, TicketType } from '../../lib/types'
+import type { AddonPrice, CustomAnswer, EventQuestion, EventRow, Experience, Guest, Payment, Registration, RegistrationItem, StaffRole, TicketType } from '../../lib/types'
 
 export const eventKeys = {
   event: (slug: string) => ['event', slug] as const,
   tickets: (eventId: string) => ['event-tickets', eventId] as const,
+  addonPrices: (eventId: string) => ['event-addon-prices', eventId] as const,
   stats: (eventId: string) => ['event-stats', eventId] as const,
   mine: (eventId: string, uid: string | null) => ['my-registration', eventId, uid] as const,
   staff: (uid: string | null) => ['my-staff-events', uid] as const,
@@ -79,6 +80,20 @@ export function useTicketTypes(eventId: string | undefined) {
       const { data, error } = await supabase.from('event_ticket_types').select('*').eq('event_id', eventId!).order('sort')
       if (error) throw error
       return data as TicketType[]
+    },
+  })
+}
+
+/** Per-person-type prices of the optional extras. */
+export function useAddonPrices(eventId: string | undefined) {
+  return useQuery({
+    queryKey: eventKeys.addonPrices(eventId ?? ''),
+    enabled: !!eventId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.from('event_addon_prices').select('*').eq('event_id', eventId!)
+      if (error) throw error
+      return data as AddonPrice[]
     },
   })
 }
@@ -184,7 +199,7 @@ export function useUpsertRegistration(eventId: string) {
   const qc = useQueryClient()
   const uid = useUserId()
   return useMutation({
-    mutationFn: async (input: { details: RegistrationDetails; items: { ticket_type_id: string; quantity: number }[] }) => {
+    mutationFn: async (input: { details: RegistrationDetails; items: { ticket_type_id: string; quantity: number; for_ticket_type_id?: string }[] }) => {
       const { data, error } = await supabase.rpc('upsert_registration', {
         p_event: eventId,
         p_details: input.details,

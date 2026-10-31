@@ -104,7 +104,7 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
 
   const expected = main + 50000 + 2 * 65000
   await expect(page.getByText('Step 5 of 5 · Review & pay')).toBeVisible()
-  await expect(page.getByText(`${extraName} × 2`)).toBeVisible()
+  await expect(page.getByText(`${extraName} (`, { exact: false })).toHaveCount(2) // one line per person type, same price here
   await expect(page.getByText(rupees(expected)).first()).toBeVisible()
   await page.getByRole('checkbox', { name: /My details are correct/ }).check()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
@@ -115,7 +115,7 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   expect(row.headcount).toBe(2) // extras are not extra people
   expect(row.day_heads).toEqual({ '1': 2, '2': 2 })
   expect(row.days).toEqual([1])
-  expect(sql(`select quantity from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.label = '${extraName}'`)).toBe('2')
+  expect(sql(`select sum(quantity) from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.label = '${extraName}'`)).toBe('2')
 
   // reload the form: the extras stay ticked, and after payment they are locked
   const utr = newUtr()

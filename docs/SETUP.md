@@ -179,6 +179,7 @@ Use this when one day is optional and priced per person, for anyone registered (
 2. Name it (for example "Outdoor tour"), enter the **extra price per person** (for example 650), tick **27 Dec** under "Valid on", and leave **Max** at 10 (the most people in one registration). Optionally add a description or a discount. Tap **Save changes**.
 3. Members see **Optional extras** on the days step of registration, with a tickbox for themselves and for each family member, and an "Add for all N people" shortcut. The Meet page shows it under "Optional · 27 Dec".
 4. The extra adds money and heads to its own day only: people are counted once for capacity (the main and family tickets), while the day-by-day counts (Responses, Day of) include everyone who ticked the extra.
+5. **Different price per person type** (for example Alumnus and Spouse 650, Child 350): the extra's own price is the default. In **Fees**, open the ticket card of the person type (Child, Spouse ...). Under **Optional extras for this ticket** each extra has a field "Price of Outdoor tour for this ticket (₹)": empty uses the extra's own price, 0 makes it free for that person type, and **Not available for this ticket** stops that person type from taking it. Tap **Save changes**. Members then see each person's own price on their tickbox, the total adds each person's own amount, and the server charges exactly that. Registrations made before this feature keep the default price.
 
 ---
 

@@ -161,7 +161,7 @@ function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registratio
             <KeyValue label="City">{reg.city ?? '—'}</KeyValue>
             {manager && <KeyValue label="Email">{reg.email ?? '—'}</KeyValue>}
             {items.map((i) => (
-              <KeyValue key={i.ticket_type_id} label={`${i.label} × ${i.quantity}`}>
+              <KeyValue key={`${i.ticket_type_id}:${i.for_ticket_type_id ?? ''}`} label={`${i.label} × ${i.quantity}`}>
                 {manager ? formatPaise(i.unit_price_paise * i.quantity) : ''}
               </KeyValue>
             ))}

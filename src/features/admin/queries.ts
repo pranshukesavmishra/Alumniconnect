@@ -6,7 +6,7 @@ import { hasAnyPerm, hasPerm } from '../../lib/adminAccess'
 import { capsForAccess, rolesOnEvent, type Caps, type EventRole } from '../../lib/roles'
 import { supabase } from '../../lib/supabase'
 import type { Attention } from '../../lib/adminAttention'
-import type { EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, TicketType, VerificationStatus } from '../../lib/types'
+import type { AddonPrice, EventRow, Payment, PaymentStatus, Profile, Registration, RegistrationItem, RegistrationStatus, TicketType, VerificationStatus } from '../../lib/types'
 
 /** PostgREST returns at most 1000 rows per request; page through everything. */
 async function fetchAll<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
@@ -82,7 +82,9 @@ export function useAdminEvent(slug: string) {
       if (!data) return null
       const t = await supabase.from('event_ticket_types').select('*').eq('event_id', data.id).order('sort')
       if (t.error) throw t.error
-      return { event: data as EventRow, tickets: t.data as TicketType[] }
+      const ap = await supabase.from('event_addon_prices').select('*').eq('event_id', data.id)
+      if (ap.error) throw ap.error
+      return { event: data as EventRow, tickets: t.data as TicketType[], addonPrices: ap.data as AddonPrice[] }
     },
   })
 }
@@ -157,7 +159,12 @@ export async function proofUrl(path: string): Promise<string> {
 export function useSaveEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { event: Partial<EventRow> & { id?: string }; tickets: (Partial<TicketType> & { id?: string; _delete?: boolean })[] }) => {
+    mutationFn: async (input: {
+      event: Partial<EventRow> & { id?: string }
+      tickets: (Partial<TicketType> & { id?: string; _delete?: boolean; _key?: string })[]
+      /** per person type prices of the extras, by the drafts' keys (a ticket without an id yet is resolved after it is saved) */
+      addonPrices?: { addonKey: string; ticketKey: string; price_paise: number | null; available: boolean }[]
+    }) => {
       const { id, ...fields } = input.event
       let eventId = id
       if (eventId) {
@@ -168,8 +175,10 @@ export function useSaveEvent() {
         if (error) throw error
         eventId = data.id as string
       }
+      const idByKey = new Map<string, string>()
       for (const [i, t] of input.tickets.entries()) {
-        const { id: tid, _delete, ...tf } = t
+        const { id: tid, _delete, _key, ...tf } = t
+        if (tid && _key) idByKey.set(_key, tid)
         if (_delete) {
           if (tid) {
             const { error } = await supabase.from('event_ticket_types').delete().eq('id', tid)
@@ -178,8 +187,32 @@ export function useSaveEvent() {
           continue
         }
         const row = { ...tf, event_id: eventId, sort: i }
-        const { error } = tid ? await supabase.from('event_ticket_types').update(row).eq('id', tid) : await supabase.from('event_ticket_types').insert(row)
-        if (error) throw error
+        if (tid) {
+          const { error } = await supabase.from('event_ticket_types').update(row).eq('id', tid)
+          if (error) throw error
+        } else {
+          const { data, error } = await supabase.from('event_ticket_types').insert(row).select('id').single()
+          if (error) throw error
+          if (_key) idByKey.set(_key, data.id as string)
+        }
+      }
+      if (input.addonPrices) {
+        // the overrides now wanted; everything else for this event is removed (a deleted ticket's rows go with it)
+        const want = input.addonPrices
+          .map((a) => ({ addon_id: idByKey.get(a.addonKey), ticket_type_id: idByKey.get(a.ticketKey), event_id: eventId!, price_paise: a.price_paise, available: a.available }))
+          .filter((a): a is typeof a & { addon_id: string; ticket_type_id: string } => !!a.addon_id && !!a.ticket_type_id)
+        const have = await supabase.from('event_addon_prices').select('addon_id, ticket_type_id').eq('event_id', eventId!)
+        if (have.error) throw have.error
+        const keep = new Set(want.map((a) => `${a.addon_id}:${a.ticket_type_id}`))
+        for (const h of have.data as { addon_id: string; ticket_type_id: string }[]) {
+          if (keep.has(`${h.addon_id}:${h.ticket_type_id}`)) continue
+          const { error } = await supabase.from('event_addon_prices').delete().eq('addon_id', h.addon_id).eq('ticket_type_id', h.ticket_type_id)
+          if (error) throw error
+        }
+        if (want.length) {
+          const { error } = await supabase.from('event_addon_prices').upsert(want, { onConflict: 'addon_id,ticket_type_id' })
+          if (error) throw error
+        }
       }
       return eventId
     },
@@ -189,6 +222,7 @@ export function useSaveEvent() {
       await qc.invalidateQueries({ queryKey: ['admin-event'] })
       void qc.invalidateQueries({ queryKey: ['event'] })
       void qc.invalidateQueries({ queryKey: ['event-tickets'] })
+      void qc.invalidateQueries({ queryKey: ['event-addon-prices'] })
       void qc.invalidateQueries({ queryKey: ['managed-events'] })
     },
   })
