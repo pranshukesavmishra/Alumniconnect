@@ -85,19 +85,16 @@ test('extras by person type: admin sets the child price in the child card, membe
 
   const extras = page.getByTestId('optional-extras')
   const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })
-  const childGroup = extras.getByRole('group', { name: `${tour}: ${child}` })
-  const kiran = { check: async () => { const more = childGroup.getByRole('button', { name: `More: ${tour}: ${child}` }); if (await more.isEnabled()) await more.click() } }
+  const childGroup = extras.getByTestId('addon-group').filter({ hasText: child })
+  const more = childGroup.getByRole('button', { name: `More: ${tour}: ${child}` })
   await expect(me).toHaveAccessibleName(/\+₹650/)
-  await expect(extras.getByTestId('addon-group')).toContainText('₹350 each')
+  await expect(childGroup).toContainText('₹350 each')
   await expect(extras.getByTestId('addon-unavailable')).toContainText(spouse)
-  // "everyone" only covers the people who can take it
-  await extras.getByRole('button', { name: new RegExp(`for all 2 people`) }).click()
-  await expect(me).toBeChecked()
-  await expect(childGroup).toContainText('1')
-  await extras.getByRole('button', { name: 'Remove for everyone' }).click()
   await me.check()
-  await kiran.check()
-  const expected = main + 50000 + 30000 + 65000 + 35000
+  await more.click()
+  await more.click()
+  await expect(childGroup).toContainText('2') // 2 children on the 27th, only 1 on the 26th ticket
+  const expected = main + 50000 + 30000 + 65000 + 2 * 35000
   await expect(page.getByText(rupees(expected)).first()).toBeVisible()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
@@ -114,7 +111,7 @@ test('extras by person type: admin sets the child price in the child card, membe
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   await expect(page.getByText('Step 5 of 5 · Review & pay')).toBeVisible()
-  await expect(page.getByText(`${tour} (${child}) × 1`)).toBeVisible()
+  await expect(page.getByText(`${tour} (${child}) × 2`)).toBeVisible()
   await expect(page.getByText(`${tour} (`, { exact: false }).first()).toBeVisible()
   await page.getByRole('checkbox', { name: /My details are correct/ }).check()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
@@ -124,23 +121,23 @@ test('extras by person type: admin sets the child price in the child card, membe
   const row = JSON.parse(sql(`select row_to_json(r) from event_registrations r where user_id = '${uid}'`)) as Record<string, any>
   expect(row.amount_paise).toBe(expected)
   expect(row.headcount).toBe(3)
-  expect(row.day_heads).toEqual({ '1': 3, '2': 2 })
+  expect(row.day_heads).toEqual({ '1': 3, '2': 3 })
   const lines = sql(`select i.label || ':' || i.unit_price_paise || 'x' || i.quantity from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.is_addon`).split('\n').sort()
-  expect(lines).toEqual([`${tour} (${child}):35000x1`, `${tour} (${mainLabel(ev)}):65000x1`].sort())
+  expect(lines).toEqual([`${tour} (${child}):35000x2`, `${tour} (${mainLabel(ev)}):65000x1`].sort())
 
   // My registration lists both lines with their own amounts
-  await expect(page.getByText(`${tour} (${child}) × 1`)).toBeVisible()
+  await expect(page.getByText(`${tour} (${child}) × 2`)).toBeVisible()
 
   // re-open the form before paying: the ticks are restored per person
   await page.goto('/meet/register')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeChecked()
-  await expect(page.getByTestId('optional-extras').getByRole('group', { name: `${tour}: ${child}` })).toContainText('1')
+  await expect(page.getByTestId('optional-extras').getByTestId('addon-group').filter({ hasText: child })).toContainText('2')
 
   // admin People shows the lines
   await admin.goto(`/admin/events/alumni-meet-2026?tab=people&q=${encodeURIComponent(`Addonp Alum ${tag}`)}`)
   await admin.getByText(`Addonp Alum ${tag}`).first().click()
-  await expect(admin.getByText(`${tour} (${child}) × 1`)).toBeVisible()
+  await expect(admin.getByText(`${tour} (${child}) × 2`)).toBeVisible()
 
   // pay: locked afterwards and the same ticks are accepted
   await page.goto('/meet/my')
@@ -151,7 +148,7 @@ test('extras by person type: admin sets the child price in the child card, membe
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   // locked after payment: the count is shown, with no + / - buttons
   const lockedRow = page.getByTestId('optional-extras').getByTestId('addon-group').filter({ hasText: child })
-  await expect(lockedRow).toContainText('1')
+  await expect(lockedRow).toContainText('2')
   await expect(lockedRow.getByRole('button')).toHaveCount(0)
 
   await actx.close()

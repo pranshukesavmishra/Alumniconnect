@@ -79,26 +79,27 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   await page.getByRole('group', { name: 'Do you need help with accommodation?' }).getByText('No', { exact: true }).click()
   await page.getByRole('group', { name: 'Do you need help with local travel or pickup?' }).getByText('No', { exact: true }).click()
 
-  // starts at zero; tick myself, then use the everyone shortcut and untick, then tick both
+  // the extra has its own counts: it starts at zero and is NOT limited by the one spouse on the 26 Dec ticket
   const extras = page.getByTestId('optional-extras')
   const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${extraName.replace(/[()]/g, "\\$&")}`) })
-  const spouseGroup = extras.getByRole('group', { name: `${extraName}: ${spouseLabel}` })
-  const meera = { check: async () => { const more = spouseGroup.getByRole('button', { name: `More: ${extraName}: ${spouseLabel}` }); if (await more.isEnabled()) await more.click() } }
+  const spouseGroup = extras.getByTestId('addon-group').filter({ hasText: spouseLabel })
+  const more = spouseGroup.getByRole('button', { name: `More: ${extraName}: ${spouseLabel}` })
+  await expect(extras).toContainText("they don't need to be on a 26 Dec ticket")
   await expect(me).not.toBeChecked()
-  await extras.getByRole('button', { name: new RegExp(`for all 2 people`) }).click()
-  await expect(me).toBeChecked()
-  await expect(spouseGroup).toContainText('1')
-  await extras.getByRole('button', { name: 'Remove for everyone' }).click()
-  await expect(me).not.toBeChecked()
+  await expect(extras.getByRole('button', { name: /for all/ })).toHaveCount(0)
+  await expect(spouseGroup.getByTestId('addon-names')).toHaveCount(0)
   await me.check()
-  await meera.check()
+  await more.click()
+  await more.click()
+  await expect(spouseGroup).toContainText('2') // 2 on the 27th with 1 spouse on the 26th
+  await expect(spouseGroup.getByTestId('addon-names').getByRole('textbox')).toHaveCount(2) // optional names, one per counted person
+  await spouseGroup.getByTestId('addon-names').getByRole('textbox').first().fill('Day Two Guest')
 
   // a ticket that already includes 27 Dec offers no extra for it
   await page.getByText('Both days', { exact: false }).first().click()
   await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join`) })).toHaveCount(0)
   await page.getByText('26 Dec only', { exact: false }).first().click()
   await me.check()
-  await meera.check()
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
   // involved: all "No"
@@ -114,9 +115,9 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   await page.getByLabel('Contact number').fill('+91 90000 22222')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
 
-  const expected = main + 50000 + 2 * 65000
+  const expected = main + 50000 + 3 * 65000
   await expect(page.getByText('Step 5 of 5 · Review & pay')).toBeVisible()
-  await expect(page.getByText(`${extraName} (`, { exact: false })).toHaveCount(2) // one line per person type, same price here
+  await expect(page.getByText(`${extraName} (`, { exact: false })).toHaveCount(2) // one line per person type
   await expect(page.getByText(rupees(expected)).first()).toBeVisible()
   await page.getByRole('checkbox', { name: /My details are correct/ }).check()
   await page.getByRole('button', { name: 'Confirm and pay' }).click()
@@ -124,10 +125,11 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
 
   const row = JSON.parse(sql(`select row_to_json(r) from event_registrations r where user_id = '${uid}'`)) as Record<string, any>
   expect(row.amount_paise).toBe(expected)
-  expect(row.headcount).toBe(2) // extras are not extra people
-  expect(row.day_heads).toEqual({ '1': 2, '2': 2 })
+  expect(row.headcount).toBe(3) // 2 on the tickets + 1 who joins only the extra
+  expect(row.day_heads).toEqual({ '1': 2, '2': 3 })
   expect(row.days).toEqual([1])
-  expect(sql(`select sum(quantity) from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.label = '${extraName}'`)).toBe('2')
+  expect(sql(`select sum(quantity) from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.label = '${extraName}'`)).toBe('3')
+  expect(sql(`select names::text from event_registration_items i join event_ticket_types t on t.id = i.ticket_type_id where i.registration_id = '${row.id}' and t.label = '${extraName}' and i.names <> '[]'::jsonb`)).toContain('Day Two Guest')
 
   // reload the form: the extras stay ticked, and after payment they are locked
   const utr = newUtr()
@@ -139,11 +141,11 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join`) })).toBeChecked()
   await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join`) })).toBeDisabled()
 
-  // ---- admin People: 2 on each day
+  // ---- admin People: 2 on day 1, 3 on day 2
   await admin.goto('/admin/events/alumni-meet-2026?tab=responses')
   await expect(admin.getByText(/27 Dec/).first()).toBeVisible()
   const perDay = sql(`select (day_heads ->> '1') || '/' || (day_heads ->> '2') from event_registrations where user_id = '${uid}'`)
-  expect(perDay).toBe('2/2')
+  expect(perDay).toBe('2/3')
   await actx.close()
   await mctx.close()
 })
