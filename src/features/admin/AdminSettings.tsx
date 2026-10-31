@@ -354,7 +354,7 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
         </SectionTitle>
         {tickets.map((t, i) =>
           t._delete || t.is_addon ? null : (
-            <Card key={keyOf(t) || `new-${i}`} className="space-y-3 p-4">
+            <Card key={keyOf(t) || `new-${i}`} className="space-y-3 p-4" data-testid="ticket-card">
               <div className="grid gap-3 sm:grid-cols-[1fr_8rem_6rem]">
                 <Field label="Ticket name">{(p) => <Input {...p} value={t.label} onChange={(ev) => setT(i, { label: ev.target.value })} maxLength={80} />}</Field>
                 <Field label="Price (₹)" hint={parseRupeesToPaise(t.price) !== null ? formatPaise(parseRupeesToPaise(t.price)!) : undefined}>
