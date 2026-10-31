@@ -9,8 +9,10 @@ import { applyTheme } from './lib/theme'
 import { AuthProvider } from './features/auth/AuthProvider'
 import { I18nProvider } from './i18n'
 import './index.css'
+import { startAutoUpdate } from './lib/autoUpdate'
 
 applyTheme()
+startAutoUpdate()
 
 const queryClient = new QueryClient({
   defaultOptions: {

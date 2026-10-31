@@ -10,6 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false, // src/lib/autoUpdate.ts registers the worker itself and keeps it fresh
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'badge-96.png', 'push-sw.js'],
       manifest: {
         name: 'JEC Alumni Connect',
@@ -30,6 +31,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         importScripts: ['push-sw.js'], // push notifications: show them and open the right screen on tap
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/auth\/v1/, /^\/rest\/v1/, /^\/storage\/v1/],
