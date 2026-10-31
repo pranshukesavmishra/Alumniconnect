@@ -7,7 +7,9 @@ export const eventsUiEn = {
   'addon.join': '{name}: also join {what}',
   'addon.save': 'Save {percent}%',
   'addon.all': 'Add {what} for all {count} people',
+  'addon.na': 'not available',
   'addon.none': 'Remove for everyone',
+  'addon.notFor': '{name}: {what} is not available for this ticket',
   'addon.heading': 'Optional · {when}',
   // Meet page
   'evx.heroEyebrow': 'Jabalpur Engineering College · Since 1947',

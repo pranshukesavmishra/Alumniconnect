@@ -16,7 +16,7 @@ import { GlimpseCarousel } from '../glimpses/GlimpseCarousel'
 import { SponsorStrip } from '../giving/SponsorWall'
 import { Faq, MeetHero, MemoriesTeaser, PrimaryCta, ProgrammeTimeline, StickyCta, TierCards, VenueCard, WhyCome, type FaqItem } from './MeetParts'
 import { useAnnouncements, useProgramme } from './programme'
-import { registrationOpen, useEvent, useMyRegistration, useTicketTypes } from './queries'
+import { registrationOpen, useAddonPrices, useEvent, useMyRegistration, useTicketTypes } from './queries'
 import { eventDayCount } from './reunion'
 import { StatusBadge } from './StatusBadge'
 import { WaitlistCard } from './WaitlistCard'
@@ -26,6 +26,7 @@ export function MeetPage() {
   const { session } = useAuth()
   const { data: event, isLoading, error } = useEvent(MEET_SLUG)
   const { data: tickets } = useTicketTypes(event?.id)
+  const { data: addonPrices } = useAddonPrices(event?.id)
   const { data: mine, isPending: regPending } = useMyRegistration(event?.id)
   const programme = useProgramme(event?.id)
   const announcements = useAnnouncements(event?.id, !!session)
@@ -119,7 +120,7 @@ export function MeetPage() {
 
         {tickets && tickets.length > 0 && (
           <Reveal>
-            <TierCards tickets={tickets} hrefFor={hrefFor} event={event} />
+            <TierCards tickets={tickets} hrefFor={hrefFor} event={event} addonPrices={addonPrices} />
           </Reveal>
         )}
 

@@ -3,7 +3,7 @@
 // screen honest so members see the same answer before they submit.
 import { FUND_MAX_PAISE, FUND_MIN_PAISE } from '../../lib/constants'
 import { isValidPhone } from '../../lib/phone'
-import type { CustomAnswer, EventQuestion, EventRow, Experience, Profile, TicketType } from '../../lib/types'
+import type { AddonPrice, CustomAnswer, EventQuestion, EventRow, Experience, Profile, TicketType } from '../../lib/types'
 
 const TZ = 'Asia/Kolkata'
 const DAY_MS = 86_400_000
@@ -58,6 +58,92 @@ export function groupPersons(guestTickets: { id: string }[], qty: Record<string,
 export function addonCount(ticked: string[] | undefined, persons: string[]): number {
   const set = new Set(persons)
   return new Set((ticked ?? []).filter((k) => set.has(k))).size
+}
+
+/** The person type (normal ticket id) a person key belongs to: the main person is the chosen main ticket. */
+export function personTypeOf(key: string, primaryId: string): string {
+  return key === 'me' ? primaryId : key.split(':')[0]!
+}
+
+/** What an extra costs for one person type, from the organisers' per-type prices (none = the extra's own price). */
+export function addonPriceFor(
+  addon: Pick<TicketType, 'id' | 'price_paise'>,
+  typeId: string,
+  prices: Pick<AddonPrice, 'addon_id' | 'ticket_type_id' | 'price_paise' | 'available'>[] = [],
+): { available: boolean; pricePaise: number; overridden: boolean } {
+  const o = prices.find((x) => x.addon_id === addon.id && x.ticket_type_id === typeId)
+  if (!o) return { available: true, pricePaise: addon.price_paise, overridden: false }
+  if (!o.available) return { available: false, pricePaise: addon.price_paise, overridden: false }
+  return o.price_paise == null ? { available: true, pricePaise: addon.price_paise, overridden: false } : { available: true, pricePaise: o.price_paise, overridden: true }
+}
+
+export interface AddonLine {
+  addonId: string
+  forId: string
+  qty: number
+  unitPaise: number
+}
+
+/**
+ * One line per (extra, person type) from the ticked people. A tick of a person who is no longer in the registration, or of
+ * a person type that cannot take the extra, is left out (the server would refuse it).
+ */
+export function addonLines(
+  addons: Pick<TicketType, 'id' | 'price_paise'>[],
+  ticked: Record<string, string[] | undefined>,
+  persons: string[],
+  primaryId: string | undefined,
+  prices: Pick<AddonPrice, 'addon_id' | 'ticket_type_id' | 'price_paise' | 'available'>[] = [],
+): AddonLine[] {
+  if (!primaryId) return []
+  const inRegistration = new Set(persons)
+  const out: AddonLine[] = []
+  for (const a of addons) {
+    const counts = new Map<string, number>()
+    for (const k of new Set(ticked[a.id] ?? [])) {
+      if (!inRegistration.has(k)) continue
+      const t = personTypeOf(k, primaryId)
+      if (!addonPriceFor(a, t, prices).available) continue
+      counts.set(t, (counts.get(t) ?? 0) + 1)
+    }
+    for (const [forId, qty] of counts) out.push({ addonId: a.id, forId, qty, unitPaise: addonPriceFor(a, forId, prices).pricePaise })
+  }
+  return out
+}
+
+/** Money for the extras: each person's own price. */
+export function addonLinesTotal(lines: AddonLine[]): number {
+  return lines.reduce((s, l) => s + l.unitPaise * l.qty, 0)
+}
+
+/** Who has an extra, rebuilt from saved item rows: typed rows fill the first people of that type, untyped (older) rows the first people overall. */
+export function ticksFromItems(
+  addonId: string,
+  items: { ticket_type_id: string; for_ticket_type_id?: string | null; quantity: number }[],
+  persons: string[],
+  primaryId: string | undefined,
+): string[] {
+  const rows = items.filter((i) => i.ticket_type_id === addonId)
+  const out = new Set<string>()
+  for (const r of rows.filter((x) => x.for_ticket_type_id)) {
+    let left = r.quantity
+    for (const k of persons) {
+      if (left <= 0) break
+      if (primaryId && personTypeOf(k, primaryId) === r.for_ticket_type_id && !out.has(k)) {
+        out.add(k)
+        left--
+      }
+    }
+  }
+  let legacy = rows.filter((x) => !x.for_ticket_type_id).reduce((s, x) => s + x.quantity, 0)
+  for (const k of persons) {
+    if (legacy <= 0) break
+    if (!out.has(k)) {
+      out.add(k)
+      legacy--
+    }
+  }
+  return [...out]
 }
 
 /** People per day for a ticket selection: { 1: 1, 2: 4 }. */

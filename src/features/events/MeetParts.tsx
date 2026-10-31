@@ -13,7 +13,7 @@ import { Tabs } from '../../components/ui/Tabs'
 import { useT } from '../../i18n'
 import { formatDateRange } from '../../lib/format'
 import { formatPaise } from '../../lib/money'
-import type { EventRow, TicketType } from '../../lib/types'
+import type { AddonPrice, EventRow, TicketType } from '../../lib/types'
 import { dayLabel } from './reunion'
 import { glimpsePoster, useLiveGlimpses } from '../glimpses/api'
 import { clock, groupByDay, type ProgrammeItem } from './programme'
@@ -231,13 +231,21 @@ export function ProgrammeTimeline({ items, event }: { items: ProgrammeItem[]; ev
 }
 
 /** Ticket tiers as premium cards. The full pass (all days) wears the beam; family tickets get the gold hairline. */
-export function TierCards({ tickets, hrefFor, event }: { tickets: TicketType[]; hrefFor: (ticketId: string) => string; event?: Pick<EventRow, 'starts_at'> }) {
+export function TierCards({ tickets, hrefFor, event, addonPrices = [] }: { tickets: TicketType[]; hrefFor: (ticketId: string) => string; event?: Pick<EventRow, 'starts_at'>; addonPrices?: AddonPrice[] }) {
   const tx = useT()
   // the full pass (every day) leads
   const primary = tickets.filter((t) => t.is_primary).sort((a, b) => Number(!!a.days) - Number(!!b.days))
   const family = tickets.filter((t) => !t.is_primary && !t.is_addon)
   const addons = tickets.filter((t) => t.is_addon)
   const addonWhen = (t: TicketType) => (t.days ?? []).map((d) => dayLabel(event ?? { starts_at: null }, d)).join(' & ')
+  // per person type prices of an extra that differ from its own price ("Child ₹350 · Spouse not available")
+  const typeLine = (a: TicketType) =>
+    addonPrices
+      .filter((o) => o.addon_id === a.id && (!o.available || (o.price_paise != null && o.price_paise !== a.price_paise)))
+      .map((o) => ({ o, t: tickets.find((x) => x.id === o.ticket_type_id) }))
+      .filter((x) => x.t)
+      .map(({ o, t }) => `${t!.label} ${o.available ? price(o.price_paise ?? a.price_paise) : tx('addon.na')}`)
+      .join(' · ')
   const price = (p: number) => (p === 0 ? tx('evx.free') : formatPaise(p))
   const card = (t: TicketType) => {
     const full = t.is_primary && !t.days
@@ -307,6 +315,7 @@ export function TierCards({ tickets, hrefFor, event }: { tickets: TicketType[]; 
                 <div className="min-w-0 flex-1">
                   <p className="text-title">{t.label}</p>
                   <p className="text-caption text-muted">{[addonWhen(t), tx('addon.perPerson'), t.description].filter(Boolean).join(' · ')}</p>
+                  {typeLine(t) && <p className="text-caption text-muted" data-testid="addon-type-prices">{typeLine(t)}</p>}
                 </div>
                 <PriceTag t={t} className="shrink-0 items-end" perPerson={tx('evx.perPerson')} />
               </div>

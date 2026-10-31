@@ -424,7 +424,7 @@ function Details({ mine, event }: { mine: MyRegistration; event: EventRow }) {
             <span className="font-mono">{reg.code}</span>
           </KeyValue>
           {mine.items.map((i) => (
-            <KeyValue key={i.ticket_type_id} label={`${i.label} × ${i.quantity}`}>
+            <KeyValue key={`${i.ticket_type_id}:${i.for_ticket_type_id ?? ''}`} label={`${i.label} × ${i.quantity}`}>
               {formatPaise(i.unit_price_paise * i.quantity)}
             </KeyValue>
           ))}
