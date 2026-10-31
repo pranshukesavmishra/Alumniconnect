@@ -214,6 +214,23 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
     })
   const nDays = eventDayCount({ starts_at: fromLocalIst(f.starts_at), ends_at: fromLocalIst(f.ends_at) })
   const dayName = (d: number) => dayLabel({ starts_at: fromLocalIst(f.starts_at) }, d)
+  const mainCovered = (() => {
+    const out = new Set<number>()
+    for (const m of tickets.filter((x) => x.is_primary && !x.is_addon && !x._delete)) {
+      if (m.days.length === 0) return null
+      m.days.forEach((d) => out.add(d))
+    }
+    return out
+  })()
+  const convertible = (t: TicketDraft) => !t.is_primary && !t.is_addon && t.days.length > 0 && mainCovered !== null && t.days.every((d) => !mainCovered.has(d))
+  /** A normal ticket that only covers days no main ticket covers is really an optional extra: turn it into one, keeping its price. */
+  function convertToExtra(i: number) {
+    setTickets((ts) => {
+      const t = ts[i]!
+      const d = t.days
+      return ts.map((x, j) => (j === i ? { ...x, is_addon: true, is_primary: false, optional: undefined, prices: {} } : !x.is_addon && !x._delete && !x.days.some((y) => d.includes(y)) && x.days.length > 0 ? { ...x, optional: { ...x.optional, ...Object.fromEntries(d.map((y) => [y, ''])) } } : x))
+    })
+  }
   const visibleIdx = tickets.map((t, i) => (t._delete || t.is_addon ? -1 : i)).filter((i) => i >= 0)
   const live = tickets.filter((t) => !t._delete)
 
@@ -374,6 +391,12 @@ export function AdminSettings({ existing }: { existing?: { event: EventRow; tick
                 </Field>
                 <Field label="Max each">{(p) => <Input {...p} inputMode="numeric" value={t.max} onChange={(ev) => setT(i, { max: ev.target.value })} />}</Field>
               </div>
+              {convertible(t) && (
+                <Notice tone="warning" title="This looks like an optional extra">
+                  <p>{`“${t.label}” only covers days the main ticket does not. Members would have to buy it as a separate ticket. Make it an optional extra instead, so members tick it for each person.`}</p>
+                  <Button size="sm" variant="secondary" onClick={() => convertToExtra(i)}>Convert to optional extra</Button>
+                </Notice>
+              )}
               <TicketDiscountEditor t={t} onChange={(patch) => setT(i, patch)} />
               <Field label="What it includes" optional>{(p) => <Input {...p} value={t.description} onChange={(ev) => setT(i, { description: ev.target.value })} maxLength={200} />}</Field>
               {nDays > 1 && <TicketDays ticket={t} nDays={nDays} dayName={dayName} onChange={(patch) => setT(i, patch)} />}
