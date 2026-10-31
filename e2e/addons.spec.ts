@@ -82,11 +82,12 @@ test('optional extras: admin adds the 27 Dec tour, a day-1 member ticks it for s
   // starts at zero; tick myself, then use the everyone shortcut and untick, then tick both
   const extras = page.getByTestId('optional-extras')
   const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${extraName.replace(/[()]/g, "\\$&")}`) })
-  const meera = extras.getByRole('checkbox', { name: new RegExp(`Meera: also join ${extraName.replace(/[()]/g, "\\$&")}`) })
+  const spouseGroup = extras.getByRole('group', { name: `${extraName}: ${spouseLabel}` })
+  const meera = { check: async () => { const more = spouseGroup.getByRole('button', { name: `More: ${extraName}: ${spouseLabel}` }); if (await more.isEnabled()) await more.click() } }
   await expect(me).not.toBeChecked()
   await extras.getByRole('button', { name: new RegExp(`for all 2 people`) }).click()
   await expect(me).toBeChecked()
-  await expect(meera).toBeChecked()
+  await expect(spouseGroup).toContainText('1')
   await extras.getByRole('button', { name: 'Remove for everyone' }).click()
   await expect(me).not.toBeChecked()
   await me.check()

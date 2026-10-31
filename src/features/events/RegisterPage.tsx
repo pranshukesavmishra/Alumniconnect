@@ -692,21 +692,15 @@ export function RegisterPage() {
                             <p className="text-sm text-muted">{[tx('addon.perPerson'), a.description].filter(Boolean).join(' · ')}</p>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          {persons.map((k) => {
-                            const pr = addonPriceFor(a, personTypeOf(k, selectedPrimary.id), addonPrices)
-                            if (!pr.available) {
-                              return (
-                                <p key={k} className="text-sm text-muted" data-testid="addon-unavailable">
-                                  {tx('addon.notFor', { name: personName(k), what: a.label })}
-                                </p>
-                              )
-                            }
-                            // a crossed-out original only where the extra is at its own price (a per-person price has none)
+                        <div className="space-y-3">
+                          {/* me: one tickbox */}
+                          {persons.includes('me') && (() => {
+                            const pr = addonPriceFor(a, personTypeOf('me', selectedPrimary.id), addonPrices)
+                            if (!pr.available) return <p className="text-sm text-muted" data-testid="addon-unavailable">{tx('addon.notFor', { name: personName('me'), what: a.label })}</p>
                             const d = pr.overridden ? null : discountInfo(a)
                             return (
-                              <Checkbox key={k} checked={ticked.has(k)} disabled={locked} onChange={(on) => toggleAddon(a, k, on)}>
-                                {tx('addon.join', { name: personName(k), what: a.label })}
+                              <Checkbox checked={ticked.has('me')} disabled={locked} onChange={(on) => toggleAddon(a, 'me', on)}>
+                                {tx('addon.join', { name: personName('me'), what: a.label })}
                                 <span className="ml-1 text-muted">
                                   {`(+${formatPaise(pr.pricePaise)}`}
                                   {d && <>{' '}<s>{formatPaise(d.listPaise)}</s>{` · ${tx('addon.save', { percent: d.percent })}`}</>}
@@ -714,7 +708,41 @@ export function RegisterPage() {
                                 </span>
                               </Checkbox>
                             )
-                          })}
+                          })()}
+                          {/* family: one +/- row per kind of person (adults, children), price x number */}
+                          {extraTickets
+                            .filter((t) => (form.qty[t.id] ?? 0) > 0)
+                            .map((t) => {
+                              const keys = persons.filter((k) => k.startsWith(`${t.id}:`))
+                              if (keys.length === 0) return null
+                              const pr = addonPriceFor(a, t.id, addonPrices)
+                              if (!pr.available) {
+                                return (
+                                  <p key={t.id} className="text-sm text-muted" data-testid="addon-unavailable">
+                                    {tx('addon.notFor', { name: t.label, what: a.label })}
+                                  </p>
+                                )
+                              }
+                              const on = keys.filter((k) => ticked.has(k))
+                              const setCount = (v: number) =>
+                                setForm((f) => {
+                                  const cur = new Set(f.addonOn?.[a.id] ?? [])
+                                  keys.forEach((k, i) => (i < v ? cur.add(k) : cur.delete(k)))
+                                  return { ...f, addonOn: { ...f.addonOn, [a.id]: [...cur] } }
+                                })
+                              return (
+                                <div key={t.id} className="flex items-center justify-between gap-3" data-testid="addon-group">
+                                  <div className="min-w-0">
+                                    <p className="font-medium">{t.label}</p>
+                                    <p className="text-sm text-muted">
+                                      {`${formatPaise(pr.pricePaise)} ${tx('reg.each')}`}
+                                      {on.length > 0 && ` · ${formatPaise(pr.pricePaise * on.length)}`}
+                                    </p>
+                                  </div>
+                                  {locked ? <span className="font-semibold tabular-nums">{on.length}</span> : <Stepper value={on.length} max={keys.length} onChange={setCount} label={`${a.label}: ${t.label}`} />}
+                                </div>
+                              )
+                            })}
                         </div>
                         {!locked && eligible.length > 1 && (
                           <Button type="button" variant="secondary" size="sm" onClick={() => setAddonAll(a, n < eligible.length)}>

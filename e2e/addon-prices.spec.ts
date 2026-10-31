@@ -85,15 +85,15 @@ test('extras by person type: admin sets the child price in the child card, membe
 
   const extras = page.getByTestId('optional-extras')
   const me = extras.getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })
-  const kiran = extras.getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })
+  const childGroup = extras.getByRole('group', { name: `${tour}: ${child}` })
+  const kiran = { check: async () => { const more = childGroup.getByRole('button', { name: `More: ${tour}: ${child}` }); if (await more.isEnabled()) await more.click() } }
   await expect(me).toHaveAccessibleName(/\+₹650/)
-  await expect(kiran).toHaveAccessibleName(/\+₹350/)
-  await expect(extras.getByRole('checkbox', { name: new RegExp(`Meera`) })).toHaveCount(0)
-  await expect(extras.getByTestId('addon-unavailable')).toContainText('Meera')
+  await expect(extras.getByTestId('addon-group')).toContainText('₹350 each')
+  await expect(extras.getByTestId('addon-unavailable')).toContainText(spouse)
   // "everyone" only covers the people who can take it
   await extras.getByRole('button', { name: new RegExp(`for all 2 people`) }).click()
   await expect(me).toBeChecked()
-  await expect(kiran).toBeChecked()
+  await expect(childGroup).toContainText('1')
   await extras.getByRole('button', { name: 'Remove for everyone' }).click()
   await me.check()
   await kiran.check()
@@ -135,7 +135,7 @@ test('extras by person type: admin sets the child price in the child card, membe
   await page.goto('/meet/register')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
   await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Me: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeChecked()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeChecked()
+  await expect(page.getByTestId('optional-extras').getByRole('group', { name: `${tour}: ${child}` })).toContainText('1')
 
   // admin People shows the lines
   await admin.goto(`/admin/events/alumni-meet-2026?tab=people&q=${encodeURIComponent(`Addonp Alum ${tag}`)}`)
@@ -149,7 +149,10 @@ test('extras by person type: admin sets the child price in the child card, membe
   await expect(page.getByText('Payment received. The treasurer is verifying it.')).toBeVisible()
   await page.goto('/meet/register')
   await page.getByRole('button', { name: 'Continue', exact: true }).click()
-  await expect(page.getByTestId('optional-extras').getByRole('checkbox', { name: new RegExp(`Kiran: also join ${tour.replace(/[()]/g, "\\$&")}`) })).toBeDisabled()
+  // locked after payment: the count is shown, with no + / - buttons
+  const lockedRow = page.getByTestId('optional-extras').getByTestId('addon-group').filter({ hasText: child })
+  await expect(lockedRow).toContainText('1')
+  await expect(lockedRow.getByRole('button')).toHaveCount(0)
 
   await actx.close()
   await mctx.close()
