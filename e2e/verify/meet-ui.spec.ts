@@ -131,10 +131,10 @@ test('registration: days, family names, draft survives reload, preferences, pais
   await page.waitForTimeout(900)
   expect(await page.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('reg-draft:')).length)).toBe(0)
 
-  // cancel, then register again
-  page.once('dialog', (d) => void d.accept())
-  await page.getByRole('button', { name: 'Cancel registration' }).click()
-  await expect(page).toHaveURL(/\/meet$/)
+  // members cannot cancel themselves (no button); an organiser cancelling is simulated in SQL, then the member registers again
+  await expect(page.getByRole('button', { name: 'Cancel registration' })).toHaveCount(0)
+  sql(`update event_registrations set status = 'cancelled' where id = '${r.id}'`)
+  await page.goto('/meet')
   expect(myReg(email)!.status).toBe('cancelled')
   await page.getByRole('link', { name: 'Register now' }).filter({ visible: true }).first().click()
   await registerForReunion(page, { size: 'M' })

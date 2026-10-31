@@ -23,7 +23,7 @@ import { formatPaise } from '../../lib/money'
 import type { EventRow, Payment } from '../../lib/types'
 import { buildUpiLink, isValidUpiId, normalizeUtr } from '../../lib/upi'
 import { useMyProfile, useUserId } from '../auth/AuthProvider'
-import { useCancelRegistration, useEvent, useEventQuestions, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
+import { useEvent, useEventQuestions, useMyRegistration, useSubmitPayment, type MyRegistration } from './queries'
 import { answerText, dayLabel, eventDayCount } from './reunion'
 import { EntryPass, PassTips, RegisteredCelebration, ShareCardButton } from './PassParts'
 import { PaymentBadge, StatusBadge } from './StatusBadge'
@@ -524,7 +524,6 @@ function BringBatch() {
 function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
   const tx = useT()
   const reg = mine.registration
-  const cancel = useCancelRegistration(event.id)
   const shareText = tx('my.shareText', { title: event.title + (event.tagline ? ` (${event.tagline})` : ''), when: formatDateRange(event.starts_at, event.ends_at), url: `${window.location.origin}/meet` })
 
   return (
@@ -555,19 +554,6 @@ function Actions({ event, mine }: { event: EventRow; mine: MyRegistration }) {
       >
         <WhatsAppIcon className="size-4" /> {tx('my.inviteWa')}
       </a>
-      {reg.status === 'pending_payment' && (
-        <Button
-          variant="danger-ghost"
-          loading={cancel.isPending}
-          onClick={() => {
-            if (window.confirm(tx('my.cancelConfirm'))) {
-              cancel.mutate(reg.id, { onError: (e) => toast.error(friendlyError(e)), onSuccess: () => toast.success(tx('my.cancelled')) })
-            }
-          }}
-        >
-          {tx('my.cancel')}
-        </Button>
-      )}
     </section>
   )
 }
