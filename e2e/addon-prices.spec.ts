@@ -89,7 +89,7 @@ test('extras by person type: admin sets the child price in the child card, membe
   const more = childGroup.getByRole('button', { name: `More: ${tour}: ${child}` })
   await expect(me).toHaveAccessibleName(/\+₹650/)
   await expect(childGroup).toContainText('₹350 each')
-  await expect(extras.getByTestId('addon-unavailable')).toContainText(spouse)
+  await expect(extras.getByTestId('addon-group').filter({ hasText: spouse })).toHaveCount(0) // not offered for this person type
   await me.check()
   await more.click()
   await more.click()

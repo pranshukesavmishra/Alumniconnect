@@ -709,13 +709,7 @@ export function RegisterPage() {
                           {/* one +/- row per kind of person (adults, children), price x number, not limited by the 26 Dec family tickets */}
                           {extraTickets.map((t) => {
                             const pr = addonPriceFor(a, t.id, addonPrices)
-                            if (!pr.available) {
-                              return (
-                                <p key={t.id} className="text-sm text-muted" data-testid="addon-unavailable">
-                                  {tx('addon.notFor', { name: t.label, what: a.label })}
-                                </p>
-                              )
-                            }
+                            if (!pr.available) return null // the organisers switched this extra off for this person type
                             const on = Math.min(cnt[t.id] ?? 0, a.max_per_registration)
                             const room = addonRoom(a.max_per_registration, { ...cnt, [selectedPrimary.id]: 0 }, t.id)
                             const d = pr.overridden ? null : discountInfo(a)
