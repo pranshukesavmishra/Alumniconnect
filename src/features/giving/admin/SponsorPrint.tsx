@@ -27,7 +27,7 @@ export function SponsorPrint() {
       <Page>
         <PrintArea>
           <div data-testid="sponsor-doc" data-doc={doc}>
-            <p className="text-lg font-bold">{d.assoc_name ?? 'JEC Alumni Association'}</p>
+            <p className="text-lg font-bold">{d.assoc_name ?? 'JEC Alumni Connect'}</p>
             {d.assoc_details && <p className="whitespace-pre-line text-sm text-gray-600">{d.assoc_details}</p>}
             <h1 className="mt-4 text-xl font-bold uppercase tracking-wide">{TITLE[doc]}</h1>
             <p className="text-sm text-gray-600">{formatDate(new Date().toISOString())}</p>

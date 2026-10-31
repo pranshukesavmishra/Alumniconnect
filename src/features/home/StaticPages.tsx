@@ -26,13 +26,6 @@ export function AboutPage() {
             <p className="text-sm text-muted">Many alumni still say GEC Jabalpur. Both names are welcome here, and you will find the same college under either.</p>
           </div>
         </Card>
-        <Card className="flex items-center gap-4 p-5">
-          <img src="/jecaa-logo.png" alt="JECAA, Jabalpur Engineering College Alumni Association" className="h-24 w-auto shrink-0 rounded-lg bg-white p-1" />
-          <div>
-            <h2 className="text-lg font-bold">JECAA, the Alumni Association</h2>
-            <p className="text-sm text-muted">The Jabalpur Engineering College Alumni Association. JEC Alumni Connect is the place where its members find each other, share news and meet.</p>
-          </div>
-        </Card>
         <div className="flex flex-wrap gap-3">
           <ButtonLink to="/privacy" variant="secondary">Privacy</ButtonLink>
           <ButtonLink to="/terms" variant="secondary">Terms</ButtonLink>

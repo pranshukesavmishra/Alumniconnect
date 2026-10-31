@@ -8,7 +8,6 @@ export const landingEn = {
   'landing.signIn': 'Sign in',
   'landing.crestAlt': 'Jabalpur Engineering College crest',
   'landing.gecAlt': 'Earlier crest of Government Engineering College, Jabalpur',
-  'landing.jecaaAlt': 'JECAA, Jabalpur Engineering College Alumni Association',
   'landing.est': 'Est. {year} · Formerly GEC Jabalpur',
   'landing.heroA': 'Where every JECian',
   'landing.heroB': 'comes home.',
@@ -72,11 +71,11 @@ export const landingEn = {
   'landing.giveCta': 'See the appeals',
   'landing.give1': 'Scholarships, labs and campus projects chosen with the college',
   'landing.give2': 'A receipt for every gift and a public record of spending',
-  'landing.give3': 'Run by the alumni association, for JECians',
+  'landing.give3': 'Run by JECians, for JECians',
 
   'landing.quoteLabel': 'Our promise',
   'landing.quote': '“Wherever life has taken us, Jabalpur Engineering College is where we began. This is our common room, open to every JECian, from every batch, in every city.”',
-  'landing.quoteBy': 'JEC Alumni Association',
+  'landing.quoteBy': 'The JEC Alumni Connect team',
 
   'landing.faqEyebrow': 'Questions',
   'landing.faqTitle': 'Good to know',
@@ -99,7 +98,7 @@ export const landingEn = {
   'landing.install': 'Install the app',
   'landing.footerNav': 'More',
   'landing.footerAbout': 'The alumni network of Jabalpur Engineering College (formerly Government Engineering College, Jabalpur), est. 1947.',
-  'landing.footerNote': '© {year} JEC Alumni Association. Made by JECians, for JECians.',
+  'landing.footerNote': '© {year} JEC Alumni Connect. Made by JECians, for JECians.',
 
   // ---------------------------------------------------------------- JEC World
   'world.title': 'JEC World',

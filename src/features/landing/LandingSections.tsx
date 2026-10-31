@@ -321,7 +321,6 @@ export function LandingFooter() {
           <div className="flex items-center gap-3">
             <img src="/jec-logo.png" alt={tx('landing.crestAlt')} className="h-12 w-auto" />
             <img src="/gec-crest.png" alt={tx('landing.gecAlt')} className="h-12 w-auto rounded-lg bg-white p-0.5" />
-            <img src="/jecaa-logo.png" alt={tx('landing.jecaaAlt')} className="h-12 w-auto rounded-lg bg-white p-0.5" />
           </div>
           <p className="mt-4 font-display text-lg font-semibold">JEC Alumni Connect</p>
           <p className="mt-1 text-sm text-muted">{tx('landing.footerAbout')}</p>

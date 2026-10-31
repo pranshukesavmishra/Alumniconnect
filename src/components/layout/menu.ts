@@ -96,7 +96,7 @@ export const MENU: readonly MenuItem[] = [
   { id: 'language', group: 'me', label: 'menu.language', icon: Languages, to: '/me#language', keywords: 'hindi english bhasha' },
   { id: 'my-data', group: 'me', label: 'menu.downloadData', icon: Download, to: '/me#my-data', keywords: 'export privacy' },
   { id: 'guide', group: 'me', label: 'guide.menu', icon: CircleHelp, to: '/guide', public: true, keywords: 'help tutorial video guide how to use learn start' },
-  { id: 'about', group: 'me', label: 'menu.about', icon: Landmark, to: '/about', public: true, keywords: 'college gec government engineering jecaa association history' },
+  { id: 'about', group: 'me', label: 'menu.about', icon: Landmark, to: '/about', public: true, keywords: 'college gec government engineering association history' },
   { id: 'privacy', group: 'me', label: 'menu.privacy', icon: ShieldHalf, to: '/privacy', public: true },
   { id: 'terms', group: 'me', label: 'menu.terms', icon: ScrollText, to: '/terms', public: true },
   { id: 'signout', group: 'me', label: 'profile.signOut', icon: LogOut, action: 'signout', keywords: 'log out' },

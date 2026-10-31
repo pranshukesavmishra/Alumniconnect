@@ -7,7 +7,7 @@ export const wowHi = {
   'wow.card.title': 'एलुमनाई आईडी कार्ड',
   'wow.card.subtitle': 'आपका डिजिटल सदस्यता कार्ड',
   'wow.card.college': 'जबलपुर इंजीनियरिंग कॉलेज',
-  'wow.card.collegeSub': 'एलुमनाई एसोसिएशन · स्थापना 1947',
+  'wow.card.collegeSub': 'JEC Alumni Connect · स्थापना 1947',
   'wow.card.alumniId': 'एलुमनाई आईडी',
   'wow.card.membershipNo': 'सदस्यता क्रमांक',
   'wow.card.memberSince': 'सदस्य कब से',
@@ -55,7 +55,7 @@ export const wowHi = {
   'wow.card.addHomeHint': 'फिर आपका कार्ड एक टैप में खुलेगा, गेट पर भी।',
 
   'wow.verify.title': 'सदस्यता जाँच',
-  'wow.verify.association': 'एलुमनाई एसोसिएशन · स्थापना 1947',
+  'wow.verify.association': 'JEC Alumni Connect · स्थापना 1947',
   'wow.verify.checking': 'कार्ड की जाँच हो रही है',
   'wow.verify.verified': 'सत्यापित JEC पूर्व छात्र',
   'wow.verify.photoAlt': '{name} की फ़ोटो',

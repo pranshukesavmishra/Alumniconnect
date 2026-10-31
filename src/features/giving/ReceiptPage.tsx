@@ -36,7 +36,7 @@ export function ReceiptPage() {
             <div className="-m-6 mb-4 flex items-center gap-3 bg-[linear-gradient(135deg,#0b4a37,#062a20)] p-5 text-white print:bg-white print:text-black">
               <img src="/jec-logo.png" alt="" className="size-12 rounded-xl bg-white p-1" />
               <div className="min-w-0">
-                <p className="text-lg font-bold leading-tight">{r.assoc_name ?? 'JEC Alumni Association'}</p>
+                <p className="text-lg font-bold leading-tight">{r.assoc_name ?? 'JEC Alumni Connect'}</p>
                 <p className="text-xs text-[#ecc56a] print:text-gray-600">{tx('evx.receiptVerified')}</p>
               </div>
             </div>

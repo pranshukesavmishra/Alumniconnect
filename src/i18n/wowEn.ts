@@ -6,7 +6,7 @@ export const wowEn = {
   'wow.card.title': 'Alumni ID card',
   'wow.card.subtitle': 'Your digital membership card',
   'wow.card.college': 'Jabalpur Engineering College',
-  'wow.card.collegeSub': 'Alumni Association · Est. 1947',
+  'wow.card.collegeSub': 'JEC Alumni Connect · Est. 1947',
   'wow.card.alumniId': 'Alumni ID',
   'wow.card.membershipNo': 'Membership no.',
   'wow.card.memberSince': 'Member since',
@@ -54,7 +54,7 @@ export const wowEn = {
   'wow.card.addHomeHint': 'Your card then opens in one tap, even at the gate.',
 
   'wow.verify.title': 'Membership check',
-  'wow.verify.association': 'Alumni Association · Est. 1947',
+  'wow.verify.association': 'JEC Alumni Connect · Est. 1947',
   'wow.verify.checking': 'Checking the card',
   'wow.verify.verified': 'Verified JEC alumnus',
   'wow.verify.photoAlt': 'Photo of {name}',
