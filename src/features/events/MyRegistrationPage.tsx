@@ -12,6 +12,7 @@ import { Field, Input } from '../../components/ui/Form'
 import { WhatsAppIcon } from '../../components/ui/Icons'
 import { QrCode } from '../../components/ui/QrCode'
 import { MEET_SLUG } from '../../lib/constants'
+import { amountDue } from './advance'
 import { useT } from '../../i18n'
 import { tr } from '../../i18n/core'
 import { foodLabel, modeLabel, performLabel, sponsorLabel, teamLabel, tshirtLabel } from '../../i18n/labels'
@@ -85,7 +86,7 @@ export function MyRegistrationPage() {
       <Page className="space-y-6">
         {justRegistered && <WhatNext mine={mine} event={event} />}
         <div className="flex justify-center"><StatusBadge status={reg.status} /></div>
-        <Timeline status={reg.status} hasPayment={mine.payments.some((p) => p.status !== 'rejected')} free={reg.amount_paise === 0} />
+        <Timeline status={reg.status} hasPayment={mine.payments.some((p) => p.status !== 'rejected')} free={reg.amount_paise === 0 || (reg.advance_paise ?? 0) >= reg.amount_paise} />
         {reg.status === 'confirmed' && <TicketCard event={event} mine={mine} />}
         {reg.status === 'confirmed' && !justRegistered && <ShareRow event={event} mine={mine} />}
         {reg.status === 'pending_payment' && <PaymentPanel event={event} mine={mine} />}
@@ -231,6 +232,11 @@ function PaymentPanel({ event, mine }: { event: EventRow; mine: MyRegistration }
           <p className="text-caption mt-3 text-white/70">{tx('evx.amountDue')}</p>
           <p className="text-stat text-[2.75rem] leading-tight">{formatPaise(due)}</p>
           <p className="text-caption text-hero-text">{tx('my.payTo', { name: event.upi_payee_name ?? '' })}</p>
+          {(reg.advance_paise ?? 0) > 0 && (
+            <p className="text-caption mt-1 text-hero-text" data-testid="pay-advance">
+              {tx('my.totalLabel')} {formatPaise(reg.amount_paise, { zeroAsFree: false })} · {tx('adv.paid')} −{formatPaise(reg.advance_paise ?? 0, { zeroAsFree: false })}
+            </p>
+          )}
           {reg.fund_paise > 0 && <p className="text-caption mt-1 text-hero-text">{tx('rr.payBreakdown', { tickets: formatPaise(reg.amount_paise - reg.fund_paise, { zeroAsFree: false }), fund: formatPaise(reg.fund_paise) })}</p>}
         </div>
         <div className="space-y-4 p-4 sm:p-5">
@@ -355,12 +361,13 @@ function UnderReview({ mine }: { mine: MyRegistration }) {
 }
 
 function PaymentRow({ p }: { p: Payment }) {
+  const tx = useT()
   return (
     <Card className="flex items-center justify-between gap-3 p-4">
       <div className="min-w-0">
         <p className="font-semibold tabular-nums">{formatPaise(p.amount_paise)}</p>
         <p className="truncate text-sm text-muted">
-          {p.utr ? `UTR ${p.utr}` : p.method.replace('_', ' ')} · {formatDateTime(p.created_at)}
+          {p.utr ? `UTR ${p.utr}` : p.method === 'advance' ? tx('adv.method') : p.method.replace('_', ' ')} · {formatDateTime(p.created_at)}
         </p>
       </div>
       <PaymentBadge status={p.status} />
@@ -467,6 +474,16 @@ function Details({ mine, event }: { mine: MyRegistration; event: EventRow }) {
             <dt className="font-semibold">{tx('my.totalLabel')}</dt>
             <dd className="text-lg font-bold tabular-nums">{formatPaise(reg.amount_paise)}</dd>
           </div>
+          {(reg.advance_paise ?? 0) > 0 && (
+            <>
+              <KeyValue label={tx('adv.paid')}>
+                <span className="font-semibold text-success" data-testid="my-advance">−{formatPaise(reg.advance_paise ?? 0, { zeroAsFree: false })}</span>
+              </KeyValue>
+              <KeyValue label={tx('adv.toPay')}>
+                <span className="font-semibold" data-testid="my-to-pay">{formatPaise(amountDue(reg.amount_paise, mine.payments), { zeroAsFree: false })}</span>
+              </KeyValue>
+            </>
+          )}
         </dl>
       </Card>
       {mine.payments.filter((p) => p.status === 'verified').map((p) => (
@@ -483,7 +500,7 @@ function WhatNext({ mine, event }: { mine: MyRegistration; event: EventRow }) {
   const tx = useT()
   const { data: profile } = useMyProfile()
   const reg = mine.registration
-  const free = reg.amount_paise === 0
+  const free = reg.amount_paise === 0 || (reg.advance_paise ?? 0) >= reg.amount_paise
   const steps = [free ? tx('rr.next1Free') : tx('rr.next1'), ...(free ? [] : [tx('rr.next2')]), tx('rr.next3')]
   return (
     <RegisteredCelebration

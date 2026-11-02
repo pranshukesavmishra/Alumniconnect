@@ -20,7 +20,7 @@ import { formatPhone, normalizePhone } from '../../lib/phone'
 import type { CustomAnswer, EventRow, FoodPref, Guest, TicketType } from '../../lib/types'
 import { useAuth, useMyProfile, useUserId } from '../auth/AuthProvider'
 import { useMyPrivate } from '../profile/queries'
-import { registrationOpen, useAddonPrices, useEvent, useEventQuestions, useMyExperiences, useMyRegistration, useTicketTypes, useUpsertRegistration } from './queries'
+import { registrationOpen, useAddonPrices, useEvent, useEventQuestions, useMyAdvance, useMyExperiences, useMyRegistration, useTicketTypes, useUpsertRegistration } from './queries'
 import { PriceTag } from './PriceTag'
 import { discountInfo, totalSavings } from './ticketPricing'
 import { FundPicker, MultiChoice, ProfileCard, QuestionField, YesNo, boolToYn, ynToBool, type YN } from './RegisterParts'
@@ -145,6 +145,7 @@ export function RegisterPage() {
   const { data: addonPrices = [], isLoading: lp } = useAddonPrices(event?.id)
   const { data: questions, isLoading: lq } = useEventQuestions(event?.id)
   const { data: mine, isLoading: lm } = useMyRegistration(event?.id)
+  const { data: advance } = useMyAdvance(event?.id)
   const { data: profile } = useMyProfile()
   const { data: priv } = useMyPrivate()
   const { data: experiences } = useMyExperiences()
@@ -283,6 +284,9 @@ export function RegisterPage() {
   const people = (tickets ?? []).filter((t) => !t.is_addon).reduce((sum, t) => sum + (form.qty[t.id] ?? 0), 0)
   const fundPaise = fundPaiseOf(form)
   const total = ticketsTotal + (fundOk(fundPaise) ? fundPaise : 0)
+  // an advance paid before the app (found on the organisers' list by the server) comes off what is paid by UPI
+  const advancePaise = advance && advance.state !== 'review' ? (advance.amount_paise ?? 0) : 0
+  const toPay = Math.max(0, total - advancePaise)
   // a crossed-out price on an extra only applies where the extra is at its own (default) price
   const savings =
     totalSavings((tickets ?? []).filter((t) => !t.is_addon), qtyAll) +
@@ -1034,8 +1038,21 @@ export function RegisterPage() {
                     <dt className="font-semibold">{tx('reg.total', { people: tx('common.people', { count: people }) })}</dt>
                     <dd className="text-xl font-bold tabular-nums">{formatPaise(total)}</dd>
                   </div>
+                  {advancePaise > 0 && (
+                    <>
+                      <KeyValue label={tx('adv.paid')}>
+                        <span className="font-semibold text-success" data-testid="reg-advance">−{formatPaise(advancePaise, { zeroAsFree: false })}</span>
+                      </KeyValue>
+                      <div className="flex items-center justify-between py-3.5">
+                        <dt className="font-semibold">{tx('adv.toPay')}</dt>
+                        <dd className="text-xl font-bold tabular-nums" data-testid="reg-to-pay">{formatPaise(toPay, { zeroAsFree: false })}</dd>
+                      </div>
+                    </>
+                  )}
                 </dl>
               </Card>
+              {advancePaise > 0 && <p className="mt-2 text-sm text-muted">{toPay === 0 ? tx('adv.coveredAll') : tx('adv.note')}</p>}
+              {advance?.state === 'review' && <Notice tone="info" className="mt-2" title={tx('adv.review')} />}
             </div>
             <div className="space-y-2">
               <Checkbox checked={form.photo_consent} onChange={(v) => set('photo_consent', v)}>
@@ -1083,6 +1100,12 @@ export function RegisterPage() {
               <NumberTicker value={total} startOnView={false} duration={600} format={(n) => formatPaise(Math.round(n / 100) * 100)} className="text-stat text-2xl" />
             </span>
           </div>
+          {advancePaise > 0 && (
+            <div className="-mt-1 mb-2 flex items-baseline justify-between gap-3 px-1 text-sm" data-testid="bar-advance">
+              <span className="text-success">{tx('adv.paid')} −{formatPaise(advancePaise, { zeroAsFree: false })}</span>
+              <span className="font-bold tabular-nums">{tx('adv.toPayAmount', { amount: formatPaise(toPay, { zeroAsFree: false }) })}</span>
+            </div>
+          )}
           <div className="flex gap-3">
             {stepIdx > 0 && (
               <Button variant="secondary" size="lg" onClick={() => setStepIdx((i) => i - 1)}>
@@ -1095,7 +1118,7 @@ export function RegisterPage() {
               </Button>
             ) : (
               <Button size="lg" variant="gold" haptic className="fx-shine flex-1" loading={upsert.isPending} onClick={submit} icon={locked ? <Save className="size-5" /> : <Check className="size-5" />}>
-                {locked ? tx('reg.save') : total > 0 ? tx('reg.confirmPay') : tx('reg.confirm')}
+                {locked ? tx('reg.save') : toPay > 0 ? tx('reg.confirmPay') : tx('reg.confirm')}
               </Button>
             )}
           </div>

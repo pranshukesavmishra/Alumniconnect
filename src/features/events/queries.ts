@@ -12,6 +12,26 @@ export const eventKeys = {
   staff: (uid: string | null) => ['my-staff-events', uid] as const,
   questions: (eventId: string) => ['event-questions', eventId] as const,
   experiences: (uid: string | null) => ['my-experiences', uid] as const,
+  advance: (eventId: string, uid: string | null) => ['my-advance', eventId, uid] as const,
+}
+
+/** An advance I paid before the app: 'applied' (on my registration), 'expected' (will be applied when I register) or
+ * 'review' (the organisers are checking which advance is mine). null = none. */
+export interface MyAdvance {
+  state: 'applied' | 'expected' | 'review'
+  amount_paise: number | null
+}
+export function useMyAdvance(eventId: string | undefined) {
+  const uid = useUserId()
+  return useQuery({
+    queryKey: eventKeys.advance(eventId ?? '', uid),
+    enabled: !!eventId && !!uid,
+    queryFn: async (): Promise<MyAdvance | null> => {
+      const { data, error } = await supabase.rpc('my_advance_credit', { p_event: eventId! })
+      if (error) throw error
+      return (data as MyAdvance | null) ?? null
+    },
+  })
 }
 
 /** The organisers' own registration questions (active and inactive; members only see active ones). */
@@ -211,6 +231,7 @@ export function useUpsertRegistration(eventId: string) {
     // awaited, so callers navigate only after the fresh registration is in the cache
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: eventKeys.mine(eventId, uid) })
+      void qc.invalidateQueries({ queryKey: eventKeys.advance(eventId, uid) })
       void qc.invalidateQueries({ queryKey: eventKeys.stats(eventId) })
     },
   })

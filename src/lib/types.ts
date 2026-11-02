@@ -172,7 +172,13 @@ export interface Registration {
   terms_accepted_at: string | null
   photo_consent: boolean
   headcount: number
+  /** the full ticket total (tickets + fund); what is still due = amount_paise less the payments, the advance among them */
   amount_paise: number
+  /** advance paid offline before the app (organisers' advance list), already counted as a verified 'advance' payment */
+  advance_paise?: number
+  /** more than one advance on the list could be this person: an admin decides */
+  advance_review?: boolean
+  advance_manual?: boolean
   admin_note: string | null
   checked_in_at: string | null
   checked_in_by: string | null
@@ -233,7 +239,7 @@ export interface Payment {
   id: string
   registration_id: string
   amount_paise: number
-  method: 'upi' | 'cash' | 'bank_transfer' | 'waiver'
+  method: 'upi' | 'cash' | 'bank_transfer' | 'waiver' | 'advance'
   utr: string | null
   payer_name: string | null
   proof_path: string | null

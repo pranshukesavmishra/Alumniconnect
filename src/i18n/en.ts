@@ -6,6 +6,7 @@ import { designEn } from './designEn'
 import { quickProfileEn } from './quickProfileEn'
 import { shellEn } from './shellEn'
 import { eventsUiEn } from './eventsUiEn'
+import { advanceEn } from './advanceEn'
 import { wowEn } from './wowEn'
 import { peopleUiEn } from './peopleUiEn'
 import { landingEn } from './landingEn'
@@ -1327,6 +1328,7 @@ export const en = {
   ...quickProfileEn,
   ...shellEn,
   ...eventsUiEn,
+  ...advanceEn,
   ...wowEn,
   ...peopleUiEn,
   ...landingEn,
