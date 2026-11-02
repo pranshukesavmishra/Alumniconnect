@@ -181,7 +181,7 @@ as $$
   end;
 $$;
 
--- The identity of a registration for matching: phones (profile, sign-in, registration), emails (sign-in, registration), name, batch, branch.
+-- The identity of a registration for matching: phones (profile, registration; the app has no phone sign-in), emails (sign-in, registration), name, batch, branch.
 create or replace function public._adv_identity(p_registration uuid)
 returns jsonb
 language sql
@@ -190,7 +190,7 @@ security definer
 set search_path = ''
 as $$
   select jsonb_build_object(
-    'phones', to_jsonb(array_remove(array[public._adv_phone(pp.phone), public._adv_phone(u.phone), public._adv_phone(r.phone)], null)),
+    'phones', to_jsonb(array_remove(array[public._adv_phone(pp.phone), public._adv_phone(r.phone)], null)),
     'emails', to_jsonb(array_remove(array[public._adv_email(u.email), public._adv_email(r.email)], null)),
     'name', r.full_name, 'year', coalesce(r.grad_year, p.grad_year), 'branch', coalesce(nullif(r.branch, ''), p.branch))
     from public.event_registrations r
@@ -411,7 +411,7 @@ begin
   else
     select * into me from public.profiles where id = auth.uid();
     select jsonb_build_object(
-             'phones', to_jsonb(array_remove(array[public._adv_phone(pp.phone), public._adv_phone(u.phone)], null)),
+             'phones', to_jsonb(array_remove(array[public._adv_phone(pp.phone)], null)),
              'emails', to_jsonb(array_remove(array[public._adv_email(u.email)], null)),
              'name', me.full_name, 'year', me.grad_year, 'branch', me.branch)
       into ident
