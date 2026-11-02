@@ -1,5 +1,6 @@
 import { m } from 'motion/react'
 import { CalendarHeart, Home, MessagesSquare, Plus, Users, type LucideIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router'
 import { SPRING } from '../../components/ui/Motion'
 import { useT, type MsgKey } from '../../i18n'
@@ -63,6 +64,9 @@ export function BottomTabs({ unread, onCreate, createOpen }: { unread: number; o
   const tx = useT()
   const { pathname } = useLocation()
   const active = activeTab(pathname)
+  const modal = useModalOpen()
+  // a dialog drawn inside the page can sit below this bar (page transitions create their own layer): step aside while one is open
+  if (modal) return null
   return (
     <nav aria-label={tx('nav.main')} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 px-3 pb-[calc(0.6rem+env(safe-area-inset-bottom))] md:hidden">
       <div aria-hidden className="absolute inset-x-0 bottom-0 h-24 bg-[linear-gradient(to_top,var(--bg),transparent)] opacity-80" />
@@ -99,4 +103,17 @@ export function BottomTabs({ unread, onCreate, createOpen }: { unread: number; o
       </ul>
     </nav>
   )
+}
+
+/** True while any modal dialog (aria-modal) is on screen. */
+function useModalOpen(): boolean {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const check = () => setOpen(!!document.querySelector('[aria-modal="true"]'))
+    check()
+    const mo = new MutationObserver(check)
+    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-modal'] })
+    return () => mo.disconnect()
+  }, [])
+  return open
 }

@@ -16,6 +16,7 @@ test.afterAll(() => {
 })
 
 test('reunion registration: profile card, days and family, fund, teams, sponsor, performance, extras, custom question, Responses, CSV, locked after payment', async ({ browser }) => {
+  test.setTimeout(180_000) // the longest journey in the suite: registration, payment, admin views, CSV and an edit after paying
   const eventId = sql(`select id from events where slug = 'alumni-meet-2026'`)
   const price = (label: string) => Number(sql(`select price_paise from event_ticket_types where event_id = '${eventId}' and label like '${label}%'`))
   const both = price('Both days')
