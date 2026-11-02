@@ -56,6 +56,8 @@ insert into public.event_payments (id, registration_id, amount_paise, method, ut
   ('93000000-0000-0000-0000-0000000000e9', '93000000-0000-0000-0000-0000000000d1', 100000, 'upi', '930000000001', 'submitted', '93000000-0000-0000-0000-0000000000c1/proof1.jpg'),
   ('93000000-0000-0000-0000-0000000000ea', '93000000-0000-0000-0000-0000000000d2', 100000, 'upi', '930000000002', 'submitted', '93000000-0000-0000-0000-0000000000c2/proof2.jpg'),
   ('93000000-0000-0000-0000-0000000000eb', '93000000-0000-0000-0000-0000000000d3', 100000, 'upi', '930000000003', 'verified', null);
+insert into public.event_advance_credits (id, event_id, full_name, phone, amount_paise) values
+  ('93000000-0000-0000-0000-0000000000af', '93000000-0000-0000-0000-0000000000e1', 'Adv Open', '+919000093001', 50000);
 insert into public.event_waitlist (id, event_id, user_id, headcount, status) values
   ('93000000-0000-0000-0000-0000000000b9', '93000000-0000-0000-0000-0000000000e1', '93000000-0000-0000-0000-0000000000c2', 1, 'waiting'),
   ('93000000-0000-0000-0000-0000000000ba', '93000000-0000-0000-0000-0000000000e2', '93000000-0000-0000-0000-0000000000c1', 1, 'waiting');
@@ -153,6 +155,14 @@ insert into public.t93_cases values
   ('admin_waitlist', $q$select * from public.admin_waitlist('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'events_registrations'),
   ('review_payment', $q$select public.review_payment('93000000-0000-0000-0000-0000000000e9', true, null)$q$, 'at', 'money_payments'),
   ('record_offline_payment', $q$select public.record_offline_payment('93000000-0000-0000-0000-0000000000d1', 'cash', 100, 'n')$q$, 'at', 'money_payments'),
+  -- advances paid before the app: reading needs any money / registrations permission, changing needs the payments one
+  ('admin_advance_credits', $q$select public.admin_advance_credits('93000000-0000-0000-0000-0000000000e1')$q$, 'at', 'money_payments,money_refunds,money_finance,money_exports,events_registrations'),
+  ('admin_advance_candidates', $q$select public.admin_advance_candidates('93000000-0000-0000-0000-0000000000d1')$q$, 'at', 'money_payments,money_refunds,money_finance,money_exports,events_registrations'),
+  ('admin_add_advance_credits', $q$select public.admin_add_advance_credits('93000000-0000-0000-0000-0000000000e1', '[{"full_name":"Adv Matrix","phone":"+91 90000 93093","amount_paise":50000}]'::jsonb, 'M93')$q$, 'at', 'money_payments'),
+  ('admin_void_advance_credit', $q$select public.admin_void_advance_credit('93000000-0000-0000-0000-0000000000af', 'matrix')$q$, 'at', 'money_payments'),
+  ('admin_apply_advance_credit', $q$select public.admin_apply_advance_credit('93000000-0000-0000-0000-0000000000d1', '93000000-0000-0000-0000-0000000000af', 'matrix')$q$, 'at', 'money_payments'),
+  ('admin_remove_advance_credit', $q$select public.admin_remove_advance_credit('93000000-0000-0000-0000-0000000000d1', 'matrix')$q$, 'at', 'money_payments'),
+  ('admin_dismiss_advance_review', $q$select public.admin_dismiss_advance_review('93000000-0000-0000-0000-0000000000d1')$q$, 'at', 'money_payments'),
   -- the same functions on another event: the event 1 treasurer is refused
   ('admin_event_ledger', $q$select public.admin_event_ledger('93000000-0000-0000-0000-0000000000e2')$q$, 'a', 'money_finance'),
   ('admin_promote_waitlist', $q$select public.admin_promote_waitlist('93000000-0000-0000-0000-0000000000ba')$q$, 'a', 'events_registrations'),

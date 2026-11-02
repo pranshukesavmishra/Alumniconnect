@@ -600,8 +600,8 @@ declare
   v_reason text := btrim(coalesce(p_reason, ''));
 begin
   select * into c from public.event_advance_credits where id = p_credit;
-  if not found then raise exception 'Advance not found'; end if;
-  perform public._adv_require(c.event_id, true);
+  perform public._adv_require(c.event_id, true); -- before telling whether it exists
+  if c.id is null then raise exception 'Advance not found'; end if;
   select * into c from public.event_advance_credits where id = p_credit for update;
   if c.status = 'claimed' then raise exception 'This advance is applied to a registration. Remove it from the registration first.'; end if;
   if c.status = 'void' then raise exception 'This advance is already void.'; end if;
