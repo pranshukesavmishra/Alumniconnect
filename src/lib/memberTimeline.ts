@@ -21,7 +21,7 @@ export interface TimelineLine {
 
 const REG_STATUS: Record<string, string> = { pending_payment: 'payment due', under_review: 'payment under review', confirmed: 'confirmed', cancelled: 'cancelled' }
 const PAY_STATUS: Record<string, string> = { submitted: 'waiting to be verified', verified: 'verified', rejected: 'not received', refunded: 'refunded' }
-const METHOD: Record<string, string> = { upi: 'UPI', cash: 'Cash', bank_transfer: 'Bank transfer', waiver: 'Fee waived' }
+const METHOD: Record<string, string> = { upi: 'UPI', cash: 'Cash', bank_transfer: 'Bank transfer', waiver: 'Fee waived', advance: 'Advance (offline)' }
 const TARGET: Record<string, string> = { post: 'a post', comment: 'a comment', profile: 'a profile', message: 'a chat message' }
 const s = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v))
 

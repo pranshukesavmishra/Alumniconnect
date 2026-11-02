@@ -19,13 +19,14 @@ import { AdminPeople } from './AdminPeople'
 import { AdminSettings } from './AdminSettings'
 import { AdminProgramme } from './AdminProgramme'
 import { PhotoAdminTab } from '../photos/PhotoAdminTab'
+import { AdminAdvances } from './AdminAdvances'
 import { AdminResponses } from './AdminResponses'
 import { AdminTeam } from './AdminTeam'
 import { AdminWaitlist } from './AdminWaitlist'
 import { fundTotals, ticketRevenue } from './responses'
 import { useAdminData, useAdminEvent, useEventCaps, type AdminData } from './queries'
 
-type Tab = 'overview' | 'payments' | 'people' | 'responses' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'photos' | 'settings' | 'team'
+type Tab = 'overview' | 'payments' | 'advances' | 'people' | 'responses' | 'programme' | 'messages' | 'finance' | 'waitlist' | 'dayof' | 'photos' | 'settings' | 'team'
 
 export function AdminEventPage() {
   const { slug = '' } = useParams()
@@ -60,6 +61,7 @@ export function AdminEventPage() {
   const tabs: TabDef[] = ([
     caps.finance && { id: 'overview' as const, label: 'Overview' },
     caps.payments && { id: 'payments' as const, label: 'Payments', count: admin.data?.payments.filter((p) => p.status === 'submitted').length },
+    caps.finance && { id: 'advances' as const, label: 'Advances', count: admin.data?.registrations.filter((r) => r.advance_review && !(r.advance_paise ?? 0) && r.status !== 'cancelled').length || undefined },
     caps.checkin && { id: 'people' as const, label: 'People' },
     caps.finance && { id: 'responses' as const, label: 'Responses' },
     (caps.programme || caps.announce) && { id: 'programme' as const, label: 'Programme' },
@@ -105,7 +107,7 @@ export function AdminEventPage() {
       </div>
       <Page wide className="space-y-4">
         {admin.error && <Notice tone="danger" title={friendlyError(admin.error)} />}
-        {tab !== 'settings' && tab !== 'team' && tab !== 'programme' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && tab !== 'photos' && (
+        {tab !== 'settings' && tab !== 'advances' && tab !== 'team' && tab !== 'programme' && tab !== 'messages' && tab !== 'finance' && tab !== 'waitlist' && tab !== 'dayof' && tab !== 'photos' && (
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" icon={<RefreshCw className={clsx('size-4', admin.isFetching && 'animate-spin')} />} onClick={() => admin.refetch()}>
               Refresh
@@ -114,6 +116,7 @@ export function AdminEventPage() {
         )}
         {tab === 'overview' && (admin.data ? <Overview data={admin.data} /> : <PageSkeleton />)}
         {tab === 'payments' && (admin.data ? <AdminPayments event={data.event} data={admin.data} /> : <PageSkeleton />)}
+        {tab === 'advances' && <AdminAdvances event={data.event} canWrite={caps.payments} />}
         {tab === 'people' && (admin.data ? <AdminPeople event={data.event} data={admin.data} manager={manager} caps={caps} initialQuery={params.get('q') ?? ''} /> : <PageSkeleton />)}
         {tab === 'responses' && (admin.data ? <AdminResponses event={data.event} data={admin.data} /> : <PageSkeleton />)}
         {tab === 'programme' && <AdminProgramme eventId={data.event.id} canAnnounce={caps.announce} canProgramme={caps.programme} />}
@@ -164,6 +167,7 @@ function Overview({ data }: { data: AdminData }) {
     const verified = data.payments.filter((p) => p.status === 'verified')
     const collected = verified.filter((p) => p.method !== 'waiver').reduce((a, p) => a + p.amount_paise, 0)
     const waived = verified.filter((p) => p.method === 'waiver').reduce((a, p) => a + p.amount_paise, 0)
+    const advance = verified.filter((p) => p.method === 'advance').reduce((a, p) => a + p.amount_paise, 0)
     const awaiting = data.payments.filter((p) => p.status === 'submitted')
     const byStatus = (st: string) => live.filter((r) => r.status === st).length
     const people = (list: typeof live) => list.reduce((a, r) => a + r.headcount, 0)
@@ -179,6 +183,7 @@ function Overview({ data }: { data: AdminData }) {
       review: byStatus('under_review'),
       collected,
       waived,
+      advance,
       awaitingAmount: awaiting.reduce((a, p) => a + p.amount_paise, 0),
       awaitingCount: awaiting.length,
       accommodation: paidOrConfirmed.filter((r) => r.needs_accommodation).length,
@@ -196,7 +201,7 @@ function Overview({ data }: { data: AdminData }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Registrations" value={s.total} hint={`${s.pending} unpaid · ${s.review} being verified`} />
         <Stat label="Confirmed" value={s.confirmed} hint={plural(s.confirmedPeople, 'person', 'people')} tone="success" />
-        <Stat label="Collected (verified)" value={formatPaise(s.collected, { zeroAsFree: false })} hint={s.waived ? `${formatPaise(s.waived)} waived` : undefined} tone="success" />
+        <Stat label="Collected (verified)" value={formatPaise(s.collected, { zeroAsFree: false })} hint={[s.advance ? `incl. ${formatPaise(s.advance)} advance (offline)` : '', s.waived ? `${formatPaise(s.waived)} waived` : ''].filter(Boolean).join(' · ') || undefined} tone="success" />
         <Stat label="Awaiting verification" value={formatPaise(s.awaitingAmount, { zeroAsFree: false })} hint={plural(s.awaitingCount, 'payment', 'payments')} tone="accent" />
       </div>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -13,7 +13,7 @@ export interface LedgerFlag {
 
 export interface Ledger {
   period: { from: string | null; to: string | null }
-  totals: { verified: number; refunded: number; net: number; pending: number; pending_count: number; waived: number; payments: number; refunds: number }
+  totals: { verified: number; refunded: number; net: number; pending: number; pending_count: number; waived: number; payments: number; refunds: number; advance?: number; advance_count?: number }
   by_method: { method: string; verified: number; refunded: number; pending: number }[]
   by_day: { day: string; verified: number; refunded: number; pending: number; waived: number }[]
   position: { booked: number; covered: number; awaiting: number; outstanding: number; registrations: number }
@@ -48,7 +48,7 @@ export const FLAGS: Record<FlagKind, { title: string; tone: 'danger' | 'warning'
 
 export const FLAG_ORDER: FlagKind[] = ['overpaid', 'confirmed_underpaid', 'cancelled_holds_money', 'amount_mismatch', 'status_mismatch', 'stale_submitted']
 
-export const METHOD_LABELS: Record<string, string> = { upi: 'UPI', cash: 'Cash', bank_transfer: 'Bank transfer', waiver: 'Waiver', other: 'Other' }
+export const METHOD_LABELS: Record<string, string> = { upi: 'UPI', cash: 'Cash', bank_transfer: 'Bank transfer', waiver: 'Waiver', advance: 'Advance (offline)', other: 'Other' }
 
 /** Member-typed text: a leading = + - @ would run as a formula in Excel. */
 export const spreadsheetSafe = (v: string | null | undefined) => {
@@ -88,7 +88,8 @@ export function ledgerSummaryRecords(l: Ledger): Record<string, string>[] {
       'Net (₹)': verified === '' || refunded === '' ? '' : rupees(verified - refunded), 'Awaiting verification (₹)': pending === '' ? '' : rupees(pending), Note: note,
     })
   const t = l.totals
-  add('Totals', l.period.from || l.period.to ? `${l.period.from ?? 'start'} to ${l.period.to ?? 'today'}` : 'All time', t.verified, t.refunded, t.pending, `${t.waived ? `Waived: ₹${rupees(t.waived)}` : ''}`)
+  add('Totals', l.period.from || l.period.to ? `${l.period.from ?? 'start'} to ${l.period.to ?? 'today'}` : 'All time', t.verified, t.refunded, t.pending, [t.waived ? `Waived: ₹${rupees(t.waived)}` : '', t.advance ? `Includes advance (offline): ₹${rupees(t.advance)}` : ''].filter(Boolean).join('; '))
+  if (t.advance) add('Totals', 'Advance (offline), paid before the app', t.advance, '', '', `${t.advance_count ?? 0} people`)
   for (const m of l.by_method) add('By method', METHOD_LABELS[m.method] ?? m.method, m.verified, m.refunded, m.pending)
   for (const d of l.by_day) add('By day', d.day, d.verified, d.refunded, d.pending, d.waived ? `Waived: ₹${rupees(d.waived)}` : '')
   for (const k of l.by_ticket) add('By ticket type (booked, estimate of collected)', `${k.label} × ${k.quantity}`, k.collected, '', '', `Booked ₹${rupees(k.booked)}`)

@@ -209,7 +209,10 @@ export function AdminPayments({ event, data }: { event: EventRow; data: AdminDat
 
 function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSelect }: { p: Payment; reg?: Registration; match?: MatchResult; onApprove: () => void; onReject: () => void; busy: boolean; selected?: boolean; onSelect?: (v: boolean) => void }) {
   const [opening, setOpening] = useState(false)
-  const short = reg && p.amount_paise < reg.amount_paise
+  // an advance paid before the app is already on record: the member pays (and the treasurer checks) only the rest
+  const advance = reg?.advance_paise ?? 0
+  const dueTotal = reg ? Math.max(0, reg.amount_paise - advance) : 0
+  const short = reg && p.amount_paise < dueTotal
   return (
     <li>
       <Card className={clsx('p-4', match?.status === 'matched' && 'border-success', selected && 'border-primary')}>
@@ -231,6 +234,7 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSel
             <p className="text-xl font-bold tabular-nums">{formatPaise(p.amount_paise)}</p>
             <p className="text-xs text-muted">{relativeTime(p.created_at)}</p>
             {!!reg?.fund_paise && <p className="text-xs text-muted">incl. {formatPaise(reg.fund_paise)} Reunion Fund</p>}
+            {advance > 0 && <p className="text-xs font-semibold text-success" data-testid="payment-advance">{`Advance (offline) ${formatPaise(advance)} already paid · total ${formatPaise(reg!.amount_paise)}`}</p>}
           </div>
         </div>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
@@ -260,7 +264,7 @@ function PaymentCard({ p, reg, match, onApprove, onReject, busy, selected, onSel
             </dd>
           </div>
         </dl>
-        {short && <Notice tone="warning" className="mt-3" title={`Partial payment: total due is ${formatPaise(reg.amount_paise)}`} />}
+        {short && <Notice tone="warning" className="mt-3" title={`Partial payment: total due is ${formatPaise(dueTotal)}`} />}
         {match && (
           <div className="mt-3 text-sm">
             {match.status === 'matched' && <Badge tone="success">Matches bank statement</Badge>}

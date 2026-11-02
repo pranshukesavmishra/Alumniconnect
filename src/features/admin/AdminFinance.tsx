@@ -83,6 +83,7 @@ export function AdminFinance({ event }: { event: EventRow }) {
         <Figure label="Covered so far" value={money(l.position.covered)} hint={`${pct}% of booked (incl. waivers)`} tone="success" />
         <Figure label="Still to collect" value={money(l.position.outstanding)} hint="Not paid and not waiting" tone={l.position.outstanding ? 'warning' : undefined} />
         <Figure label="Waived" value={money(l.totals.waived)} hint="Fee waivers and discounts" />
+        {(l.totals.advance ?? 0) > 0 && <Figure label="Advance (offline)" value={money(l.totals.advance ?? 0)} hint="Paid before the app, counted in verified" tone="success" />}
       </div>
 
       <section className="space-y-3" aria-label="Discrepancies">

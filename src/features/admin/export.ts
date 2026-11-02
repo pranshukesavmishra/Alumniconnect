@@ -1,3 +1,4 @@
+import { METHOD_LABELS } from '../../lib/ledger'
 import Papa from 'papaparse'
 import { downloadFile } from '../../lib/ics'
 import { FOOD_PREFS } from '../../lib/constants'
@@ -42,7 +43,11 @@ export function exportRegistrations(event: EventRow, d: AdminData) {
   const itemsBy = new Map<string, string>()
   for (const i of d.items) itemsBy.set(i.registration_id, [itemsBy.get(i.registration_id), `${i.label} x${i.quantity}${i.names?.length ? ` (${i.names.join(', ')})` : ''}`].filter(Boolean).join('; '))
   const paidBy = new Map<string, number>()
-  for (const p of d.payments) if (p.status === 'verified' && p.method !== 'waiver') paidBy.set(p.registration_id, (paidBy.get(p.registration_id) ?? 0) + p.amount_paise)
+  const coveredBy = new Map<string, number>()
+  for (const p of d.payments) {
+    if (p.status === 'verified' && p.method !== 'waiver' && p.method !== 'advance') paidBy.set(p.registration_id, (paidBy.get(p.registration_id) ?? 0) + p.amount_paise)
+    if (p.status === 'verified' || p.status === 'submitted') coveredBy.set(p.registration_id, (coveredBy.get(p.registration_id) ?? 0) + p.amount_paise)
+  }
   saveCsv(
     `${event.slug}-registrations-${stamp()}.csv`,
     d.registrations.map((r) => ({
@@ -59,8 +64,12 @@ export function exportRegistrations(event: EventRow, d: AdminData) {
       'With them': safe(r.guests.map((g) => `${g.name || '(no name)'} (${g.relation ?? ''})`).join('; ')),
       'Tickets (₹)': rupees(r.amount_paise - r.fund_paise),
       'Reunion Fund (₹)': rupees(r.fund_paise),
-      'Amount due (₹)': rupees(r.amount_paise),
+      'Total (₹)': rupees(r.amount_paise),
+      'Advance (offline) (₹)': rupees(r.advance_paise ?? 0),
       'Paid, verified (₹)': rupees(paidBy.get(r.id) ?? 0),
+      // the total less the advance, verified money, waivers and payments waiting for verification
+      'Amount due (₹)': rupees(Math.max(0, r.amount_paise - (coveredBy.get(r.id) ?? 0))),
+      'Advance needs review': r.advance_review ? 'Yes' : '',
       Food: food(r.food_pref),
       'T-shirt': r.tshirt_size ?? '',
       'Needs accommodation': r.needs_accommodation ? 'Yes' : 'No',
@@ -95,7 +104,7 @@ export function exportPayments(event: EventRow, d: AdminData) {
       Name: safe(reg.get(p.registration_id)?.full_name),
       'Amount (₹)': rupees(p.amount_paise),
       'Of which Reunion Fund (₹)': rupees(Math.min(p.amount_paise, reg.get(p.registration_id)?.fund_paise ?? 0)),
-      Method: p.method,
+      Method: METHOD_LABELS[p.method] ?? p.method,
       UTR: asText(p.utr),
       'Paid by': safe(p.payer_name),
       Status: p.status,

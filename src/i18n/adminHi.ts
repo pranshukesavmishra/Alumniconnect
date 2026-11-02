@@ -2,9 +2,11 @@
 // the Hindi side refers to those parts as {1}, {2}... in the order they appear in the English key. A key that starts with
 // `{} ` only matches a number first (so "{} members" never swallows "Select members"). Used by adminTranslate.ts.
 import { ADMIN_HI_WOW } from './adminHiWow'
+import { ADMIN_HI_ADVANCE } from './adminHiAdvance'
 
 export const ADMIN_HI: Record<string, string> = {
   ...ADMIN_HI_WOW,
+  ...ADMIN_HI_ADVANCE,
   "Content": "सामग्री",
   "Added a glimpse video": "झलक वीडियो जोड़ा",
   "Changed a glimpse video": "झलक वीडियो बदला",

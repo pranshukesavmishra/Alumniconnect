@@ -18,6 +18,7 @@ import { useRecordOfflinePayment, type AdminData } from './queries'
 import { RegistrationAdjustments } from './RegistrationAdjustments'
 import { extraPeople } from '../events/reunion'
 import { AdminReunionDetail } from './AdminReunionDetail'
+import { AdvancePanel } from './AdvancePanel'
 import { RegistrationEditor } from './RegistrationEditor'
 import { usePaged } from '../../lib/paging'
 import { formatPhone, phoneMatches, telHref, whatsappDigits } from '../../lib/phone'
@@ -97,6 +98,9 @@ export function AdminPeople({ event, data, manager, caps, initialQuery = '' }: {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <StatusBadge status={r.status} />
+                  {manager && r.advance_review && (r.advance_paise ?? 0) === 0 && r.status !== 'cancelled' && (
+                    <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-bold text-warning" data-testid="advance-review-flag">Needs review: possible advance match</span>
+                  )}
                   {manager && <span className="text-sm font-semibold tabular-nums">{formatPaise(r.amount_paise)}</span>}
                 </div>
               </button>
@@ -178,11 +182,14 @@ function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registratio
             <KeyValue label="Registered">{formatDateTime(reg.created_at)}</KeyValue>
             {reg.checked_in_at && <KeyValue label="Checked in">{formatDateTime(reg.checked_in_at)}</KeyValue>}
             {manager && <KeyValue label="Total">{formatPaise(reg.amount_paise)}</KeyValue>}
+            {manager && (reg.advance_paise ?? 0) > 0 && <KeyValue label="Advance (offline)">{`−${formatPaise(reg.advance_paise ?? 0)}`}</KeyValue>}
+            {manager && <KeyValue label="Amount due">{formatPaise(due, { zeroAsFree: false })}</KeyValue>}
           </dl>
         </Card>
 
         <AdminReunionDetail event={event} reg={reg} manager={manager} />
 
+        {manager && <AdvancePanel key={`adv:${reg.id}:${reg.updated_at}`} reg={reg} canWrite={caps?.payments ?? true} />}
         {manager && (caps?.registrations ?? true) && <RegistrationEditor key={`${reg.id}:${reg.updated_at}`} reg={reg} items={items} />}
         {manager && <RegistrationAdjustments key={`adj:${reg.id}:${reg.updated_at}`} reg={reg} payments={payments} due={due} onClose={onClose} canTransfer={caps?.registrations ?? true} canMoney={caps?.refunds ?? true} />}
 
@@ -197,7 +204,7 @@ function Detail({ reg, data, manager, caps, event, onClose }: { reg: Registratio
                   <div key={p.id} className="flex items-center justify-between gap-3 p-3 text-sm">
                     <div className="min-w-0">
                       <p className="font-semibold tabular-nums">
-                        {formatPaise(p.amount_paise)} · {p.method.replace('_', ' ')}
+                        {formatPaise(p.amount_paise)} · {p.method === 'advance' ? 'Advance (offline)' : p.method.replace('_', ' ')}
                       </p>
                       <p className="truncate text-muted">{[p.utr, p.review_note].filter(Boolean).join(' · ') || formatDateTime(p.created_at)}</p>
                     </div>
