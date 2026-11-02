@@ -1,0 +1,63 @@
+{
+  "phone": [
+    ["9876543210", "+919876543210"],
+    ["098765 43210", "+919876543210"],
+    ["+91 98765 43210", "+919876543210"],
+    ["+91-98765-43210", "+919876543210"],
+    ["919876543210", "+919876543210"],
+    ["+910 98765 43210", "+919876543210"],
+    ["0091 98765 43210", "+919876543210"],
+    ["'9876543210", "+919876543210"],
+    ["+44 7700 900123", "+447700900123"],
+    ["+1 (415) 555-0100", "+14155550100"],
+    ["12345", null],
+    ["5876543210", null],
+    ["", null]
+  ],
+  "email": [
+    [" Asha.Rao @Example.com ", "asha.rao@example.com"],
+    ["ASHA.RAO@EXAMPLE.COM", "asha.rao@example.com"],
+    ["asha rao@example.com", "asharao@example.com"],
+    ["not-an-email", null],
+    ["", null]
+  ],
+  "name": [
+    ["Dr. A.K. Sharma", "ak sharma"],
+    ["Er. Rahul  Kumar Sharma", "rahul kumar sharma"],
+    ["Mrs.Neha Verma", "neha verma"],
+    ["MR NEHA VERMA", "neha verma"],
+    ["Drashti Patel", "drashti patel"],
+    ["Ravi O'Brien-Singh", "ravi obrien singh"],
+    ["  Amit   Jain. ", "amit jain"]
+  ],
+  "name_first_last": [
+    ["Er. Rahul Kumar Sharma", "rahul sharma"],
+    ["Rahul Sharma", "rahul sharma"],
+    ["Rahul", null]
+  ],
+  "branch": [
+    ["B.E. in Electronics & Telecommunications", "electronic telecommunication"],
+    ["Electronics & Telecommunication Engineering", "electronic telecommunication"],
+    ["Electronics and Telecommunication Engg.", "electronic telecommunication"],
+    ["E&TC", "electronic telecommunication"],
+    ["ETC", "electronic telecommunication"],
+    ["ECE", "electronic telecommunication"],
+    ["Electronics & Communication", "electronic telecommunication"],
+    ["B.E. in Computer Science & Engineering", "computer science"],
+    ["CSE", "computer science"],
+    ["BE (CSE)", "computer science"],
+    ["Computer Science", "computer science"],
+    ["B.E. in Information Technology", "information technology"],
+    ["IT", "information technology"],
+    ["B.E. in Electrical Engineering", "electrical"],
+    ["EE", "electrical"],
+    ["B.E. in Mechanical Engineering", "mechanical"],
+    ["Mech", "mechanical"],
+    ["B.E. in Civil Engineering", "civil"],
+    ["B.E. Industrial & Production Engineering", "industrial production"],
+    ["IP", "industrial production"],
+    ["MCA", "mca"],
+    ["M.E. in Communication Systems", "me communication system"],
+    ["", ""]
+  ]
+}
